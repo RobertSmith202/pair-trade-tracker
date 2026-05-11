@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Pair Trades">
+<meta name="theme-color" content="#1a1a1a">
+<title>Pair Trade Tracker</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='36' fill='%231a1a1a'/><text x='50%25' y='58%25' text-anchor='middle' fill='white' font-size='90' font-family='-apple-system' font-weight='700'>L|S</text></svg>">
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231a1a1a'/><text x='50%25' y='62%25' text-anchor='middle' fill='white' font-size='28' font-weight='700' font-family='sans-serif'>L|S</text></svg>">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root { color-scheme: light dark; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; } }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom) 14px; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; }
+header { padding: 14px 0 10px; }
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+.subtitle { color: var(--muted); font-size: 13px; }
+.aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 14px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.agg-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+.agg-cell .value { font-size: 22px; font-weight: 700; line-height: 1.1; padding: 2px 6px; margin: -2px -6px; border-radius: 6px; transition: background-color 0.05s linear; }
+.agg-cell .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.agg-cell.wide { grid-column: 1 / -1; }
+.agg-cell.wide .value { font-size: 28px; }
+button, select { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 11px 16px; border-radius: 9px; cursor: pointer; font-size: 14px; font-weight: 500; min-height: 44px; -webkit-appearance: none; appearance: none; touch-action: manipulation; }
+button:active { transform: scale(0.98); }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+button.danger { color: var(--neg); border-color: var(--neg-bg); }
+button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+.toolbar button { flex: 1 1 auto; min-width: 0; }
+.toolbar .menu-btn { flex: 0 0 auto; }
+.statusbar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); padding: 4px 4px 12px; gap: 8px; flex-wrap: wrap; }
+.status.loading::before { content: "● "; color: #ff9800; animation: pulse 1s infinite; }
+.status.ok::before { content: "● "; color: var(--pos); }
+.status.err::before { content: "● "; color: var(--neg); }
+.status.off::before { content: "○ "; color: var(--muted); }
+@keyframes pulse { 50% { opacity: 0.3; } }
+.form-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; display: none; }
+.form-card.open { display: block; }
+.form-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+.form-card .form-help { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 8px; margin-bottom: 12px; line-height: 1.4; }
+.form-section { padding: 12px; border-radius: 10px; margin-bottom: 10px; }
+.form-section.long { background: var(--pos-soft); border-left: 3px solid var(--pos); }
+.form-section.short { background: var(--neg-soft); border-left: 3px solid var(--neg); }
+.form-section.alarm { background: rgba(255,152,0,0.06); border-left: 3px solid #ff9800; }
+.form-section h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+.form-section.long h4 { color: var(--pos); }
+.form-section.short h4 { color: var(--neg); }
+.form-section.alarm h4 { color: #ef6c00; }
+.field { margin-bottom: 8px; }
+.field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
+.field .help { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.field input, .field select { width: 100%; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--card); color: var(--text); -webkit-appearance: none; appearance: none; }
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; cursor: pointer; }
+.checkbox-row input[type=checkbox] { width: 20px; height: 20px; min-width: 20px; flex-shrink: 0; cursor: pointer; }
+.checkbox-row label { font-size: 12px; color: var(--text); margin: 0; cursor: pointer; line-height: 1.3; }
+.form-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.form-actions button { flex: 1; min-width: 100px; }
+.trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 80px; }
+.trade-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.trade-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.trade-name { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
+.trade-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.trade-perf { padding: 12px 14px; border-radius: 10px; background: var(--bg); margin-bottom: 12px; display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: baseline; }
+.trade-perf .pnl-abs { font-size: 22px; font-weight: 700; line-height: 1.1; padding: 2px 6px; margin: -2px -6px; border-radius: 6px; transition: background-color 0.05s linear; }
+.trade-perf .pnl-pct { font-size: 18px; font-weight: 700; padding: 3px 11px; border-radius: 6px; }
+.trade-perf .meta { grid-column: 1 / -1; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.alarm-row { display: inline-block; font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-top: 4px; }
+.alarm-row.watching { background: rgba(46,125,50,0.1); color: var(--pos); }
+.alarm-row.triggered { background: var(--neg-bg); color: var(--neg); font-weight: 700; animation: pulse 1.5s infinite; }
+.alarm-row.acked { background: rgba(120,120,120,0.15); color: var(--muted); }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+.pnl-pct.pos { background: var(--pos-bg); color: var(--pos); }
+.pnl-pct.neg { background: var(--neg-bg); color: var(--neg); }
+.pnl-pct.neutral { background: var(--border); color: var(--muted); }
+.legs { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.leg { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.leg.long { background: var(--pos-soft); }
+.leg.short { background: var(--neg-soft); }
+.leg .leg-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
+.leg .side { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
+.leg.long .side { background: var(--pos); color: white; }
+.leg.short .side { background: var(--neg); color: white; }
+.leg .ticker { font-weight: 700; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leg .row { display: flex; justify-content: space-between; padding: 2px 6px; margin: 0 -6px; border-radius: 4px; color: var(--muted); font-size: 12px; gap: 8px; transition: background-color 0.05s linear; }
+.leg .row .v { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+.leg .pnl-line { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); font-weight: 700; font-size: 13px; }
+.leg .fx-note { font-size: 10px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.leg .ccy-tag { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: var(--border); color: var(--muted); margin-left: 6px; }
+@keyframes flashUp { 0% { background-color: rgba(46, 125, 50, 0.40); } 25% { background-color: rgba(46, 125, 50, 0.35); } 100% { background-color: transparent; } }
+@keyframes flashDown { 0% { background-color: rgba(176, 0, 32, 0.40); } 25% { background-color: rgba(176, 0, 32, 0.35); } 100% { background-color: transparent; } }
+.flash-up { animation: flashUp 900ms ease-out; }
+.flash-down { animation: flashDown 900ms ease-out; }
+.empty { background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 50px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+.warn-box { font-size: 11px; color: var(--warn); margin-top: 8px; padding: 6px 10px; background: rgba(184,133,0,0.08); border-radius: 6px; }
+.info-box { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 8px; margin-bottom: 10px; line-height: 1.45; }
+.muted { color: var(--muted); }
+.tabular { font-variant-numeric: tabular-nums; }
+.menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 100; align-items: flex-end; }
+.menu-overlay.open { display: flex; }
+.menu-sheet { background: var(--card); width: 100%; max-width: 640px; margin: 0 auto; border-radius: 16px 16px 0 0; padding: 14px 14px calc(env(safe-area-inset-bottom) + 14px) 14px; display: flex; flex-direction: column; gap: 8px; max-height: 85vh; overflow-y: auto; }
+.menu-sheet h4 { font-size: 12px; color: var(--muted); margin: 8px 4px 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.menu-sheet button { justify-content: flex-start; text-align: left; width: 100%; }
+.io-textarea { width: 100%; min-height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; resize: vertical; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--card); width: 100%; max-width: 520px; padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 16px; font-weight: 700; }
+.modal h4.section-h { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.modal h4.section-h:first-of-type { border-top: none; padding-top: 0; }
+.modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.modal-actions button { flex: 1; min-width: 100px; }
+.test-result { padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+.test-result.ok { background: var(--pos-bg); color: var(--pos); }
+.test-result.err { background: var(--neg-bg); color: var(--neg); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 data-i18n="app_title">Pair Trade Tracker</h1>
+  <div class="subtitle" data-i18n="header_subtitle">Long − Short · Yahoo via Cloudflare Worker · Auto-Refresh · Telegram-Alarm</div>
+</header>
+
+<div class="aggregate" id="aggregate">
+  <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" id="agg-pnl">—</div><div class="sub" id="agg-pnl-sub">&nbsp;</div></div>
+  <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" id="agg-pct">—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
+  <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" id="agg-notional">—</div><div class="sub" id="agg-count-sub">0 Trades</div></div>
+</div>
+
+<div class="toolbar">
+  <button class="primary" id="btn-new" data-i18n="btn_new_trade">+ Neuer Trade</button>
+  <button id="btn-refresh" data-i18n="btn_refresh">↻ Kurse</button>
+  <button class="menu-btn icon" id="btn-menu" aria-label="Menü">⋯</button>
+</div>
+<div class="statusbar">
+  <div class="status" id="status" data-i18n="status_ready">Bereit</div>
+  <div class="status" id="auto-status">⏱ …</div>
+  <div class="status off" id="sync-status" data-i18n="status_sync_off">Sync aus</div>
+</div>
+
+<div class="form-card" id="form">
+  <h3 id="form-title" data-i18n="form_title_new">Neuer Pair Trade</h3>
+  <div class="form-help" id="form-help-currency"></div>
+  <div class="field"><label data-i18n="form_trade_name">Trade-Name (frei)</label><input id="f-name" type="text" data-i18n-placeholder="form_trade_name_ph" placeholder="z.B. SAP vs Oracle"></div>
+  <div class="form-section long">
+    <h4 data-i18n="form_long_position">Long-Position</h4>
+    <div class="field"><label data-i18n="form_ticker">Ticker (Yahoo-Format)</label><input id="f-long-ticker" type="text" autocapitalize="characters" autocorrect="off" autocomplete="off"></div>
+    <div class="field-row">
+      <div class="field"><label data-i18n="form_qty">Anzahl Aktien</label><input id="f-long-qty" type="text" inputmode="decimal" autocomplete="off" placeholder="100"></div>
+      <div class="field"><label data-i18n="form_entry">Einstand</label><input id="f-long-entry" type="text" inputmode="decimal" autocomplete="off" placeholder="150,50"></div>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="f-long-native">
+      <label for="f-long-native" id="f-long-native-label"></label>
+    </div>
+  </div>
+  <div class="form-section short">
+    <h4 data-i18n="form_short_position">Short-Position</h4>
+    <div class="field"><label data-i18n="form_ticker">Ticker (Yahoo-Format)</label><input id="f-short-ticker" type="text" autocapitalize="characters" autocorrect="off" autocomplete="off"></div>
+    <div class="field-row">
+      <div class="field"><label data-i18n="form_qty">Anzahl Aktien</label><input id="f-short-qty" type="text" inputmode="decimal" autocomplete="off" placeholder="100"></div>
+      <div class="field"><label data-i18n="form_entry">Einstand</label><input id="f-short-entry" type="text" inputmode="decimal" autocomplete="off" placeholder="150,50"></div>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="f-short-native">
+      <label for="f-short-native" id="f-short-native-label"></label>
+    </div>
+  </div>
+  <div class="form-section alarm">
+    <h4 data-i18n="form_alarm_title">🚨 Telegram-Alarm (optional)</h4>
+    <div class="field">
+      <label data-i18n="form_alarm_pct_label">Alarm bei Performance unter % (negative Zahl)</label>
+      <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="-30">
+      <div class="help" data-i18n="form_alarm_pct_help"></div>
+    </div>
+  </div>
+  <div class="form-actions"><button id="f-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="f-save" data-i18n="btn_save">Speichern</button></div>
+</div>
+
+<div id="trade-list" class="trade-list"></div>
+
+<div class="menu-overlay" id="menu-overlay">
+  <div class="menu-sheet">
+    <h4 data-i18n="menu_actions">Aktionen</h4>
+    <button id="m-sync-now" data-i18n="menu_sync_now">Jetzt syncen</button>
+    <button id="m-settings" data-i18n="btn_settings">Einstellungen</button>
+    <h4 data-i18n="menu_data_mgmt">Datenverwaltung</h4>
+    <button id="m-export" data-i18n="menu_export">Export (JSON kopieren)</button>
+    <button id="m-import" data-i18n="menu_import">Import (JSON einfügen)</button>
+    <button id="m-clear" class="danger" data-i18n="menu_clear_all">Alle Trades löschen</button>
+    <h4></h4>
+    <button id="m-close" data-i18n="btn_close">Schließen</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h3 data-i18n="settings_title">Einstellungen</h3>
+
+    <h4 class="section-h" data-i18n="settings_language">Sprache</h4>
+    <div class="info-box" data-i18n="settings_language_info"></div>
+    <div class="field">
+      <label data-i18n="settings_language_label">Sprache</label>
+      <select id="lang-select">
+        <option value="de">Deutsch</option>
+        <option value="en">English</option>
+        <option value="it">Italiano</option>
+        <option value="ru">Русский</option>
+      </select>
+    </div>
+
+    <h4 class="section-h" data-i18n="settings_home_ccy">Heimat-Währung</h4>
+    <div class="info-box" data-i18n="settings_home_ccy_info"></div>
+    <div class="field"><label data-i18n="settings_home_ccy_label">ISO-Code (EUR, USD, GBP, CHF, ...)</label><input id="home-ccy" type="text" autocapitalize="characters" autocorrect="off" autocomplete="off" placeholder="EUR" maxlength="3"></div>
+
+    <h4 class="section-h" data-i18n="settings_worker_title">Live-Kurse · Cloudflare Worker</h4>
+    <div class="info-box" data-i18n="settings_worker_info"></div>
+    <div class="field"><label data-i18n="settings_worker_label">Worker-URL</label><input id="worker-url" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="https://yahoo-finance-proxy.dein-name.workers.dev"></div>
+    <div id="price-test-result" style="display:none;"></div>
+
+    <h4 class="section-h" data-i18n="settings_sync_title">Sync · JSONBin</h4>
+    <div class="info-box" data-i18n="settings_sync_info"></div>
+    <div class="field"><label data-i18n="settings_sync_key">X-Master-Key</label><input id="sync-key" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="$2a$10$..."></div>
+    <div class="field"><label data-i18n="settings_sync_bin">Bin-ID</label><input id="sync-bin" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="65f..."></div>
+    <div id="sync-test-result" style="display:none;"></div>
+
+    <div class="modal-actions">
+      <button id="settings-cancel" data-i18n="btn_cancel">Abbrechen</button>
+      <button id="settings-test" data-i18n="btn_test_both">Beides testen</button>
+      <button id="settings-save" class="primary" data-i18n="btn_save">Speichern</button>
+    </div>
+    <div class="modal-actions" style="margin-top:4px;">
+      <button id="sync-disable" class="danger" style="flex:1;" data-i18n="settings_sync_disable">Sync ausschalten</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================== I18N STRINGS DICTIONARY ===========================
+const STRINGS = {
+  de: {
+    html_lang: "de",
+    app_title: "Pair Trade Tracker",
+    header_subtitle: "Long − Short · Yahoo via Cloudflare Worker · Auto-Refresh · Telegram-Alarm",
+    agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
+    agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
+    agg_trades_count: "{n} {plural}", agg_trade_singular: "Trade", agg_trade_plural: "Trades",
+    agg_partial: " · {n} unvollständig", agg_loading: "Lädt...", agg_no_trades: "Noch keine Trades",
+    btn_new_trade: "+ Neuer Trade", btn_refresh: "↻ Kurse", btn_save: "Speichern", btn_cancel: "Abbrechen",
+    btn_close: "Schließen", btn_edit: "Bearbeiten", btn_import: "Importieren", btn_test_both: "Beides testen",
+    btn_settings: "Einstellungen",
+    status_ready: "Bereit", status_loading_prices: "Lade Kurse…", status_updated: "Aktualisiert {time}",
+    status_no_worker_url: "Keine Worker-URL (⋯ → Einstellungen)",
+    status_ticker_errors: "{time} · {err}/{total} Ticker fehlerhaft",
+    status_auto_off: "⏱ Auto-Refresh: aus", status_auto_outside_hours: "⏱ Auto-Refresh: außerhalb Handelszeit",
+    status_auto_next: "⏱ Nächster Auto-Refresh: {time}", status_auto_active: "⏱ Auto-Refresh: aktiv (alle 1 Min)",
+    status_sync_off: "Sync aus", status_sync_active: "Sync aktiv", status_pull: "Pull…", status_push: "Push…",
+    status_sync_synced: "synchron · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
+    status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
+    form_title_new: "Neuer Pair Trade", form_title_edit: "Pair Trade bearbeiten",
+    form_help_currency: "Standard: Einstand wird in <strong>{ccy}</strong> interpretiert (pfadunabhängig fixiert). Häkchen setzen wenn der Einstand stattdessen in der Notierungswährung der Aktie gemeint ist. Ticker im Yahoo-Format (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
+    form_trade_name: "Trade-Name (frei)", form_trade_name_ph: "z.B. SAP vs Oracle",
+    form_long_position: "Long-Position", form_short_position: "Short-Position",
+    form_ticker: "Ticker (Yahoo-Format)", form_qty: "Anzahl Aktien", form_entry: "Einstand",
+    form_native_checkbox: "Einstand in Notierungswährung der Aktie (statt {ccy})",
+    form_alarm_title: "🚨 Telegram-Alarm (optional)", form_alarm_pct_label: "Alarm bei Performance unter % (negative Zahl)",
+    form_alarm_pct_help: "Leer = aus. Beispiel: <code>-30</code> = Alarm ab 30% Verlust auf Notional. Telegram-Wiederholung alle 3 Min bis du quittierst.",
+    card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
+    card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
+    card_delete_confirm: "„{name}\" löschen?",
+    alarm_watching: "🔔 Alarm wachend — Schwelle {pct}",
+    alarm_triggered: "🚨 ALARM AUSGELÖST · Nachricht {n} · Schwelle {pct} — auf Telegram quittieren",
+    alarm_acknowledged: "✓ Quittiert · wird neu scharf bei Erholung über {pct}",
+    menu_actions: "Aktionen", menu_data_mgmt: "Datenverwaltung", menu_sync_now: "Jetzt syncen",
+    menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
+    settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
+    settings_language_info: "Pro Gerät gespeichert (nicht synced).",
+    settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
+    settings_home_ccy_info: "Alle PnL-Werte und Notionals in dieser Währung. Standard für Einstand-Eingabe bei neuen Trades. Bei bestehenden Trades bleibt die Einstands-Whg pfadunabhängig fix.",
+    settings_worker_title: "Live-Kurse · Cloudflare Worker", settings_worker_info: "URL deines Yahoo-Finance-Proxy-Workers (workers.dev).",
+    settings_worker_label: "Worker-URL",
+    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master-Key + Bin-ID von jsonbin.io.",
+    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin-ID",
+    settings_sync_disable: "Sync ausschalten", settings_sync_disable_confirm: "Sync ausschalten? Lokale Daten bleiben erhalten.",
+    test_worker_loading: "Worker testen…", test_sync_loading: "JSONBin testen…",
+    test_worker_ok: "OK — AAPL aktuell {price} {ccy}", test_worker_no_price: "Antwort unerwartet",
+    test_worker_no_url: "Worker: Keine URL eingegeben", test_sync_ok: "OK — Bin enthält {n} Trade(s)",
+    test_sync_no_creds: "JSONBin: Key oder Bin-ID fehlt",
+    test_worker_prefix: "Worker: ", test_sync_prefix: "JSONBin: ",
+    io_title: "Import / Export", io_export_btn: "Export (in Zwischenablage)",
+    io_input_label: "JSON zum Importieren einfügen:", io_paste_title: "JSON einfügen",
+    io_clipboard_ok: "Trades als JSON in Zwischenablage kopiert.", io_clipboard_prompt: "Kopiere diesen JSON-Text:",
+    io_invalid_json: "Ungültiges JSON: {err}", io_no_valid_trades: "Kein gültiger Trade gefunden.",
+    io_replace_confirm: "Bestehende {existing} Trade(s) durch {new} importierte ersetzen? (Abbrechen = anhängen)",
+    io_clear_confirm: "Wirklich ALLE Trades löschen?",
+    err_ticker_required: "Bitte beide Ticker eingeben.", err_long_invalid: "Long: Anzahl und Einstand müssen > 0 sein.",
+    err_short_invalid: "Short: Anzahl und Einstand müssen > 0 sein.",
+    err_alarm_invalid: "Alarm-Schwelle: ungültige Zahl. Beispiel: -30",
+    err_no_ticker: "Kein Ticker", err_no_data: "Keine Daten", err_no_price_feed: "Kein Preis im Feed",
+    err_no_worker_url: "Keine Worker-URL (⋯ → Einstellungen)",
+    empty_no_trades_full: "Noch keine Pair Trades. Tippe oben auf <strong>+ Neuer Trade</strong>.",
+  },
+  en: {
+    html_lang: "en",
+    app_title: "Pair Trade Tracker",
+    header_subtitle: "Long − Short · Yahoo via Cloudflare Worker · Auto-Refresh · Telegram alerts",
+    agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
+    agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
+    agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trades",
+    agg_partial: " · {n} incomplete", agg_loading: "Loading...", agg_no_trades: "No trades yet",
+    btn_new_trade: "+ New Trade", btn_refresh: "↻ Quotes", btn_save: "Save", btn_cancel: "Cancel",
+    btn_close: "Close", btn_edit: "Edit", btn_import: "Import", btn_test_both: "Test both",
+    btn_settings: "Settings",
+    status_ready: "Ready", status_loading_prices: "Loading quotes…", status_updated: "Updated {time}",
+    status_no_worker_url: "No Worker URL (⋯ → Settings)",
+    status_ticker_errors: "{time} · {err}/{total} tickers failed",
+    status_auto_off: "⏱ Auto-refresh: off", status_auto_outside_hours: "⏱ Auto-refresh: outside trading hours",
+    status_auto_next: "⏱ Next auto-refresh: {time}", status_auto_active: "⏱ Auto-refresh: active (every 1 min)",
+    status_sync_off: "Sync off", status_sync_active: "Sync active", status_pull: "Pull…", status_push: "Push…",
+    status_sync_synced: "in sync · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
+    status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
+    form_title_new: "New pair trade", form_title_edit: "Edit pair trade",
+    form_help_currency: "Default: entry price is interpreted in <strong>{ccy}</strong> (locked path-independently). Tick the box if the entry price is in the stock's quoted currency instead. Tickers in Yahoo format (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
+    form_trade_name: "Trade name (optional)", form_trade_name_ph: "e.g. SAP vs Oracle",
+    form_long_position: "Long position", form_short_position: "Short position",
+    form_ticker: "Ticker (Yahoo format)", form_qty: "Number of shares", form_entry: "Entry price",
+    form_native_checkbox: "Entry price in stock's quoted currency (instead of {ccy})",
+    form_alarm_title: "🚨 Telegram alert (optional)", form_alarm_pct_label: "Alert when performance below % (negative number)",
+    form_alarm_pct_help: "Empty = off. Example: <code>-30</code> = alert at 30% loss on notional. Telegram repeats every 3 min until you acknowledge.",
+    card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
+    card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
+    card_delete_confirm: "Delete \"{name}\"?",
+    alarm_watching: "🔔 Alarm armed — threshold {pct}",
+    alarm_triggered: "🚨 ALARM TRIGGERED · Message {n} · threshold {pct} — acknowledge on Telegram",
+    alarm_acknowledged: "✓ Acknowledged · re-arms when recovers above {pct}",
+    menu_actions: "Actions", menu_data_mgmt: "Data management", menu_sync_now: "Sync now",
+    menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
+    settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
+    settings_language_info: "Stored per device (not synced).",
+    settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
+    settings_home_ccy_info: "All P&L values and notionals shown in this currency. Default for entry input on new trades. Existing trades keep their entry currency fixed (path-independent).",
+    settings_worker_title: "Live quotes · Cloudflare Worker", settings_worker_info: "URL of your Yahoo Finance proxy Worker (workers.dev).",
+    settings_worker_label: "Worker URL",
+    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master key + bin ID from jsonbin.io.",
+    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin ID",
+    settings_sync_disable: "Disable sync", settings_sync_disable_confirm: "Disable sync? Local data is kept.",
+    test_worker_loading: "Testing worker…", test_sync_loading: "Testing JSONBin…",
+    test_worker_ok: "OK — AAPL is at {price} {ccy}", test_worker_no_price: "Unexpected response",
+    test_worker_no_url: "Worker: no URL provided", test_sync_ok: "OK — bin contains {n} trade(s)",
+    test_sync_no_creds: "JSONBin: key or bin ID missing",
+    test_worker_prefix: "Worker: ", test_sync_prefix: "JSONBin: ",
+    io_title: "Import / Export", io_export_btn: "Export (to clipboard)",
+    io_input_label: "Paste JSON to import:", io_paste_title: "Paste JSON",
+    io_clipboard_ok: "Trades copied as JSON to clipboard.", io_clipboard_prompt: "Copy this JSON text:",
+    io_invalid_json: "Invalid JSON: {err}", io_no_valid_trades: "No valid trade found.",
+    io_replace_confirm: "Replace existing {existing} trade(s) with {new} imported ones? (Cancel = append)",
+    io_clear_confirm: "Really delete ALL trades?",
+    err_ticker_required: "Please enter both tickers.", err_long_invalid: "Long: quantity and entry must be > 0.",
+    err_short_invalid: "Short: quantity and entry must be > 0.",
+    err_alarm_invalid: "Alarm threshold: invalid number. Example: -30",
+    err_no_ticker: "No ticker", err_no_data: "No data", err_no_price_feed: "No price in feed",
+    err_no_worker_url: "No Worker URL (⋯ → Settings)",
+    empty_no_trades_full: "No pair trades yet. Tap <strong>+ New Trade</strong> at the top.",
+  },
+  it: {
+    html_lang: "it",
+    app_title: "Pair Trade Tracker",
+    header_subtitle: "Long − Short · Yahoo via Cloudflare Worker · Auto-aggiornamento · Avvisi Telegram",
+    agg_total_pnl: "P&L totale", agg_performance: "Performance", agg_notional: "Nozionale totale",
+    agg_on_notional: "sul nozionale", agg_in_ccy_fx: "in {ccy} · convertito FX",
+    agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trade",
+    agg_partial: " · {n} incompleto", agg_loading: "Caricamento...", agg_no_trades: "Nessun trade",
+    btn_new_trade: "+ Nuovo Trade", btn_refresh: "↻ Quote", btn_save: "Salva", btn_cancel: "Annulla",
+    btn_close: "Chiudi", btn_edit: "Modifica", btn_import: "Importa", btn_test_both: "Testa entrambi",
+    btn_settings: "Impostazioni",
+    status_ready: "Pronto", status_loading_prices: "Caricamento quote…", status_updated: "Aggiornato {time}",
+    status_no_worker_url: "Nessun URL Worker (⋯ → Impostazioni)",
+    status_ticker_errors: "{time} · {err}/{total} ticker falliti",
+    status_auto_off: "⏱ Auto-aggiornamento: spento", status_auto_outside_hours: "⏱ Auto-aggiornamento: fuori orario",
+    status_auto_next: "⏱ Prossimo auto-aggiornamento: {time}", status_auto_active: "⏱ Auto-aggiornamento: attivo (ogni 1 min)",
+    status_sync_off: "Sync disattivato", status_sync_active: "Sync attivo", status_pull: "Pull…", status_push: "Push…",
+    status_sync_synced: "sincronizzato · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
+    status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
+    form_title_new: "Nuovo pair trade", form_title_edit: "Modifica pair trade",
+    form_help_currency: "Predefinito: il prezzo d'ingresso è interpretato in <strong>{ccy}</strong> (fissato indipendentemente dal percorso). Spunta la casella se il prezzo d'ingresso è invece nella valuta di quotazione del titolo. Ticker in formato Yahoo (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
+    form_trade_name: "Nome del trade (libero)", form_trade_name_ph: "es. SAP vs Oracle",
+    form_long_position: "Posizione long", form_short_position: "Posizione short",
+    form_ticker: "Ticker (formato Yahoo)", form_qty: "Numero di azioni", form_entry: "Prezzo d'ingresso",
+    form_native_checkbox: "Prezzo d'ingresso nella valuta di quotazione (invece di {ccy})",
+    form_alarm_title: "🚨 Avviso Telegram (opzionale)", form_alarm_pct_label: "Avviso quando la performance scende sotto % (numero negativo)",
+    form_alarm_pct_help: "Vuoto = disattivato. Esempio: <code>-30</code> = avviso al 30% di perdita sul nozionale. Ripetizione Telegram ogni 3 min finché non confermi.",
+    card_notional: "Nozionale ({ccy})", card_qty_x_entry: "Qtà × Ingresso", card_current: "Attuale",
+    card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "Tasso FX non disponibile", card_loading: "carico...",
+    card_delete_confirm: "Eliminare \"{name}\"?",
+    alarm_watching: "🔔 Allarme armato — soglia {pct}",
+    alarm_triggered: "🚨 ALLARME ATTIVATO · Messaggio {n} · soglia {pct} — conferma su Telegram",
+    alarm_acknowledged: "✓ Confermato · si riattiva quando torna sopra {pct}",
+    menu_actions: "Azioni", menu_data_mgmt: "Gestione dati", menu_sync_now: "Sincronizza ora",
+    menu_export: "Esporta (copia JSON)", menu_import: "Importa (incolla JSON)", menu_clear_all: "Elimina tutti i trade",
+    settings_title: "Impostazioni", settings_language: "Lingua", settings_language_label: "Lingua",
+    settings_language_info: "Memorizzato per dispositivo (non sincronizzato).",
+    settings_home_ccy: "Valuta principale", settings_home_ccy_label: "Codice ISO (EUR, USD, GBP, CHF, ...)",
+    settings_home_ccy_info: "Tutti i valori P&L e nozionali sono mostrati in questa valuta. Predefinito per inserimento prezzo nei nuovi trade. I trade esistenti mantengono la loro valuta d'ingresso fissata (indipendente dal percorso).",
+    settings_worker_title: "Quote live · Cloudflare Worker", settings_worker_info: "URL del tuo Worker proxy Yahoo Finance (workers.dev).",
+    settings_worker_label: "URL Worker",
+    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master key + bin ID da jsonbin.io.",
+    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin ID",
+    settings_sync_disable: "Disattiva sync", settings_sync_disable_confirm: "Disattivare il sync? I dati locali vengono mantenuti.",
+    test_worker_loading: "Test worker…", test_sync_loading: "Test JSONBin…",
+    test_worker_ok: "OK — AAPL a {price} {ccy}", test_worker_no_price: "Risposta inattesa",
+    test_worker_no_url: "Worker: nessun URL inserito", test_sync_ok: "OK — bin contiene {n} trade",
+    test_sync_no_creds: "JSONBin: key o bin ID mancante",
+    test_worker_prefix: "Worker: ", test_sync_prefix: "JSONBin: ",
+    io_title: "Importa / Esporta", io_export_btn: "Esporta (negli appunti)",
+    io_input_label: "Incolla JSON da importare:", io_paste_title: "Incolla JSON",
+    io_clipboard_ok: "Trade copiati come JSON negli appunti.", io_clipboard_prompt: "Copia questo testo JSON:",
+    io_invalid_json: "JSON non valido: {err}", io_no_valid_trades: "Nessun trade valido trovato.",
+    io_replace_confirm: "Sostituire i {existing} trade esistenti con {new} importati? (Annulla = aggiungi)",
+    io_clear_confirm: "Eliminare davvero TUTTI i trade?",
+    err_ticker_required: "Inserisci entrambi i ticker.", err_long_invalid: "Long: quantità e ingresso devono essere > 0.",
+    err_short_invalid: "Short: quantità e ingresso devono essere > 0.",
+    err_alarm_invalid: "Soglia allarme: numero non valido. Esempio: -30",
+    err_no_ticker: "Nessun ticker", err_no_data: "Nessun dato", err_no_price_feed: "Nessun prezzo nel feed",
+    err_no_worker_url: "Nessun URL Worker (⋯ → Impostazioni)",
+    empty_no_trades_full: "Ancora nessun pair trade. Tocca <strong>+ Nuovo Trade</strong> in alto.",
+  },
+  ru: {
+    html_lang: "ru",
+    app_title: "Pair Trade Tracker",
+    header_subtitle: "Long − Short · Yahoo через Cloudflare Worker · Авто-обновление · Уведомления в Telegram",
+    agg_total_pnl: "Общий P&L", agg_performance: "Доходность", agg_notional: "Общий номинал",
+    agg_on_notional: "от номинала", agg_in_ccy_fx: "в {ccy} · с конвертацией FX",
+    agg_trades_count: "{n} {plural}", agg_trade_singular: "сделка", agg_trade_plural: "сделок",
+    agg_partial: " · {n} неполных", agg_loading: "Загрузка...", agg_no_trades: "Сделок ещё нет",
+    btn_new_trade: "+ Новая сделка", btn_refresh: "↻ Котировки", btn_save: "Сохранить", btn_cancel: "Отмена",
+    btn_close: "Закрыть", btn_edit: "Изменить", btn_import: "Импорт", btn_test_both: "Проверить оба",
+    btn_settings: "Настройки",
+    status_ready: "Готов", status_loading_prices: "Загрузка котировок…", status_updated: "Обновлено {time}",
+    status_no_worker_url: "Нет URL Worker (⋯ → Настройки)",
+    status_ticker_errors: "{time} · {err}/{total} тикеров с ошибкой",
+    status_auto_off: "⏱ Авто-обновление: выкл", status_auto_outside_hours: "⏱ Авто-обновление: вне торговых часов",
+    status_auto_next: "⏱ Следующее авто-обновление: {time}", status_auto_active: "⏱ Авто-обновление: активно (раз в 1 мин)",
+    status_sync_off: "Sync выкл", status_sync_active: "Sync активен", status_pull: "Pull…", status_push: "Push…",
+    status_sync_synced: "синхронизирован · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
+    status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
+    form_title_new: "Новая парная сделка", form_title_edit: "Изменить парную сделку",
+    form_help_currency: "По умолчанию: цена входа интерпретируется в <strong>{ccy}</strong> (зафиксировано независимо от пути). Поставь галочку, если цена входа в валюте котировки акции. Тикеры в формате Yahoo (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
+    form_trade_name: "Название сделки (свободно)", form_trade_name_ph: "напр. SAP vs Oracle",
+    form_long_position: "Long-позиция", form_short_position: "Short-позиция",
+    form_ticker: "Тикер (формат Yahoo)", form_qty: "Количество акций", form_entry: "Цена входа",
+    form_native_checkbox: "Цена входа в валюте котировки (вместо {ccy})",
+    form_alarm_title: "🚨 Уведомление Telegram (опционально)", form_alarm_pct_label: "Уведомление при доходности ниже % (отрицательное число)",
+    form_alarm_pct_help: "Пусто = выкл. Пример: <code>-30</code> = уведомление при 30% убытка от номинала. Повтор в Telegram каждые 3 мин до подтверждения.",
+    card_notional: "Номинал ({ccy})", card_qty_x_entry: "Кол-во × Вход", card_current: "Текущая",
+    card_pnl: "P&L", card_pnl_in: "(в {ccy})", card_fx_unavailable: "FX-курс недоступен", card_loading: "загрузка...",
+    card_delete_confirm: "Удалить «{name}»?",
+    alarm_watching: "🔔 Тревога активна — порог {pct}",
+    alarm_triggered: "🚨 ТРЕВОГА · Сообщение {n} · порог {pct} — подтверди в Telegram",
+    alarm_acknowledged: "✓ Подтверждено · сработает снова при восстановлении выше {pct}",
+    menu_actions: "Действия", menu_data_mgmt: "Управление данными", menu_sync_now: "Синхронизировать сейчас",
+    menu_export: "Экспорт (копировать JSON)", menu_import: "Импорт (вставить JSON)", menu_clear_all: "Удалить все сделки",
+    settings_title: "Настройки", settings_language: "Язык", settings_language_label: "Язык",
+    settings_language_info: "Сохраняется на устройстве (не синхронизируется).",
+    settings_home_ccy: "Основная валюта", settings_home_ccy_label: "Код ISO (EUR, USD, GBP, CHF, ...)",
+    settings_home_ccy_info: "Все значения P&L и номинала отображаются в этой валюте. По умолчанию для ввода цены в новых сделках. Существующие сделки сохраняют свою валюту входа неизменной (независимо от пути).",
+    settings_worker_title: "Live-котировки · Cloudflare Worker", settings_worker_info: "URL твоего прокси-Worker для Yahoo Finance (workers.dev).",
+    settings_worker_label: "URL Worker",
+    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master-ключ + bin ID от jsonbin.io.",
+    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin ID",
+    settings_sync_disable: "Отключить sync", settings_sync_disable_confirm: "Отключить sync? Локальные данные сохраняются.",
+    test_worker_loading: "Проверка worker…", test_sync_loading: "Проверка JSONBin…",
+    test_worker_ok: "OK — AAPL по {price} {ccy}", test_worker_no_price: "Неожиданный ответ",
+    test_worker_no_url: "Worker: URL не указан", test_sync_ok: "OK — bin содержит {n} сделок",
+    test_sync_no_creds: "JSONBin: нет key или bin ID",
+    test_worker_prefix: "Worker: ", test_sync_prefix: "JSONBin: ",
+    io_title: "Импорт / Экспорт", io_export_btn: "Экспорт (в буфер)",
+    io_input_label: "Вставь JSON для импорта:", io_paste_title: "Вставить JSON",
+    io_clipboard_ok: "Сделки скопированы как JSON в буфер обмена.", io_clipboard_prompt: "Скопируй этот JSON-текст:",
+    io_invalid_json: "Неверный JSON: {err}", io_no_valid_trades: "Действительных сделок не найдено.",
+    io_replace_confirm: "Заменить существующие {existing} сделок на {new} импортированных? (Отмена = добавить)",
+    io_clear_confirm: "Действительно удалить ВСЕ сделки?",
+    err_ticker_required: "Введи оба тикера.", err_long_invalid: "Long: количество и цена входа должны быть > 0.",
+    err_short_invalid: "Short: количество и цена входа должны быть > 0.",
+    err_alarm_invalid: "Порог тревоги: некорректное число. Пример: -30",
+    err_no_ticker: "Нет тикера", err_no_data: "Нет данных", err_no_price_feed: "Нет цены в ленте",
+    err_no_worker_url: "Нет URL Worker (⋯ → Настройки)",
+    empty_no_trades_full: "Пока нет парных сделок. Нажми <strong>+ Новая сделка</strong> сверху.",
+  }
+};
+
+let currentLang = "de";
+function setLanguage(langKey) {
+  currentLang = STRINGS[langKey] ? langKey : "de";
+  document.documentElement.lang = STRINGS[currentLang].html_lang;
+  applyTranslations();
+}
+
+function t(key, params) {
+  const dict = STRINGS[currentLang] || STRINGS.de;
+  let s = dict[key] || STRINGS.de[key] || key;
+  if (params) {
+    Object.keys(params).forEach(k => {
+      s = s.split("{" + k + "}").join(String(params[k]));
+    });
+  }
+  return s;
+}
+
+function applyTranslations() {
+  // Übersetzt alle Elemente mit data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+  // Übersetzt Placeholder
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    el.setAttribute('placeholder', t(key));
+  });
+  // Spezielle Elemente mit HTML-Inhalt
+  const formHelp = document.getElementById('form-help-currency');
+  if (formHelp) formHelp.innerHTML = t('form_help_currency', { ccy: homeCurrency });
+  const longNativeLabel = document.getElementById('f-long-native-label');
+  if (longNativeLabel) longNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
+  const shortNativeLabel = document.getElementById('f-short-native-label');
+  if (shortNativeLabel) shortNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
+  const alarmHelp = document.querySelector('.form-section.alarm .help');
+  if (alarmHelp) alarmHelp.innerHTML = t('form_alarm_pct_help');
+  // Re-render dynamic content
+  if (typeof render === 'function') render();
+  setAutoStatus();
+}
+
+// =========================== APP STATE ===========================
+const STORAGE_KEY = "pair_trade_tracker_v2";
+const STORAGE_KEY_OLD = "pair_trade_tracker_v1";
+const SYNC_KEY = "pair_trade_sync_v1";
+const PRICE_KEY = "pair_trade_price_v1";
+const LANG_KEY = "pair_trade_lang_v1";
+const PRICE_CACHE = new Map();
+const FX_CACHE = new Map();
+const FX_CACHE_TTL = 300000;
+const PREVIOUS_PRICES = new Map();
+
+const AUTO_REFRESH_INTERVAL_MS = 1 * 60 * 1000;
+const APP_TZ = "Europe/Berlin";
+const APP_TRADING_DAYS = [1,2,3,4,5];
+const APP_TRADING_START_HOUR = 9;
+const APP_TRADING_END_HOUR = 23;
+let autoRefreshTimer = null;
+let lastAutoRefreshAt = 0;
+let lastTotalPnlForFlash = null;
+
+let trades = [];
+let alertStates = {};
+let localLastModified = 0;
+let syncSettings = loadSyncSettings();
+let priceSettings = loadPriceSettings();
+let homeCurrency = (priceSettings.homeCurrency || "EUR").toUpperCase();
+let editingId = null;
+let syncDebounce = null;
+
+function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); return (v && STRINGS[v]) ? v : "de"; } catch { return "de"; } }
+function saveLangPreference(lang) { try { localStorage.setItem(LANG_KEY, lang); } catch {} }
+
+function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
+function saveSyncSettings() { localStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); }
+function loadPriceSettings() { try { const raw = localStorage.getItem(PRICE_KEY); if (!raw) return { workerUrl: "", homeCurrency: "EUR" }; return Object.assign({ workerUrl: "", homeCurrency: "EUR" }, JSON.parse(raw)); } catch { return { workerUrl: "", homeCurrency: "EUR" }; } }
+function savePriceSettings() { localStorage.setItem(PRICE_KEY, JSON.stringify(priceSettings)); }
+
+function migrateTrades() {
+  let changed = false;
+  for (const t of trades) {
+    if (t.longEntryCcy === undefined && !t.longEntryNative) { t.longEntryCcy = "EUR"; changed = true; }
+    if (t.shortEntryCcy === undefined && !t.shortEntryNative) { t.shortEntryCcy = "EUR"; changed = true; }
+  }
+  return changed;
+}
+
+function loadStorage() {
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
+  try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
+  trades = []; alertStates = {}; localLastModified = 0;
+}
+function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, alertStates, lastModified: localLastModified })); }
+function markLocalChange() { localLastModified = Date.now(); persistLocal(); scheduleSyncPush(); }
+
+function fmtMoney(n, c) { if (n == null || !isFinite(n)) return "—"; try { return new Intl.NumberFormat("de-DE", { style: "currency", currency: c || homeCurrency, maximumFractionDigits: 2 }).format(n); } catch { return n.toFixed(2) + " " + (c || homeCurrency); } }
+function fmtPct(n) { if (n == null || !isFinite(n)) return "—"; return (n > 0 ? "+" : "") + n.toFixed(2) + "%"; }
+function fmtNum(n, dp) { if (n == null || !isFinite(n)) return "—"; return new Intl.NumberFormat("de-DE", { maximumFractionDigits: dp ?? 4 }).format(n); }
+function signClass(n) { if (!isFinite(n) || n === 0) return "neutral"; return n > 0 ? "pos" : "neg"; }
+function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+function parseDecimal(s) { if (s == null) return NaN; let v = String(s).trim().replace(/\s+/g, ""); if (!v) return NaN; if (v.includes(",")) v = v.replace(/\./g, "").replace(",", "."); return parseFloat(v); }
+function formatForInput(n) { if (n == null || !isFinite(n)) return ""; return String(n).replace(".", ","); }
+
+function isAppWithinTradingHours() {
+  try {
+    const now = new Date();
+    const fmt = new Intl.DateTimeFormat("en-US", { timeZone: APP_TZ, weekday: "short", hour: "2-digit", hour12: false });
+    const parts = fmt.formatToParts(now);
+    const wd = parts.find(p => p.type === "weekday").value;
+    const hr = parseInt(parts.find(p => p.type === "hour").value, 10);
+    const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const day = dayMap[wd];
+    return APP_TRADING_DAYS.includes(day) && hr >= APP_TRADING_START_HOUR && hr < APP_TRADING_END_HOUR;
+  } catch { return false; }
+}
+
+function setAutoStatus() {
+  const el = document.getElementById("auto-status");
+  if (!el) return;
+  if (!priceSettings.workerUrl || trades.length === 0) { el.textContent = t("status_auto_off"); return; }
+  if (!isAppWithinTradingHours()) { el.textContent = t("status_auto_outside_hours"); return; }
+  if (lastAutoRefreshAt > 0) {
+    const next = new Date(lastAutoRefreshAt + AUTO_REFRESH_INTERVAL_MS);
+    el.textContent = t("status_auto_next", { time: next.toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) });
+  } else {
+    el.textContent = t("status_auto_active");
+  }
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(async () => {
+    if (document.hidden) return;
+    if (!priceSettings.workerUrl) return;
+    if (trades.length === 0) return;
+    if (!isAppWithinTradingHours()) { setAutoStatus(); return; }
+    lastAutoRefreshAt = Date.now();
+    await refreshAll(false);
+    if (syncSettings.enabled) await syncFull();
+    setAutoStatus();
+  }, AUTO_REFRESH_INTERVAL_MS);
+  setAutoStatus();
+}
+
+function workerBase() {
+  let u = (priceSettings.workerUrl || "").trim();
+  if (!u) return "";
+  u = u.replace(/[?#].*$/, "").replace(/\/$/, "");
+  return u;
+}
+
+async function fetchYahooSymbol(symbol) {
+  const base = workerBase();
+  if (!base) throw new Error(t("err_no_worker_url"));
+  const url = base + "/?symbol=" + encodeURIComponent(symbol);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) { let txt = ""; try { txt = await res.text(); } catch {} throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); }
+  const data = await res.json();
+  if (data.error || data?.chart?.error) throw new Error(data.error || data.chart.error.description || "API error");
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error(t("err_no_data"));
+  return result;
+}
+
+async function fetchPrice(ticker, force = false) {
+  if (!ticker) return { error: t("err_no_ticker") };
+  const sym = ticker.trim().toUpperCase();
+  const now = Date.now();
+  const cached = PRICE_CACHE.get(sym);
+  if (!force && cached && (now - cached.ts) < 30000) return cached;
+  if (!priceSettings.workerUrl) { const v = { error: t("err_no_worker_url"), ts: now }; PRICE_CACHE.set(sym, v); return v; }
+  try {
+    const result = await fetchYahooSymbol(sym);
+    const meta = result.meta || {};
+    const price = meta.regularMarketPrice;
+    const currency = (meta.currency || "").toUpperCase();
+    const name = meta.shortName || meta.longName || sym;
+    if (!isFinite(price)) { const v = { error: t("err_no_price_feed"), ts: now }; PRICE_CACHE.set(sym, v); return v; }
+    const v = { price, currency, name, ts: now };
+    PRICE_CACHE.set(sym, v); return v;
+  } catch (e) { const v = { error: (e.message || e), ts: now }; PRICE_CACHE.set(sym, v); return v; }
+}
+
+async function testPriceCredentials(workerUrl) {
+  if (!workerUrl) return { ok: false, msg: t("test_worker_no_url") };
+  try {
+    const base = workerUrl.replace(/[?#].*$/, "").replace(/\/$/, "");
+    const res = await fetch(base + "/?symbol=AAPL", { cache: "no-store" });
+    if (!res.ok) return { ok: false, msg: "HTTP " + res.status };
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta || !meta.regularMarketPrice) return { ok: false, msg: t("test_worker_no_price") };
+    return { ok: true, msg: t("test_worker_ok", { price: meta.regularMarketPrice, ccy: (meta.currency || "USD") }) };
+  } catch (e) { return { ok: false, msg: (e.message || e) }; }
+}
+
+async function fetchFxRate(from, to) {
+  if (!from || !to) return null;
+  const F = from.toUpperCase(), T = to.toUpperCase();
+  if (F === T) return 1;
+  const key = F + "/" + T;
+  const now = Date.now();
+  const cached = FX_CACHE.get(key);
+  if (cached && (now - cached.ts) < FX_CACHE_TTL && isFinite(cached.rate)) return cached.rate;
+  if (!priceSettings.workerUrl) return null;
+  try { const res = await fetchYahooSymbol(F + T + "=X"); const direct = res?.meta?.regularMarketPrice; if (isFinite(direct) && direct > 0) { FX_CACHE.set(key, { rate: direct, ts: now }); return direct; } } catch {}
+  try { const res = await fetchYahooSymbol(T + F + "=X"); const inv = res?.meta?.regularMarketPrice; if (isFinite(inv) && inv > 0) { const rate = 1 / inv; FX_CACHE.set(key, { rate, ts: now }); return rate; } } catch {}
+  FX_CACHE.set(key, { rate: NaN, ts: now });
+  return null;
+}
+function getCachedFx(from, to) { if (!from || !to) return null; const F = from.toUpperCase(), T = to.toUpperCase(); if (F === T) return 1; const c = FX_CACHE.get(F + "/" + T); if (c && isFinite(c.rate)) return c.rate; return null; }
+
+async function ensureFxRatesForTrades() {
+  const pairs = new Set();
+  for (const t of trades) {
+    const lp = PRICE_CACHE.get(t.longTicker.toUpperCase()); const sp = PRICE_CACHE.get(t.shortTicker.toUpperCase());
+    const longApiCcy = (lp?.currency || homeCurrency).toUpperCase();
+    const shortApiCcy = (sp?.currency || homeCurrency).toUpperCase();
+    const longEntryCcy = t.longEntryNative ? longApiCcy : (t.longEntryCcy || "EUR");
+    const shortEntryCcy = t.shortEntryNative ? shortApiCcy : (t.shortEntryCcy || "EUR");
+    if (longApiCcy !== longEntryCcy) pairs.add(longApiCcy + "/" + longEntryCcy);
+    if (shortApiCcy !== shortEntryCcy) pairs.add(shortApiCcy + "/" + shortEntryCcy);
+    if (longEntryCcy !== homeCurrency) pairs.add(longEntryCcy + "/" + homeCurrency);
+    if (shortEntryCcy !== homeCurrency) pairs.add(shortEntryCcy + "/" + homeCurrency);
+  }
+  for (const p of pairs) { const [from, to] = p.split("/"); await fetchFxRate(from, to); }
+}
+
+function jsonbinHeaders() { return { "X-Master-Key": syncSettings.apiKey, "Content-Type": "application/json" }; }
+async function jsonbinPull() { const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(syncSettings.binId) + "/latest"; const res = await fetch(url, { headers: jsonbinHeaders(), cache: "no-store" }); if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); } const data = await res.json(); return data.record || {}; }
+async function jsonbinPush(payload) { const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(syncSettings.binId); const res = await fetch(url, { method: "PUT", headers: jsonbinHeaders(), body: JSON.stringify(payload) }); if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); } }
+
+async function syncPull() {
+  if (!syncSettings.enabled || !syncSettings.apiKey || !syncSettings.binId) return { ok: false };
+  setSyncStatus("loading", t("status_pull"));
+  try {
+    const remote = await jsonbinPull();
+    const remoteMod = remote.lastModified || 0;
+    if (remoteMod > localLastModified) {
+      trades = Array.isArray(remote.trades) ? remote.trades : [];
+      alertStates = remote.alertStates || {};
+      localLastModified = remoteMod;
+      migrateTrades();
+      persistLocal(); render();
+      setSyncStatus("ok", t("status_sync_pulled", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
+      return { ok: true, updated: true };
+    } else if (remoteMod === localLastModified) {
+      const remoteStates = remote.alertStates || {};
+      if (JSON.stringify(remoteStates) !== JSON.stringify(alertStates)) {
+        alertStates = remoteStates;
+        persistLocal(); render();
+      }
+    }
+    setSyncStatus("ok", t("status_sync_synced", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
+    return { ok: true, updated: false };
+  } catch (e) { setSyncStatus("err", t("status_pull_err", { err: e.message })); return { ok: false, error: e.message }; }
+}
+async function syncPush() {
+  if (!syncSettings.enabled || !syncSettings.apiKey || !syncSettings.binId) return { ok: false };
+  setSyncStatus("loading", t("status_push"));
+  try {
+    let remoteStates = alertStates;
+    try { const remote = await jsonbinPull(); remoteStates = remote.alertStates || alertStates; } catch {}
+    await jsonbinPush({ trades, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
+    alertStates = remoteStates;
+    persistLocal();
+    setSyncStatus("ok", t("status_sync_pushed", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
+    return { ok: true };
+  } catch (e) { setSyncStatus("err", t("status_push_err", { err: e.message })); return { ok: false, error: e.message }; }
+}
+async function syncFull() { if (!syncSettings.enabled) return; const r = await syncPull(); if (!r.ok) return; if (!r.updated) await syncPush(); }
+function scheduleSyncPush() { if (!syncSettings.enabled) return; if (syncDebounce) clearTimeout(syncDebounce); syncDebounce = setTimeout(() => syncPush(), 1500); }
+function setSyncStatus(state, msg) { const el = document.getElementById("sync-status"); el.className = "status " + state; el.textContent = msg; }
+async function testSyncCredentials(key, binId) {
+  try {
+    const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(binId) + "/latest";
+    const res = await fetch(url, { headers: { "X-Master-Key": key }, cache: "no-store" });
+    if (!res.ok) { const txt = await res.text().catch(() => ""); return { ok: false, msg: "HTTP " + res.status + (txt ? " — " + txt.slice(0,120) : "") }; }
+    const data = await res.json();
+    const rec = data.record || {};
+    const tc = Array.isArray(rec.trades) ? rec.trades.length : 0;
+    return { ok: true, msg: t("test_sync_ok", { n: tc }) };
+  } catch (e) { return { ok: false, msg: (e.message || e) }; }
+}
+
+function computeLeg(entry, qty, livePx, apiCcy, useNative, storedEntryCcy, isLong) {
+  const entryCcy = useNative ? (apiCcy || homeCurrency) : (storedEntryCcy || "EUR");
+  const apiToEntry = (apiCcy === entryCcy) ? 1 : getCachedFx(apiCcy || homeCurrency, entryCcy);
+  const entryToHome = (entryCcy === homeCurrency) ? 1 : getCachedFx(entryCcy, homeCurrency);
+  let livePxInEntry = null;
+  if (livePx != null && apiToEntry != null) livePxInEntry = livePx * apiToEntry;
+  let pnlInEntry = null;
+  if (livePxInEntry != null) pnlInEntry = (isLong ? (livePxInEntry - entry) : (entry - livePxInEntry)) * qty;
+  let pnlInHome = null;
+  if (pnlInEntry != null && entryToHome != null) pnlInHome = pnlInEntry * entryToHome;
+  const entryNotionalInEntry = entry * qty;
+  let entryNotionalInHome = null;
+  if (entryToHome != null) entryNotionalInHome = entryNotionalInEntry * entryToHome;
+  return { apiCcy: apiCcy || homeCurrency, entryCcy, apiToEntryFx: apiToEntry, entryToHomeFx: entryToHome, livePxInEntry, pnlInEntry, pnlInHome, entryNotionalInEntry, entryNotionalInHome };
+}
+
+function computeTrade(tr, lp, sp) {
+  const lpx = lp && !lp.error ? lp.price : null;
+  const spx = sp && !sp.error ? sp.price : null;
+  const longApiCcy = (lp?.currency || homeCurrency).toUpperCase();
+  const shortApiCcy = (sp?.currency || homeCurrency).toUpperCase();
+  const longLeg = computeLeg(tr.longEntry, tr.longQty, lpx, longApiCcy, !!tr.longEntryNative, tr.longEntryCcy, true);
+  const shortLeg = computeLeg(tr.shortEntry, tr.shortQty, spx, shortApiCcy, !!tr.shortEntryNative, tr.shortEntryCcy, false);
+  const totalNotionalHome = (longLeg.entryNotionalInHome != null && shortLeg.entryNotionalInHome != null) ? longLeg.entryNotionalInHome + shortLeg.entryNotionalInHome : null;
+  let totalPnlHome = null, pct = null;
+  if (longLeg.pnlInHome != null && shortLeg.pnlInHome != null) { totalPnlHome = longLeg.pnlInHome + shortLeg.pnlInHome; if (totalNotionalHome > 0) pct = (totalPnlHome / totalNotionalHome) * 100; }
+  return { long: longLeg, short: shortLeg, totalNotionalHome, totalPnlHome, pct };
+}
+
+function alarmStatusHtml(tr) {
+  if (tr.alertPctMin == null || tr.alertPctMin === "") return "";
+  const st = alertStates[tr.id];
+  const thresholdStr = fmtPct(tr.alertPctMin);
+  if (!st || st.current === "idle") return `<div class="alarm-row watching">${t("alarm_watching", { pct: thresholdStr })}</div>`;
+  if (st.current === "triggered") { const n = st.notifyCount || 1; return `<div class="alarm-row triggered">${t("alarm_triggered", { n: n, pct: thresholdStr })}</div>`; }
+  if (st.current === "acknowledged") return `<div class="alarm-row acked">${t("alarm_acknowledged", { pct: thresholdStr })}</div>`;
+  return "";
+}
+
+function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
+  const isLong = side === "long";
+  const apiCcy = leg.apiCcy;
+  const entryCcy = leg.entryCcy;
+  const fxNote = (apiCcy !== entryCcy) ? `<span class="fx-note">(${apiCcy}→${entryCcy}${leg.apiToEntryFx != null ? ' · ' + leg.apiToEntryFx.toFixed(4) : ''})</span>` : '';
+  const fxMissing = (leg.apiToEntryFx == null) || (leg.entryToHomeFx == null);
+  const homeNote = (entryCcy !== homeCurrency) ? `<span class="fx-note">${t("card_pnl_in", { ccy: homeCurrency })}</span>` : '';
+  const tickerUpper = ticker.toUpperCase();
+  const sideLabel = isLong ? "Long" : "Short";
+  return `
+    <div class="leg ${side}">
+      <div class="leg-head"><span class="side">${sideLabel}</span><div class="ticker">${escapeHtml(ticker)}${lp?.name && lp.name !== ticker ? ' <span class="muted" style="font-weight:400;font-size:11px;">' + escapeHtml(lp.name) + '</span>' : ''}<span class="ccy-tag">${entryCcy}</span></div></div>
+      <div class="row"><span>${t("card_qty_x_entry")}</span><span class="v">${fmtNum(qty)} × ${fmtMoney(entry, entryCcy)}</span></div>
+      <div class="row" data-flash-ticker="${tickerUpper}"><span>${t("card_current")} ${fxNote}</span><span class="v">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (leg.livePxInEntry != null ? fmtMoney(leg.livePxInEntry, entryCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
+      ${fxMissing && !lp?.error ? `<div class="row"><span class="neg">${t("card_fx_unavailable")}</span><span></span></div>` : ''}
+      <div class="row pnl-line ${signClass(leg.pnlInHome)}"><span>${t("card_pnl")} ${homeNote}</span><span class="v">${leg.pnlInHome != null ? (leg.pnlInHome > 0 ? "+" : "") + fmtMoney(leg.pnlInHome, homeCurrency) : "—"}</span></div>
+    </div>
+  `;
+}
+
+function render() {
+  const list = document.getElementById("trade-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (trades.length === 0) { list.innerHTML = `<div class="empty">${t("empty_no_trades_full")}</div>`; updateAggregate([]); return; }
+  const rows = [];
+  for (const tr of trades) {
+    const lp = PRICE_CACHE.get(tr.longTicker.toUpperCase());
+    const sp = PRICE_CACHE.get(tr.shortTicker.toUpperCase());
+    const lpx = lp && !lp.error ? lp.price : null;
+    const spx = sp && !sp.error ? sp.price : null;
+    const c = computeTrade(tr, lp, sp);
+    rows.push({ trade: tr, c });
+    const card = document.createElement("div");
+    card.className = "trade-card";
+    card.innerHTML = `
+      <div class="trade-head">
+        <div class="trade-name">${escapeHtml(tr.name || (tr.longTicker + " / " + tr.shortTicker))}</div>
+        <div class="trade-actions"><button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button><button class="icon danger" data-act="del" data-id="${tr.id}">×</button></div>
+      </div>
+      <div class="trade-perf">
+        <div class="pnl-abs ${signClass(c.totalPnlHome)}">${c.totalPnlHome != null ? (c.totalPnlHome > 0 ? "+" : "") + fmtMoney(c.totalPnlHome, homeCurrency) : "—"}</div>
+        <div class="pnl-pct ${signClass(c.pct)}">${fmtPct(c.pct)}</div>
+        <div class="meta">${t("card_notional", { ccy: homeCurrency })}: ${c.totalNotionalHome != null ? fmtMoney(c.totalNotionalHome, homeCurrency) : '—'}</div>
+      </div>
+      ${alarmStatusHtml(tr)}
+      <div class="legs">
+        ${legHtml("long", tr.longTicker, tr.longQty, tr.longEntry, !!tr.longEntryNative, lp, lpx, c.long)}
+        ${legHtml("short", tr.shortTicker, tr.shortQty, tr.shortEntry, !!tr.shortEntryNative, sp, spx, c.short)}
+      </div>
+    `;
+    list.appendChild(card);
+  }
+  list.querySelectorAll("button[data-act]").forEach(btn => { btn.addEventListener("click", () => { const id = btn.getAttribute("data-id"); const act = btn.getAttribute("data-act"); if (act === "del") deleteTrade(id); else if (act === "edit") openForm(id); }); });
+  updateAggregate(rows);
+}
+
+function updateAggregate(rows) {
+  const valid = rows.filter(r => r.c.totalPnlHome != null);
+  let sumPnl = 0, sumNotional = 0;
+  for (const r of valid) { sumPnl += r.c.totalPnlHome; sumNotional += r.c.totalNotionalHome; }
+  const pct = sumNotional > 0 ? (sumPnl / sumNotional) * 100 : null;
+  const elPnl = document.getElementById("agg-pnl"); const elPct = document.getElementById("agg-pct"); const elNotional = document.getElementById("agg-notional"); const elPnlSub = document.getElementById("agg-pnl-sub"); const elCountSub = document.getElementById("agg-count-sub");
+  if (valid.length === 0) {
+    elPnl.textContent = "—"; elPnl.className = "value tabular";
+    elPct.textContent = "—"; elPct.className = "value tabular";
+    elNotional.textContent = "—";
+    elPnlSub.textContent = trades.length ? t("agg_loading") : t("agg_no_trades");
+  } else {
+    elPnl.textContent = (sumPnl > 0 ? "+" : "") + fmtMoney(sumPnl, homeCurrency);
+    elPnl.className = "value tabular " + signClass(sumPnl);
+    elPct.textContent = fmtPct(pct); elPct.className = "value tabular " + signClass(pct);
+    elNotional.textContent = fmtMoney(sumNotional, homeCurrency);
+    elPnlSub.textContent = t("agg_in_ccy_fx", { ccy: homeCurrency });
+  }
+  const plural = (trades.length === 1) ? t("agg_trade_singular") : t("agg_trade_plural");
+  let countText = t("agg_trades_count", { n: trades.length, plural: plural });
+  if (valid.length < trades.length) countText += t("agg_partial", { n: trades.length - valid.length });
+  elCountSub.textContent = countText;
+}
+
+function applyPriceFlashes() {
+  PRICE_CACHE.forEach((data, sym) => {
+    if (!data || data.error) return;
+    const prev = PREVIOUS_PRICES.get(sym);
+    if (prev != null && prev !== data.price) {
+      const direction = data.price > prev ? "up" : "down";
+      const cells = document.querySelectorAll('[data-flash-ticker="' + sym + '"]');
+      cells.forEach(cell => {
+        cell.classList.remove("flash-up", "flash-down");
+        void cell.offsetWidth;
+        cell.classList.add("flash-" + direction);
+        setTimeout(() => cell.classList.remove("flash-" + direction), 1000);
+      });
+    }
+    PREVIOUS_PRICES.set(sym, data.price);
+  });
+
+  let currentTotalPnl = null;
+  let allValid = true;
+  for (const tr of trades) {
+    const lp = PRICE_CACHE.get(tr.longTicker.toUpperCase());
+    const sp = PRICE_CACHE.get(tr.shortTicker.toUpperCase());
+    const c = computeTrade(tr, lp, sp);
+    if (c.totalPnlHome == null) { allValid = false; break; }
+    currentTotalPnl = (currentTotalPnl || 0) + c.totalPnlHome;
+  }
+  if (allValid && currentTotalPnl != null && lastTotalPnlForFlash != null) {
+    const diff = currentTotalPnl - lastTotalPnlForFlash;
+    if (Math.abs(diff) > 0.001) {
+      const direction = diff > 0 ? "up" : "down";
+      const el = document.getElementById("agg-pnl");
+      if (el) {
+        el.classList.remove("flash-up", "flash-down");
+        void el.offsetWidth;
+        el.classList.add("flash-" + direction);
+        setTimeout(() => el.classList.remove("flash-" + direction), 1000);
+      }
+    }
+  }
+  if (allValid) lastTotalPnlForFlash = currentTotalPnl;
+}
+
+async function refreshAll(force = false) {
+  const status = document.getElementById("status");
+  status.className = "status loading"; status.textContent = t("status_loading_prices");
+  if (!priceSettings.workerUrl) { status.className = "status err"; status.textContent = t("status_no_worker_url"); return; }
+  const tickers = new Set();
+  trades.forEach(tr => { tickers.add(tr.longTicker.toUpperCase()); tickers.add(tr.shortTicker.toUpperCase()); });
+  const arr = [...tickers]; let errCount = 0;
+  for (const tk of arr) { const r = await fetchPrice(tk, force); if (r.error) errCount++; }
+  await ensureFxRatesForTrades();
+  render();
+  applyPriceFlashes();
+  const ts = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  if (errCount > 0) { status.className = "status err"; status.textContent = t("status_ticker_errors", { time: ts, err: errCount, total: arr.length }); }
+  else if (arr.length > 0) { status.className = "status ok"; status.textContent = t("status_updated", { time: ts }); }
+  else { status.className = "status"; status.textContent = t("status_ready"); }
+  setAutoStatus();
+}
+
+function openForm(id = null) {
+  editingId = id;
+  const form = document.getElementById("form");
+  document.getElementById("form-title").textContent = id ? t("form_title_edit") : t("form_title_new");
+  applyTranslations();
+  if (id) {
+    const tr = trades.find(x => x.id === id); if (!tr) return;
+    document.getElementById("f-name").value = tr.name || "";
+    document.getElementById("f-long-ticker").value = tr.longTicker;
+    document.getElementById("f-long-qty").value = formatForInput(tr.longQty);
+    document.getElementById("f-long-entry").value = formatForInput(tr.longEntry);
+    document.getElementById("f-long-native").checked = !!tr.longEntryNative;
+    document.getElementById("f-short-ticker").value = tr.shortTicker;
+    document.getElementById("f-short-qty").value = formatForInput(tr.shortQty);
+    document.getElementById("f-short-entry").value = formatForInput(tr.shortEntry);
+    document.getElementById("f-short-native").checked = !!tr.shortEntryNative;
+    document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(tr.alertPctMin) : "";
+  } else {
+    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct"].forEach(i => document.getElementById(i).value = "");
+    document.getElementById("f-long-native").checked = false;
+    document.getElementById("f-short-native").checked = false;
+  }
+  form.classList.add("open");
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+  setTimeout(() => document.getElementById("f-name").focus(), 200);
+}
+function closeForm() { document.getElementById("form").classList.remove("open"); editingId = null; }
+
+function saveForm() {
+  const name = document.getElementById("f-name").value.trim();
+  const longTicker = document.getElementById("f-long-ticker").value.trim().toUpperCase();
+  const longQty = parseDecimal(document.getElementById("f-long-qty").value);
+  const longEntry = parseDecimal(document.getElementById("f-long-entry").value);
+  const longEntryNative = document.getElementById("f-long-native").checked;
+  const shortTicker = document.getElementById("f-short-ticker").value.trim().toUpperCase();
+  const shortQty = parseDecimal(document.getElementById("f-short-qty").value);
+  const shortEntry = parseDecimal(document.getElementById("f-short-entry").value);
+  const shortEntryNative = document.getElementById("f-short-native").checked;
+  const alertPctRaw = document.getElementById("f-alert-pct").value.trim();
+  let alertPctMin = null;
+  if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = p; }
+  if (!longTicker || !shortTicker) { alert(t("err_ticker_required")); return; }
+  if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
+  if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
+
+  let existingLongEntryCcy = null, existingShortEntryCcy = null;
+  if (editingId) {
+    const existing = trades.find(x => x.id === editingId);
+    if (existing) { existingLongEntryCcy = existing.longEntryCcy || null; existingShortEntryCcy = existing.shortEntryCcy || null; }
+  }
+  const longEntryCcy = longEntryNative ? null : (existingLongEntryCcy || homeCurrency);
+  const shortEntryCcy = shortEntryNative ? null : (existingShortEntryCcy || homeCurrency);
+
+  const data = { name, longTicker, longQty, longEntry, longEntryNative, longEntryCcy, shortTicker, shortQty, shortEntry, shortEntryNative, shortEntryCcy, alertPctMin };
+  if (editingId) { const idx = trades.findIndex(x => x.id === editingId); if (idx >= 0) trades[idx] = { ...trades[idx], ...data, updated: Date.now() }; }
+  else { data.id = "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000); data.created = Date.now(); data.updated = Date.now(); trades.push(data); }
+  markLocalChange(); closeForm(); refreshAll(true);
+}
+function deleteTrade(id) {
+  const tr = trades.find(x => x.id === id); if (!tr) return;
+  if (!confirm(t("card_delete_confirm", { name: tr.name || (tr.longTicker + " / " + tr.shortTicker) }))) return;
+  trades = trades.filter(x => x.id !== id);
+  if (alertStates[id]) delete alertStates[id];
+  markLocalChange(); render();
+}
+
+function openMenu() { document.getElementById("menu-overlay").classList.add("open"); }
+function closeMenu() { document.getElementById("menu-overlay").classList.remove("open"); }
+function openSettings() {
+  document.getElementById("lang-select").value = loadLangPreference();
+  document.getElementById("home-ccy").value = homeCurrency;
+  document.getElementById("worker-url").value = priceSettings.workerUrl || "";
+  document.getElementById("sync-key").value = syncSettings.apiKey || "";
+  document.getElementById("sync-bin").value = syncSettings.binId || "";
+  document.getElementById("price-test-result").style.display = "none";
+  document.getElementById("sync-test-result").style.display = "none";
+  document.getElementById("sync-disable").style.display = syncSettings.enabled ? "block" : "none";
+  document.getElementById("settings-modal").classList.add("open");
+  closeMenu();
+}
+function closeSettings() { document.getElementById("settings-modal").classList.remove("open"); }
+
+async function exportData() {
+  const json = JSON.stringify(trades, null, 2); closeMenu();
+  if (navigator.clipboard?.writeText) { try { await navigator.clipboard.writeText(json); alert(t("io_clipboard_ok")); return; } catch {} }
+  prompt(t("io_clipboard_prompt"), json);
+}
+function importData() {
+  closeMenu();
+  const ta = document.createElement("textarea"); ta.className = "io-textarea";
+  const dlg = document.createElement("div"); dlg.className = "modal-overlay open";
+  const inner = document.createElement("div"); inner.className = "modal";
+  inner.innerHTML = `<h3>${t("io_paste_title")}</h3>`; inner.appendChild(ta);
+  const btnRow = document.createElement("div"); btnRow.className = "modal-actions";
+  btnRow.innerHTML = `<button id="imp-cancel">${t("btn_cancel")}</button><button class="primary" id="imp-ok">${t("btn_import")}</button>`;
+  inner.appendChild(btnRow); dlg.appendChild(inner); document.body.appendChild(dlg); ta.focus();
+  document.getElementById("imp-cancel").onclick = () => dlg.remove();
+  document.getElementById("imp-ok").onclick = () => {
+    try {
+      const parsed = JSON.parse(ta.value);
+      if (!Array.isArray(parsed)) throw new Error("Not an array");
+      const valid = parsed.filter(x => x && x.longTicker && x.shortTicker && x.longEntry && x.shortEntry && x.longQty && x.shortQty);
+      if (valid.length === 0) { alert(t("io_no_valid_trades")); return; }
+      const replace = confirm(t("io_replace_confirm", { existing: trades.length, new: valid.length }));
+      if (replace) trades = valid; else trades = trades.concat(valid);
+      trades = trades.map(x => x.id ? x : { ...x, id: "t_" + Date.now() + "_" + Math.floor(Math.random()*10000), created: Date.now(), updated: Date.now() });
+      migrateTrades();
+      markLocalChange(); dlg.remove(); render(); refreshAll(true);
+    } catch (e) { alert(t("io_invalid_json", { err: e.message })); }
+  };
+}
+function clearAll() { closeMenu(); if (!confirm(t("io_clear_confirm"))) return; trades = []; alertStates = {}; markLocalChange(); render(); }
+
+document.getElementById("btn-new").addEventListener("click", () => openForm(null));
+document.getElementById("btn-refresh").addEventListener("click", () => refreshAll(true));
+document.getElementById("f-cancel").addEventListener("click", closeForm);
+document.getElementById("f-save").addEventListener("click", saveForm);
+document.getElementById("btn-menu").addEventListener("click", openMenu);
+document.getElementById("m-close").addEventListener("click", closeMenu);
+document.getElementById("menu-overlay").addEventListener("click", e => { if (e.target.id === "menu-overlay") closeMenu(); });
+document.getElementById("m-export").addEventListener("click", exportData);
+document.getElementById("m-import").addEventListener("click", importData);
+document.getElementById("m-clear").addEventListener("click", clearAll);
+document.getElementById("m-settings").addEventListener("click", openSettings);
+document.getElementById("m-sync-now").addEventListener("click", () => { closeMenu(); syncFull(); });
+document.getElementById("settings-cancel").addEventListener("click", closeSettings);
+document.getElementById("settings-modal").addEventListener("click", e => { if (e.target.id === "settings-modal") closeSettings(); });
+document.getElementById("settings-test").addEventListener("click", async () => {
+  const wu = document.getElementById("worker-url").value.trim();
+  const sk = document.getElementById("sync-key").value.trim();
+  const sb = document.getElementById("sync-bin").value.trim();
+  const pEl = document.getElementById("price-test-result"); const sEl = document.getElementById("sync-test-result");
+  pEl.style.display = "block"; pEl.className = "test-result"; pEl.textContent = t("test_worker_loading");
+  sEl.style.display = "block"; sEl.className = "test-result"; sEl.textContent = t("test_sync_loading");
+  if (wu) { const pr = await testPriceCredentials(wu); pEl.className = "test-result " + (pr.ok ? "ok" : "err"); pEl.textContent = t("test_worker_prefix") + pr.msg; }
+  else { pEl.className = "test-result err"; pEl.textContent = t("test_worker_no_url"); }
+  if (sk && sb) { const sr = await testSyncCredentials(sk, sb); sEl.className = "test-result " + (sr.ok ? "ok" : "err"); sEl.textContent = t("test_sync_prefix") + sr.msg; }
+  else { sEl.className = "test-result err"; sEl.textContent = t("test_sync_no_creds"); }
+});
+document.getElementById("settings-save").addEventListener("click", async () => {
+  const hc = document.getElementById("home-ccy").value.trim().toUpperCase().slice(0,3);
+  const wu = document.getElementById("worker-url").value.trim();
+  const sk = document.getElementById("sync-key").value.trim();
+  const sb = document.getElementById("sync-bin").value.trim();
+  const langChoice = document.getElementById("lang-select").value;
+  if (hc && /^[A-Z]{3}$/.test(hc)) { homeCurrency = hc; priceSettings.homeCurrency = hc; }
+  priceSettings.workerUrl = wu; savePriceSettings();
+  if (sk && sb) { syncSettings.apiKey = sk; syncSettings.binId = sb; syncSettings.enabled = true; saveSyncSettings(); setSyncStatus("ok", t("status_sync_active")); }
+  saveLangPreference(langChoice);
+  setLanguage(langChoice);
+  closeSettings();
+  FX_CACHE.clear(); PRICE_CACHE.clear(); PREVIOUS_PRICES.clear(); lastTotalPnlForFlash = null;
+  if (trades.length > 0) refreshAll(true);
+  if (syncSettings.enabled) syncFull();
+  setAutoStatus();
+});
+document.getElementById("sync-disable").addEventListener("click", () => {
+  if (!confirm(t("settings_sync_disable_confirm"))) return;
+  syncSettings.enabled = false; saveSyncSettings();
+  closeSettings(); setSyncStatus("off", t("status_sync_off"));
+});
+
+// Initial setup
+const initialLang = loadLangPreference();
+setLanguage(initialLang);
+
+loadStorage();
+render();
+if (syncSettings.enabled) setSyncStatus("ok", t("status_sync_active")); else setSyncStatus("off", t("status_sync_off"));
+if (trades.length > 0 && priceSettings.workerUrl) refreshAll(false);
+if (syncSettings.enabled) syncFull();
+startAutoRefresh();
+setAutoStatus();
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    if (syncSettings.enabled) syncFull();
+    if (trades.length > 0 && priceSettings.workerUrl) {
+      const lastTs = Math.max(...[...PRICE_CACHE.values()].map(v => v.ts || 0), 0);
+      if (Date.now() - lastTs > 60000) refreshAll(false);
+    }
+    setAutoStatus();
+  }
+});
+setInterval(setAutoStatus, 60000);
+</script>
+</body>
+</html>
