@@ -1,6 +1,4 @@
-// =============================================================================
 // Pair Trade Tracker — Cloudflare Worker (Super-Trade / Tranche-aware)
-// =============================================================================
 const ALERT_REPEAT_MS = 3 * 60 * 1000;
 const TRADING_START_HOUR = 9;
 const TRADING_END_HOUR = 23;
