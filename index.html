@@ -98,22 +98,28 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .flash-up { animation: flashUp 900ms ease-out; }
 .flash-down { animation: flashDown 900ms ease-out; }
 .empty { background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 50px 20px; text-align: center; color: var(--muted); font-size: 14px; }
-.warn-box { font-size: 11px; color: var(--warn); margin-top: 8px; padding: 6px 10px; background: rgba(184,133,0,0.08); border-radius: 6px; }
-.info-box { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 8px; margin-bottom: 10px; line-height: 1.45; }
-.tranche-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background: rgba(21,101,192,0.18); color: var(--info); margin-left: 8px; vertical-align: middle; letter-spacing: 0.3px; }
+.warn-box { font-size: 11px; color: var(--warn); margin-top: 8px; padding: 6px 10px; background: rgba(184,133,0,0.08); border-radius: 8px; }
+.info-box { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 10px; margin-bottom: 10px; line-height: 1.45; }
+.tranche-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(21,101,192,0.18); color: var(--info); margin-left: 8px; vertical-align: middle; letter-spacing: 0.3px; }
+.alarm-pill { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.2px; font-variant-numeric: tabular-nums; }
+.alarm-pill.watching { background: rgba(46,125,50,0.18); color: var(--pos); }
+.alarm-pill.triggered { background: var(--neg-bg); color: var(--neg); animation: pulse 1.5s infinite; }
+.alarm-pill.acked { background: rgba(120,120,120,0.18); color: var(--muted); }
 .trade-head.tappable { cursor: pointer; user-select: none; }
 .trade-head.tappable:hover .trade-name { opacity: 0.85; }
-.tranche-panel { margin-top: 10px; padding: 10px; background: rgba(120,120,120,0.06); border-radius: 8px; border: 1px solid var(--border); display: none; }
+.tranche-panel { margin-top: 10px; padding: 10px 10px 6px; background: rgba(120,120,120,0.05); border-radius: 14px; border: 1px solid var(--border); display: none; }
 .tranche-panel.open { display: block; }
-.tranche-panel h5 { font-size: 11px; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
-.tranche-item { padding: 8px 10px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); margin-bottom: 6px; }
+.tranche-panel h5 { font-size: 10px; color: var(--muted); margin: 0 0 8px 4px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+.tranche-item { padding: 8px 10px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); margin-bottom: 6px; }
 .tranche-item:last-child { margin-bottom: 0; }
-.tranche-item-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.tranche-item-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); margin-bottom: 6px; gap: 6px; }
 .tranche-item-head .tranche-label { font-weight: 700; color: var(--text); }
-.tranche-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
-.tranche-row .label { color: var(--muted); }
-.tranche-row .v { font-variant-numeric: tabular-nums; }
-.tranche-del { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: transparent; color: var(--neg); border: 1px solid var(--neg); cursor: pointer; }
+.tranche-item-head .tr-meta { flex: 1; text-align: left; padding-left: 6px; font-size: 10px; opacity: 0.75; }
+.tranche-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; font-size: 12px; }
+.tranche-cell { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; min-width: 0; }
+.tranche-cell .label { color: var(--muted); white-space: nowrap; font-size: 11px; }
+.tranche-cell .v { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tranche-del { font-size: 14px; line-height: 1; padding: 2px 7px; border-radius: 999px; background: transparent; color: var(--neg); border: 1px solid var(--neg); cursor: pointer; font-weight: 700; }
 .tranche-del:hover { background: var(--neg-bg); }
 .muted { color: var(--muted); }
 .tabular { font-variant-numeric: tabular-nums; }
@@ -321,10 +327,9 @@ const STRINGS = {
     err_no_ticker: "Kein Ticker", err_no_data: "Keine Daten", err_no_price_feed: "Kein Preis im Feed",
     err_no_worker_url: "Keine Worker-URL (⋯ → Einstellungen)",
     empty_no_trades_full: "Noch keine Pair Trades. Tippe oben auf <strong>+ Neuer Trade</strong>.",
-    tranche_badge: "× {n} Tranchen", tranche_panel_title: "Tranchen-Historie",
-    tranche_label_n: "Tranche {n}", tranche_created: "Angelegt",
-    tranche_isolated_pnl: "Isolierte P&L", tranche_isolated_pct: "Isolierte Performance",
-    tranche_delete: "Löschen", tranche_delete_confirm: "Diese Tranche löschen? Es wird nur diese Tranche entfernt, der Rest des Trades bleibt bestehen.",
+    tranche_badge: "× {n}", tranche_panel_title: "Tranchen",
+    tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
+    tranche_delete_confirm: "Diese Tranche löschen? Es wird nur diese Tranche entfernt, der Rest des Trades bleibt bestehen.",
     leg_sum_qty: "Σ Anzahl", leg_sum_notional: "Σ Einstandsbasis", leg_sum_pnl: "Σ P&L",
     form_multitranche_note: "Bei mehreren Tranchen können nur Name und Alarm-Schwelle hier bearbeitet werden. Einzelne Tranchen können über die Tranchen-Ansicht gelöscht werden.",
     alarm_supertrade_note: "Hinweis: Beim Aufstocken werden neue Tranchen-Schwellen nicht übernommen — diese Schwelle ändert sich nur durch manuelle Bearbeitung hier.",
@@ -391,10 +396,9 @@ const STRINGS = {
     err_no_ticker: "No ticker", err_no_data: "No data", err_no_price_feed: "No price in feed",
     err_no_worker_url: "No Worker URL (⋯ → Settings)",
     empty_no_trades_full: "No pair trades yet. Tap <strong>+ New Trade</strong> at the top.",
-    tranche_badge: "× {n} tranches", tranche_panel_title: "Tranche history",
-    tranche_label_n: "Tranche {n}", tranche_created: "Created",
-    tranche_isolated_pnl: "Isolated P&L", tranche_isolated_pct: "Isolated performance",
-    tranche_delete: "Delete", tranche_delete_confirm: "Delete this tranche? Only this tranche is removed, the rest of the trade stays.",
+    tranche_badge: "× {n}", tranche_panel_title: "Tranches",
+    tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
+    tranche_delete_confirm: "Delete this tranche? Only this tranche is removed, the rest of the trade stays.",
     leg_sum_qty: "Σ Quantity", leg_sum_notional: "Σ Cost basis", leg_sum_pnl: "Σ P&L",
     form_multitranche_note: "With multiple tranches you can only edit name and alert threshold here. Individual tranches can be deleted from the tranches view.",
     alarm_supertrade_note: "Note: when adding tranches, their thresholds are not adopted — this threshold only changes via manual edit here.",
@@ -461,10 +465,9 @@ const STRINGS = {
     err_no_ticker: "Nessun ticker", err_no_data: "Nessun dato", err_no_price_feed: "Nessun prezzo nel feed",
     err_no_worker_url: "Nessun URL Worker (⋯ → Impostazioni)",
     empty_no_trades_full: "Ancora nessun pair trade. Tocca <strong>+ Nuovo Trade</strong> in alto.",
-    tranche_badge: "× {n} tranche", tranche_panel_title: "Cronologia tranche",
-    tranche_label_n: "Tranche {n}", tranche_created: "Creata",
-    tranche_isolated_pnl: "P&L isolato", tranche_isolated_pct: "Performance isolata",
-    tranche_delete: "Elimina", tranche_delete_confirm: "Eliminare questa tranche? Solo questa viene rimossa, il resto del trade resta.",
+    tranche_badge: "× {n}", tranche_panel_title: "Tranche",
+    tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
+    tranche_delete_confirm: "Eliminare questa tranche? Solo questa viene rimossa, il resto del trade resta.",
     leg_sum_qty: "Σ Quantità", leg_sum_notional: "Σ Base di costo", leg_sum_pnl: "Σ P&L",
     form_multitranche_note: "Con più tranche puoi modificare qui solo nome e soglia d'allarme. Le singole tranche possono essere eliminate dalla vista tranche.",
     alarm_supertrade_note: "Nota: aggiungendo tranche, le loro soglie non vengono adottate — questa soglia cambia solo modificandola qui manualmente.",
@@ -531,10 +534,9 @@ const STRINGS = {
     err_no_ticker: "Нет тикера", err_no_data: "Нет данных", err_no_price_feed: "Нет цены в ленте",
     err_no_worker_url: "Нет URL Worker (⋯ → Настройки)",
     empty_no_trades_full: "Пока нет парных сделок. Нажми <strong>+ Новая сделка</strong> сверху.",
-    tranche_badge: "× {n} траншей", tranche_panel_title: "История траншей",
-    tranche_label_n: "Транш {n}", tranche_created: "Создан",
-    tranche_isolated_pnl: "Изолированный P&L", tranche_isolated_pct: "Изолированная доходность",
-    tranche_delete: "Удалить", tranche_delete_confirm: "Удалить этот транш? Удаляется только этот транш, остальная часть сделки остаётся.",
+    tranche_badge: "× {n}", tranche_panel_title: "Транши",
+    tranche_label_n: "Tr {n}", tranche_isolated_short: "Иso",
+    tranche_delete_confirm: "Удалить этот транш? Удаляется только этот транш, остальная часть сделки остаётся.",
     leg_sum_qty: "Σ Количество", leg_sum_notional: "Σ База стоимости", leg_sum_pnl: "Σ P&L",
     form_multitranche_note: "При нескольких траншах здесь можно редактировать только имя и порог тревоги. Отдельные транши удаляются в виде траншей.",
     alarm_supertrade_note: "Примечание: при добавлении траншей их пороги не перенимаются — этот порог меняется только вручную здесь.",
@@ -627,21 +629,15 @@ function migrateTrades() {
   for (const t of trades) {
     if (t.longEntryCcy === undefined && !t.longEntryNative) { t.longEntryCcy = "EUR"; changed = true; }
     if (t.shortEntryCcy === undefined && !t.shortEntryNative) { t.shortEntryCcy = "EUR"; changed = true; }
-    // Migrate flat leg fields → tranches array
     if (!Array.isArray(t.tranches) || t.tranches.length === 0) {
       t.tranches = [{
         id: "tr_" + (t.id || Date.now()) + "_0",
-        longQty: t.longQty,
-        longEntry: t.longEntry,
-        longEntryCcy: t.longEntryCcy,
-        longEntryNative: !!t.longEntryNative,
-        shortQty: t.shortQty,
-        shortEntry: t.shortEntry,
-        shortEntryCcy: t.shortEntryCcy,
-        shortEntryNative: !!t.shortEntryNative,
+        longQty: t.longQty, longEntry: t.longEntry,
+        longEntryCcy: t.longEntryCcy, longEntryNative: !!t.longEntryNative,
+        shortQty: t.shortQty, shortEntry: t.shortEntry,
+        shortEntryCcy: t.shortEntryCcy, shortEntryNative: !!t.shortEntryNative,
         created: t.created || Date.now()
       }];
-      // Top-level leg fields stay for backward compat with old worker — will be cleaned on next save
       changed = true;
     }
   }
@@ -899,14 +895,11 @@ function computeTrade(tr, lp, sp) {
   }
   let pct = null;
   if (totalPnlHome != null && totalNotionalHome != null && totalNotionalHome > 0) pct = (totalPnlHome / totalNotionalHome) * 100;
-  // Backward-compat aliases (some callers still expect .long / .short with leg data)
   const firstResult = trancheResults[0] || { long: { apiCcy: longApiCcy, entryCcy: longApiCcy, apiToEntryFx: null, entryToHomeFx: null, livePxInEntry: null, pnlInHome: null, entryNotionalInHome: null }, short: { apiCcy: shortApiCcy, entryCcy: shortApiCcy, apiToEntryFx: null, entryToHomeFx: null, livePxInEntry: null, pnlInHome: null, entryNotionalInHome: null } };
   return {
-    tranches: trancheResults,
-    long: firstResult.long, short: firstResult.short,
+    tranches: trancheResults, long: firstResult.long, short: firstResult.short,
     totalNotionalHome, totalPnlHome, pct,
-    aggLongQty, aggShortQty,
-    aggLongPnlHome, aggShortPnlHome,
+    aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome,
     aggLongNotionalHome, aggShortNotionalHome,
     longApiCcy, shortApiCcy, lpx, spx
   };
@@ -942,6 +935,17 @@ function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
   `;
 }
 
+function alarmPillHtml(tr) {
+  if (tr.alertPctMin == null || tr.alertPctMin === "") return "";
+  const st = alertStates[tr.id];
+  const state = st?.current || "idle";
+  const thresholdStr = fmtPct(tr.alertPctMin);
+  let icon = "🔔", cls = "watching";
+  if (state === "triggered") { icon = "🚨"; cls = "triggered"; }
+  else if (state === "acknowledged") { icon = "✓"; cls = "acked"; }
+  return `<span class="alarm-pill ${cls}">${icon} ${thresholdStr}</span>`;
+}
+
 function legAggregateHtml(side, ticker, lp, c) {
   const isLong = side === "long";
   const apiCcy = isLong ? c.longApiCcy : c.shortApiCcy;
@@ -963,25 +967,29 @@ function legAggregateHtml(side, ticker, lp, c) {
 }
 
 function tranchePanelHtml(tr, c) {
-  const localeForLang = currentLang === "de" ? "de-DE" : currentLang === "ru" ? "ru-RU" : currentLang === "it" ? "it-IT" : "en-GB";
+  const locale = currentLang === "de" ? "de-DE" : currentLang === "ru" ? "ru-RU" : currentLang === "it" ? "it-IT" : "en-GB";
   const items = c.tranches.map((tres, i) => {
     const tranche = tres.tranche;
     const dt = tranche.created ? new Date(tranche.created) : null;
-    const dtStr = dt ? dt.toLocaleString(localeForLang, { dateStyle: "short", timeStyle: "short" }) : "—";
+    const dtStr = dt ? dt.toLocaleString(locale, { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
     const longCcy = tranche.longEntryNative ? c.longApiCcy : (tranche.longEntryCcy || homeCurrency);
     const shortCcy = tranche.shortEntryNative ? c.shortApiCcy : (tranche.shortEntryCcy || homeCurrency);
-    const delBtn = c.tranches.length > 1 ? `<button class="tranche-del" data-act="del-tranche" data-trade="${tr.id}" data-tranche="${tranche.id}">${t("tranche_delete")}</button>` : '';
+    const delBtn = c.tranches.length > 1 ? `<button class="tranche-del" data-act="del-tranche" data-trade="${tr.id}" data-tranche="${tranche.id}" aria-label="delete">×</button>` : '';
+    const pnlStr = tres.pnlHome != null ? (tres.pnlHome > 0 ? "+" : "") + fmtMoney(tres.pnlHome, homeCurrency) : "—";
+    const pctStr = fmtPct(tres.pct);
     return `
       <div class="tranche-item">
         <div class="tranche-item-head">
           <span class="tranche-label">${t("tranche_label_n", { n: i + 1 })}</span>
-          <span>${t("tranche_created")}: ${dtStr}</span>
+          <span class="tr-meta">${dtStr}</span>
           ${delBtn}
         </div>
-        <div class="tranche-row"><span class="label">Long ${escapeHtml(tr.longTicker)}</span><span class="v">${fmtNum(tranche.longQty)} × ${fmtMoney(tranche.longEntry, longCcy)}</span></div>
-        <div class="tranche-row"><span class="label">Short ${escapeHtml(tr.shortTicker)}</span><span class="v">${fmtNum(tranche.shortQty)} × ${fmtMoney(tranche.shortEntry, shortCcy)}</span></div>
-        <div class="tranche-row"><span class="label">${t("tranche_isolated_pnl")}</span><span class="v ${signClass(tres.pnlHome)}">${tres.pnlHome != null ? (tres.pnlHome > 0 ? "+" : "") + fmtMoney(tres.pnlHome, homeCurrency) : "—"}</span></div>
-        <div class="tranche-row"><span class="label">${t("tranche_isolated_pct")}</span><span class="v ${signClass(tres.pct)}">${fmtPct(tres.pct)}</span></div>
+        <div class="tranche-grid">
+          <div class="tranche-cell"><span class="label">L ${escapeHtml(tr.longTicker)}</span><span class="v">${fmtNum(tranche.longQty)} × ${fmtMoney(tranche.longEntry, longCcy)}</span></div>
+          <div class="tranche-cell"><span class="label">P&L</span><span class="v ${signClass(tres.pnlHome)}">${pnlStr}</span></div>
+          <div class="tranche-cell"><span class="label">S ${escapeHtml(tr.shortTicker)}</span><span class="v">${fmtNum(tranche.shortQty)} × ${fmtMoney(tranche.shortEntry, shortCcy)}</span></div>
+          <div class="tranche-cell"><span class="label">${t("tranche_isolated_short")}</span><span class="v ${signClass(tres.pct)}">${pctStr}</span></div>
+        </div>
       </div>
     `;
   }).join("");
@@ -1005,7 +1013,8 @@ function render() {
     card.className = "trade-card";
     const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
     const firstT = (tr.tranches && tr.tranches[0]) || {};
-    const badge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
+    const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
+    const aPill = alarmPillHtml(tr);
     const headClass = isMulti ? "trade-head tappable" : "trade-head";
     const legsHtml = isMulti
       ? legAggregateHtml("long", tr.longTicker, lp, c) + legAggregateHtml("short", tr.shortTicker, sp, c)
@@ -1014,7 +1023,7 @@ function render() {
     const panel = isMulti ? tranchePanelHtml(tr, c) : '';
     card.innerHTML = `
       <div class="${headClass}" data-toggle-tranches="${tr.id}">
-        <div class="trade-name">${escapeHtml(tr.name || (tr.longTicker + " / " + tr.shortTicker))}${badge}</div>
+        <div class="trade-name">${escapeHtml(tr.name || (tr.longTicker + " / " + tr.shortTicker))}${tBadge}${aPill}</div>
         <div class="trade-actions"><button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button><button class="icon danger" data-act="del" data-id="${tr.id}">×</button></div>
       </div>
       <div class="trade-perf">
@@ -1136,68 +1145,49 @@ function openForm(id = null) {
   const form = document.getElementById("form");
   document.getElementById("form-title").textContent = id ? t("form_title_edit") : t("form_title_new");
   applyTranslations();
-  // Helper to toggle visibility of tranche-specific fields when editing a multi-tranche trade
-  const fieldsToHide = ["f-long-qty", "f-long-entry", "f-long-native", "f-short-qty", "f-short-entry", "f-short-native", "f-long-ticker", "f-short-ticker"];
-  const setFieldsDisabled = (disabled) => {
-    fieldsToHide.forEach(fid => {
-      const el = document.getElementById(fid);
-      if (!el) return;
-      const wrapper = el.closest(".field") || el.parentElement;
-      if (wrapper) wrapper.style.opacity = disabled ? "0.4" : "1";
-      el.disabled = disabled;
+  const tranchFields = ["f-long-qty", "f-long-entry", "f-long-native", "f-short-qty", "f-short-entry", "f-short-native", "f-long-ticker", "f-short-ticker"];
+  const setMulti = (multi) => {
+    tranchFields.forEach(fid => {
+      const el = document.getElementById(fid); if (!el) return;
+      const wrap = el.closest(".field") || el.parentElement;
+      if (wrap) wrap.style.opacity = multi ? "0.4" : "1";
+      el.disabled = !!multi;
     });
-    // hide leg headers too
-    document.querySelectorAll(".form-leg-header").forEach(h => { h.style.opacity = disabled ? "0.4" : "1"; });
-    // info note
     let note = document.getElementById("form-multitranche-note");
-    if (disabled) {
-      if (!note) {
-        note = document.createElement("div");
-        note.id = "form-multitranche-note";
-        note.className = "info-box";
-        const formEl = document.getElementById("form");
-        formEl.insertBefore(note, formEl.firstChild.nextSibling);
-      }
-      note.textContent = t("form_multitranche_note");
-      note.style.display = "block";
-    } else if (note) {
-      note.style.display = "none";
-    }
-    // alarm note (always shown when editing existing trade that has tranches > 0)
-    let alarmNote = document.getElementById("form-alarm-supertrade-note");
-    if (alarmNote) alarmNote.style.display = "none";
+    if (multi) {
+      if (!note) { note = document.createElement("div"); note.id = "form-multitranche-note"; note.className = "info-box"; const formEl = document.getElementById("form"); formEl.insertBefore(note, formEl.firstChild.nextSibling); }
+      note.textContent = t("form_multitranche_note"); note.style.display = "block";
+    } else if (note) note.style.display = "none";
   };
   if (id) {
     const tr = trades.find(x => x.id === id); if (!tr) return;
     const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
     const firstT = (tr.tranches && tr.tranches[0]) || {};
     document.getElementById("f-name").value = tr.name || "";
-    document.getElementById("f-long-ticker").value = tr.longTicker || firstT.longTicker || "";
+    document.getElementById("f-long-ticker").value = tr.longTicker || "";
     document.getElementById("f-long-qty").value = formatForInput(firstT.longQty);
     document.getElementById("f-long-entry").value = formatForInput(firstT.longEntry);
     document.getElementById("f-long-native").checked = !!firstT.longEntryNative;
-    document.getElementById("f-short-ticker").value = tr.shortTicker || firstT.shortTicker || "";
+    document.getElementById("f-short-ticker").value = tr.shortTicker || "";
     document.getElementById("f-short-qty").value = formatForInput(firstT.shortQty);
     document.getElementById("f-short-entry").value = formatForInput(firstT.shortEntry);
     document.getElementById("f-short-native").checked = !!firstT.shortEntryNative;
     document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(tr.alertPctMin) : "";
-    setFieldsDisabled(isMulti);
-    // Show alarm note when editing existing (super-trade has rule about non-inheritance)
+    setMulti(isMulti);
     let alarmNote = document.getElementById("form-alarm-supertrade-note");
     if (!alarmNote) {
-      alarmNote = document.createElement("div");
-      alarmNote.id = "form-alarm-supertrade-note";
-      alarmNote.className = "info-box";
+      alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box";
       const alarmField = document.getElementById("f-alert-pct").closest(".field");
       if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling);
     }
-    alarmNote.textContent = t("alarm_supertrade_note");
-    alarmNote.style.display = "block";
+    alarmNote.textContent = t("alarm_supertrade_note"); alarmNote.style.display = "block";
   } else {
     ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct"].forEach(i => document.getElementById(i).value = "");
     document.getElementById("f-long-native").checked = false;
     document.getElementById("f-short-native").checked = false;
-    setFieldsDisabled(false);
+    setMulti(false);
+    const alarmNote = document.getElementById("form-alarm-supertrade-note");
+    if (alarmNote) alarmNote.style.display = "none";
   }
   form.classList.add("open");
   form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1219,30 +1209,24 @@ function saveForm() {
   let alertPctMin = null;
   if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = p; }
 
-  // EDITING EXISTING TRADE
   if (editingId) {
     const existing = trades.find(x => x.id === editingId);
     if (!existing) { closeForm(); return; }
     const isMulti = Array.isArray(existing.tranches) && existing.tranches.length > 1;
-    existing.name = name;
-    existing.alertPctMin = alertPctMin;
-    existing.updated = Date.now();
+    existing.name = name; existing.alertPctMin = alertPctMin; existing.updated = Date.now();
     if (!isMulti) {
-      // Single-tranche edit: validate leg fields and update tranche[0]
       if (!longTicker || !shortTicker) { alert(t("err_ticker_required")); return; }
       if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
       if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
       const oldT = existing.tranches[0] || {};
       const longEntryCcy = longEntryNative ? null : (oldT.longEntryCcy || homeCurrency);
       const shortEntryCcy = shortEntryNative ? null : (oldT.shortEntryCcy || homeCurrency);
-      existing.longTicker = longTicker;
-      existing.shortTicker = shortTicker;
+      existing.longTicker = longTicker; existing.shortTicker = shortTicker;
       existing.tranches[0] = { ...oldT, longQty, longEntry, longEntryNative, longEntryCcy, shortQty, shortEntry, shortEntryNative, shortEntryCcy };
     }
     markLocalChange(); closeForm(); refreshAll(true); return;
   }
 
-  // CREATING NEW (or auto-merging into existing)
   if (!longTicker || !shortTicker) { alert(t("err_ticker_required")); return; }
   if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
   if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
@@ -1254,32 +1238,24 @@ function saveForm() {
     shortQty, shortEntry, shortEntryNative, shortEntryCcy,
     created: Date.now()
   };
-  // Auto-merge: search for existing trade with identical long+short tickers
   const matching = trades.find(x => x.longTicker === longTicker && x.shortTicker === shortTicker);
   if (matching) {
     matching.tranches = matching.tranches || [];
     matching.tranches.push(newTranche);
-    // Alarm rule: if existing has no threshold and new has one → adopt; otherwise keep existing
-    if ((matching.alertPctMin == null || matching.alertPctMin === "") && alertPctMin != null) {
-      matching.alertPctMin = alertPctMin;
-    }
+    if ((matching.alertPctMin == null || matching.alertPctMin === "") && alertPctMin != null) matching.alertPctMin = alertPctMin;
     matching.updated = Date.now();
     markLocalChange(); closeForm(); refreshAll(true);
-    // Visual confirmation
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 100);
     return;
   }
-  // No match: standalone new trade
-  const newTrade = {
+  trades.push({
     id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
     name, longTicker, shortTicker, alertPctMin,
     created: Date.now(), updated: Date.now(),
     tranches: [newTranche]
-  };
-  trades.push(newTrade);
+  });
   markLocalChange(); closeForm(); refreshAll(true);
 }
-
 function deleteTrade(id) {
   const tr = trades.find(x => x.id === id); if (!tr) return;
   if (!confirm(t("card_delete_confirm", { name: tr.name || (tr.longTicker + " / " + tr.shortTicker) }))) return;
@@ -1287,18 +1263,13 @@ function deleteTrade(id) {
   if (alertStates[id]) delete alertStates[id];
   markLocalChange(); render();
 }
-
 function deleteTranche(tradeId, trancheId) {
   const tr = trades.find(x => x.id === tradeId); if (!tr) return;
   if (!Array.isArray(tr.tranches) || tr.tranches.length === 0) return;
   if (!confirm(t("tranche_delete_confirm"))) return;
   tr.tranches = tr.tranches.filter(t => t.id !== trancheId);
   tr.updated = Date.now();
-  if (tr.tranches.length === 0) {
-    // No tranches left → delete the whole trade
-    trades = trades.filter(x => x.id !== tradeId);
-    if (alertStates[tradeId]) delete alertStates[tradeId];
-  }
+  if (tr.tranches.length === 0) { trades = trades.filter(x => x.id !== tradeId); if (alertStates[tradeId]) delete alertStates[tradeId]; }
   markLocalChange(); refreshAll(true);
 }
 
