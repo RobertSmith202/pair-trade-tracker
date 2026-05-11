@@ -13,7 +13,7 @@
 //   JSONBIN_BIN_ID
 //   JSONBIN_KEY
 //
-// Cron trigger: configure to run every 3 minutes in dashboard (*/3 * * * *).
+// Cron trigger: configure to run every 3 minutes (*/3 * * * *).
 // =============================================================================
 
 const ALERT_REPEAT_MS = 3 * 60 * 1000;
@@ -32,6 +32,7 @@ const WORKER_STRINGS = {
     threshold:     "Schwelle",
     pnl:           "P&L",
     notional_now:  "Notional jetzt",
+    tranches:      "Tranchen",
     ack_prompt:    "→ Antworte mit beliebigem Text, um den Alarm zu bestätigen",
     ack_received:  "✅ Alarm bestätigt",
     test_alert:    "🧪 Test-Alarm",
@@ -44,6 +45,7 @@ const WORKER_STRINGS = {
     threshold:     "Threshold",
     pnl:           "P&L",
     notional_now:  "Notional now",
+    tranches:      "Tranches",
     ack_prompt:    "→ Reply with any text to acknowledge the alert",
     ack_received:  "✅ Alert acknowledged",
     test_alert:    "🧪 Test alert",
@@ -56,6 +58,7 @@ const WORKER_STRINGS = {
     threshold:     "Soglia",
     pnl:           "P&L",
     notional_now:  "Notional ora",
+    tranches:      "Tranche",
     ack_prompt:    "→ Rispondi con qualsiasi testo per confermare l'allarme",
     ack_received:  "✅ Allarme confermato",
     test_alert:    "🧪 Allarme di prova",
@@ -68,6 +71,7 @@ const WORKER_STRINGS = {
     threshold:     "Порог",
     pnl:           "Прибыль/убыток",
     notional_now:  "Номинал сейчас",
+    tranches:      "Транши",
     ack_prompt:    "→ Ответьте любым текстом, чтобы подтвердить тревогу",
     ack_received:  "✅ Тревога подтверждена",
     test_alert:    "🧪 Тестовая тревога",
@@ -117,7 +121,7 @@ function isWithinTradingHours() {
 }
 
 // =============================================================================
-// Yahoo Finance proxy — raw passthrough (app expects chart.result[0].meta shape)
+// Yahoo Finance proxy — raw passthrough
 // =============================================================================
 async function yahooProxy(symbol) {
   if (!symbol) return jsonResponse({ error: "missing symbol" }, 400);
@@ -212,18 +216,30 @@ async function fetchPriceInternal(symbol) {
 }
 
 // =============================================================================
-// Path-independent performance calculation
+// Get tranches array, with backward-compat for old flat-trade format
+// =============================================================================
+function getTranches(trade) {
+  if (Array.isArray(trade.tranches) && trade.tranches.length > 0) return trade.tranches;
+  // Legacy flat format → synthesize a single tranche from top-level fields
+  return [{
+    longQty: trade.longQty,
+    longEntry: trade.longEntry,
+    longEntryCcy: trade.longEntryCcy,
+    longEntryNative: !!trade.longEntryNative,
+    shortQty: trade.shortQty,
+    shortEntry: trade.shortEntry,
+    shortEntryCcy: trade.shortEntryCcy,
+    shortEntryNative: !!trade.shortEntryNative
+  }];
+}
+
+// =============================================================================
+// Path-independent performance calculation, aggregated across tranches
 // =============================================================================
 async function computePerf(trade) {
   const longLive  = await fetchPriceInternal(trade.longTicker);
   const shortLive = await fetchPriceInternal(trade.shortTicker);
-
-  const longEntryCcy = trade.longEntryNative
-    ? longLive.currency
-    : (trade.longEntryCcy || HOME_CCY);
-  const shortEntryCcy = trade.shortEntryNative
-    ? shortLive.currency
-    : (trade.shortEntryCcy || HOME_CCY);
+  const tranches = getTranches(trade);
 
   async function legPnl(entry, qty, live, apiCcy, entryCcy, isLong) {
     const apiToEntry  = apiCcy === entryCcy   ? 1 : await getFxRate(apiCcy, entryCcy);
@@ -239,15 +255,28 @@ async function computePerf(trade) {
     return { pnlHome, notionalHomeStart, notionalHomeNow };
   }
 
-  const longLeg  = await legPnl(trade.longEntry,  trade.longQty,  longLive.price,  longLive.currency,  longEntryCcy,  true);
-  const shortLeg = await legPnl(trade.shortEntry, trade.shortQty, shortLive.price, shortLive.currency, shortEntryCcy, false);
+  let totalPnlHome = 0;
+  let totalNotionalStart = 0;
+  let totalNotionalNow = 0;
 
-  const pnlHome           = longLeg.pnlHome + shortLeg.pnlHome;
-  const notionalHomeStart = longLeg.notionalHomeStart + shortLeg.notionalHomeStart;
-  const notionalHomeNow   = longLeg.notionalHomeNow   + shortLeg.notionalHomeNow;
-  const perfPct = notionalHomeStart > 0 ? (pnlHome / notionalHomeStart) * 100 : 0;
+  for (const tranche of tranches) {
+    const longEntryCcy = tranche.longEntryNative
+      ? longLive.currency
+      : (tranche.longEntryCcy || HOME_CCY);
+    const shortEntryCcy = tranche.shortEntryNative
+      ? shortLive.currency
+      : (tranche.shortEntryCcy || HOME_CCY);
 
-  return { pnlHome, notionalHomeNow, perfPct };
+    const longLeg  = await legPnl(tranche.longEntry,  tranche.longQty,  longLive.price,  longLive.currency,  longEntryCcy,  true);
+    const shortLeg = await legPnl(tranche.shortEntry, tranche.shortQty, shortLive.price, shortLive.currency, shortEntryCcy, false);
+
+    totalPnlHome      += longLeg.pnlHome + shortLeg.pnlHome;
+    totalNotionalStart += longLeg.notionalHomeStart + shortLeg.notionalHomeStart;
+    totalNotionalNow   += longLeg.notionalHomeNow   + shortLeg.notionalHomeNow;
+  }
+
+  const perfPct = totalNotionalStart > 0 ? (totalPnlHome / totalNotionalStart) * 100 : 0;
+  return { pnlHome: totalPnlHome, notionalHomeNow: totalNotionalNow, perfPct, trancheCount: tranches.length };
 }
 
 // =============================================================================
@@ -271,19 +300,23 @@ async function sendTelegram(env, text) {
   return resp.ok;
 }
 
-function buildAlarmMessage(lang, trade, perfPct, pnl, notionalNow) {
+function buildAlarmMessage(lang, trade, perfPct, pnl, notionalNow, trancheCount) {
   const sign = perfPct >= 0 ? "+" : "";
-  return [
+  const threshold = trade.alertPctMin ?? trade.alertThreshold ?? 0;
+  const lines = [
     workerT(lang, "alarm_title"),
     "",
     workerT(lang, "pair")         + ": " + (trade.name || (trade.longTicker + " / " + trade.shortTicker)),
     workerT(lang, "performance")  + ": " + sign + perfPct.toFixed(2) + "%",
-    workerT(lang, "threshold")    + ": " + trade.alertThreshold.toFixed(2) + "%",
+    workerT(lang, "threshold")    + ": " + Number(threshold).toFixed(2) + "%",
     workerT(lang, "pnl")          + ": " + (pnl >= 0 ? "+" : "") + pnl.toFixed(2) + " " + HOME_CCY,
-    workerT(lang, "notional_now") + ": " + notionalNow.toFixed(2) + " " + HOME_CCY,
-    "",
-    workerT(lang, "ack_prompt")
-  ].join("\n");
+    workerT(lang, "notional_now") + ": " + notionalNow.toFixed(2) + " " + HOME_CCY
+  ];
+  if (trancheCount > 1) {
+    lines.push(workerT(lang, "tranches") + ": " + trancheCount);
+  }
+  lines.push("", workerT(lang, "ack_prompt"));
+  return lines.join("\n");
 }
 
 // =============================================================================
@@ -302,7 +335,8 @@ async function runAlarmCheck(env) {
   const results = [];
 
   for (const trade of trades) {
-    if (!trade.alertEnabled || !trade.alertThreshold) continue;
+    const threshold = trade.alertPctMin ?? trade.alertThreshold;
+    if (threshold == null || threshold === "") continue;
     const id = trade.id;
     const state = states[id] || { state: "idle", lastAlertAt: 0 };
     let perf;
@@ -313,16 +347,16 @@ async function runAlarmCheck(env) {
       continue;
     }
 
-    const breached = perf.perfPct <= -Math.abs(trade.alertThreshold);
+    const breached = perf.perfPct <= -Math.abs(Number(threshold));
     const now = Date.now();
 
     if (breached && state.state === "idle") {
-      await sendTelegram(env, buildAlarmMessage(lang, trade, perf.perfPct, perf.pnlHome, perf.notionalHomeNow));
+      await sendTelegram(env, buildAlarmMessage(lang, trade, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
       states[id] = { state: "triggered", lastAlertAt: now };
       stateChanged = true;
       results.push({ id, action: "triggered" });
     } else if (breached && state.state === "triggered" && (now - state.lastAlertAt) >= ALERT_REPEAT_MS) {
-      await sendTelegram(env, buildAlarmMessage(lang, trade, perf.perfPct, perf.pnlHome, perf.notionalHomeNow));
+      await sendTelegram(env, buildAlarmMessage(lang, trade, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
       states[id] = { state: "triggered", lastAlertAt: now };
       stateChanged = true;
       results.push({ id, action: "repeated" });
@@ -331,7 +365,7 @@ async function runAlarmCheck(env) {
       stateChanged = true;
       results.push({ id, action: "reset" });
     } else {
-      results.push({ id, action: "noop", state: state.state, perf: perf.perfPct });
+      results.push({ id, action: "noop", state: state.state, perf: perf.perfPct, tranches: perf.trancheCount });
     }
   }
 
