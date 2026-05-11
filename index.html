@@ -173,6 +173,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .test-result { padding: 8px 12px; border-radius: 8px; font-size: 13px; }
 .test-result.ok { background: var(--pos-bg); color: var(--pos); }
 .test-result.err { background: var(--neg-bg); color: var(--neg); }
+.kbd-hint { font-size: 11px; color: var(--muted); margin-top: -2px; line-height: 1.4; }
+.kbd-hint kbd { font-family: ui-monospace, SFMono-Regular, monospace; background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px; padding: 1px 5px; border-radius: 4px; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -349,6 +351,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
         <option value="short" data-i18n="page_shorts">Shorts</option>
         <option value="total" data-i18n="page_total">Gesamt</option>
       </select>
+      <div class="kbd-hint" id="kbd-hint">⌨︎ <kbd>⌘</kbd>+<kbd>1</kbd>..<kbd>4</kbd> (Mac) bzw. <kbd>Ctrl</kbd>+<kbd>1</kbd>..<kbd>4</kbd> springt direkt zur jeweiligen Page.</div>
     </div>
 
     <h4 class="section-h" data-i18n="settings_home_ccy">Heimat-Währung</h4>
@@ -378,7 +381,6 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 </div>
 
 <script>
-// =========================== I18N STRINGS DICTIONARY ===========================
 const STRINGS = {
   de: {
     html_lang: "de",
@@ -709,7 +711,6 @@ function applyTranslations() {
   setAutoStatus();
 }
 
-// =========================== APP STATE ===========================
 const STORAGE_KEY = "pair_trade_tracker_v2";
 const STORAGE_KEY_OLD = "pair_trade_tracker_v1";
 const SYNC_KEY = "pair_trade_sync_v1";
@@ -1215,7 +1216,6 @@ function computeRowsFor(pageTrades) {
 }
 
 function render() {
-  // Trade-Cards for pair/long/short pages
   for (const pageKey of ["pair", "long", "short"]) {
     const list = document.querySelector(`.trade-list[data-list="${pageKey}"]`);
     if (!list) continue;
@@ -1230,12 +1230,10 @@ function render() {
     for (const row of rows) list.appendChild(renderOneTradeCard(row.trade, row.c));
     updatePageAggregate(pageKey, rows);
   }
-  // Total page: big aggregate + 3 breakdown cards. No individual trades.
   const totalRows = computeRowsFor(trades);
   updatePageAggregate("total", totalRows);
   updateTotalBreakdown();
 
-  // Wire up event handlers on freshly-built buttons / headers
   document.querySelectorAll("button[data-act]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -1382,7 +1380,6 @@ async function refreshAll(force = false) {
   setAutoStatus();
 }
 
-// =========================== FORM ===========================
 function applyFormTypeUI(type) {
   formType = type;
   document.querySelectorAll(".type-radio").forEach(r => {
@@ -1639,7 +1636,6 @@ function importData() {
 }
 function clearAll() { closeMenu(); if (!confirm(t("io_clear_confirm"))) return; trades = []; alertStates = {}; markLocalChange(); render(); }
 
-// =========================== PAGE NAV ===========================
 function scrollToPage(pageKey, smooth = true) {
   const container = document.getElementById("pages-container");
   const idx = PAGES.indexOf(pageKey);
@@ -1668,7 +1664,6 @@ function onPagesScroll() {
   }, 80);
 }
 
-// =========================== EVENT WIRING ===========================
 document.getElementById("btn-new").addEventListener("click", () => openForm(null));
 document.getElementById("btn-refresh").addEventListener("click", () => refreshAll(true));
 document.getElementById("f-cancel").addEventListener("click", closeForm);
@@ -1730,7 +1725,20 @@ document.querySelectorAll(".page-dot").forEach(d => {
 document.getElementById("pages-container").addEventListener("scroll", onPagesScroll, { passive: true });
 window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
-// Initial setup
+// =========== KEYBOARD SHORTCUTS (Mac Cmd / Win-Linux Ctrl + 1..4) ===========
+// Skip when typing in inputs or when an overlay is open and the focus matters.
+document.addEventListener("keydown", (e) => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  if (e.altKey || e.shiftKey) return;
+  if (e.key < "1" || e.key > "4") return;
+  const tag = (e.target?.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target?.isContentEditable)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const idx = parseInt(e.key, 10) - 1;
+  if (idx >= 0 && idx < PAGES.length) scrollToPage(PAGES[idx], true);
+}, { capture: true });
+
 const initialLang = loadLangPreference();
 setLanguage(initialLang);
 
