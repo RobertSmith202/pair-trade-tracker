@@ -14,8 +14,9 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 :root { color-scheme: light dark; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
 @media (prefers-color-scheme: dark) { :root { --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; } }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom) 14px; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; }
-header { padding: 14px 0 10px; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 50px) 0; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; overflow-x: hidden; }
+.body-pad { padding: 0 14px; }
+header { padding: 14px 14px 10px; }
 h1 { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
 .subtitle { color: var(--muted); font-size: 13px; }
 .aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 14px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -29,16 +30,17 @@ button:active { transform: scale(0.98); }
 button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 button.danger { color: var(--neg); border-color: var(--neg-bg); }
 button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+.toolbar-wrap { position: sticky; top: 0; z-index: 50; background: var(--bg); padding: 8px 14px 4px; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .toolbar button { flex: 1 1 auto; min-width: 0; }
 .toolbar .menu-btn { flex: 0 0 auto; }
-.statusbar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); padding: 4px 4px 12px; gap: 8px; flex-wrap: wrap; }
+.statusbar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); padding: 4px 4px 8px; gap: 8px; flex-wrap: wrap; }
 .status.loading::before { content: "● "; color: #ff9800; animation: pulse 1s infinite; }
 .status.ok::before { content: "● "; color: var(--pos); }
 .status.err::before { content: "● "; color: var(--neg); }
 .status.off::before { content: "○ "; color: var(--muted); }
 @keyframes pulse { 50% { opacity: 0.3; } }
-.form-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; display: none; }
+.form-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 0 14px 14px; display: none; }
 .form-card.open { display: block; }
 .form-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
 .form-card .form-help { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 8px; margin-bottom: 12px; line-height: 1.4; }
@@ -46,10 +48,15 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .form-section.long { background: var(--pos-soft); border-left: 3px solid var(--pos); }
 .form-section.short { background: var(--neg-soft); border-left: 3px solid var(--neg); }
 .form-section.alarm { background: rgba(255,152,0,0.06); border-left: 3px solid #ff9800; }
+.form-section.type { background: rgba(21,101,192,0.06); border-left: 3px solid var(--info); }
 .form-section h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
 .form-section.long h4 { color: var(--pos); }
 .form-section.short h4 { color: var(--neg); }
 .form-section.alarm h4 { color: #ef6c00; }
+.form-section.type h4 { color: var(--info); }
+.type-radio-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.type-radio { padding: 10px 8px; border: 1px solid var(--border); border-radius: 8px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 600; background: var(--card); user-select: none; }
+.type-radio.active { background: var(--info); color: white; border-color: var(--info); }
 .field { margin-bottom: 8px; }
 .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
 .field .help { font-size: 11px; color: var(--muted); margin-top: 4px; }
@@ -61,7 +68,17 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .checkbox-row label { font-size: 12px; color: var(--text); margin: 0; cursor: pointer; line-height: 1.3; }
 .form-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .form-actions button { flex: 1; min-width: 100px; }
-.trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 80px; }
+
+/* PAGES */
+.pages-container { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; width: 100%; scrollbar-width: none; }
+.pages-container::-webkit-scrollbar { display: none; }
+.page { flex: 0 0 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; padding: 0 14px; }
+.page-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 700; padding: 8px 4px 0; }
+.trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
+.page-dots { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; padding: 12px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(to top, var(--bg) 60%, transparent); z-index: 40; pointer-events: none; }
+.page-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); cursor: pointer; transition: background-color 0.15s, transform 0.15s; pointer-events: auto; }
+.page-dot.active { background: var(--accent); transform: scale(1.3); }
+
 .trade-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
 .trade-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .trade-name { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
@@ -98,6 +115,10 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .flash-up { animation: flashUp 900ms ease-out; }
 .flash-down { animation: flashDown 900ms ease-out; }
 .empty { background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 50px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+.type-badge { display: inline-block; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.4px; }
+.type-badge.long { background: var(--pos-bg); color: var(--pos); }
+.type-badge.short { background: var(--neg-bg); color: var(--neg); }
+.type-badge.pair { background: rgba(21,101,192,0.15); color: var(--info); }
 .warn-box { font-size: 11px; color: var(--warn); margin-top: 8px; padding: 6px 10px; background: rgba(184,133,0,0.08); border-radius: 6px; }
 .info-box { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 8px; margin-bottom: 10px; line-height: 1.45; }
 .tranche-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: rgba(21,101,192,0.18); color: var(--info); margin-left: 8px; vertical-align: middle; letter-spacing: 0.3px; }
@@ -149,28 +170,32 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   <div class="subtitle" data-i18n="header_subtitle">Long − Short · Yahoo via Cloudflare Worker · Auto-Refresh · Telegram-Alarm</div>
 </header>
 
-<div class="aggregate" id="aggregate">
-  <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" id="agg-pnl">—</div><div class="sub" id="agg-pnl-sub">&nbsp;</div></div>
-  <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" id="agg-pct">—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
-  <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" id="agg-notional">—</div><div class="sub" id="agg-count-sub">0 Trades</div></div>
-</div>
-
-<div class="toolbar">
-  <button class="primary" id="btn-new" data-i18n="btn_new_trade">+ Neuer Trade</button>
-  <button id="btn-refresh" data-i18n="btn_refresh">↻ Kurse</button>
-  <button class="menu-btn icon" id="btn-menu" aria-label="Menü">⋯</button>
-</div>
-<div class="statusbar">
-  <div class="status" id="status" data-i18n="status_ready">Bereit</div>
-  <div class="status" id="auto-status">⏱ …</div>
-  <div class="status off" id="sync-status" data-i18n="status_sync_off">Sync aus</div>
+<div class="toolbar-wrap">
+  <div class="toolbar">
+    <button class="primary" id="btn-new" data-i18n="btn_new_trade">+ Neuer Trade</button>
+    <button id="btn-refresh" data-i18n="btn_refresh">↻ Kurse</button>
+    <button class="menu-btn icon" id="btn-menu" aria-label="Menü">⋯</button>
+  </div>
+  <div class="statusbar">
+    <div class="status" id="status" data-i18n="status_ready">Bereit</div>
+    <div class="status" id="auto-status">⏱ …</div>
+    <div class="status off" id="sync-status" data-i18n="status_sync_off">Sync aus</div>
+  </div>
 </div>
 
 <div class="form-card" id="form">
-  <h3 id="form-title" data-i18n="form_title_new">Neuer Pair Trade</h3>
+  <h3 id="form-title" data-i18n="form_title_new">Neuer Trade</h3>
+  <div class="form-section type" id="form-type-section">
+    <h4 data-i18n="form_type_label">Trade-Typ</h4>
+    <div class="type-radio-row">
+      <div class="type-radio active" data-type="pair" data-i18n="form_type_pair">Paar</div>
+      <div class="type-radio" data-type="long" data-i18n="form_type_long">Nur Long</div>
+      <div class="type-radio" data-type="short" data-i18n="form_type_short">Nur Short</div>
+    </div>
+  </div>
   <div class="form-help" id="form-help-currency"></div>
   <div class="field"><label data-i18n="form_trade_name">Trade-Name (frei)</label><input id="f-name" type="text" data-i18n-placeholder="form_trade_name_ph" placeholder="z.B. SAP vs Oracle"></div>
-  <div class="form-section long">
+  <div class="form-section long" id="form-long-section">
     <h4 data-i18n="form_long_position">Long-Position</h4>
     <div class="field"><label data-i18n="form_ticker">Ticker (Yahoo-Format)</label><input id="f-long-ticker" type="text" autocapitalize="characters" autocorrect="off" autocomplete="off"></div>
     <div class="field-row">
@@ -182,7 +207,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
       <label for="f-long-native" id="f-long-native-label"></label>
     </div>
   </div>
-  <div class="form-section short">
+  <div class="form-section short" id="form-short-section">
     <h4 data-i18n="form_short_position">Short-Position</h4>
     <div class="field"><label data-i18n="form_ticker">Ticker (Yahoo-Format)</label><input id="f-short-ticker" type="text" autocapitalize="characters" autocorrect="off" autocomplete="off"></div>
     <div class="field-row">
@@ -205,7 +230,51 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   <div class="form-actions"><button id="f-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="f-save" data-i18n="btn_save">Speichern</button></div>
 </div>
 
-<div id="trade-list" class="trade-list"></div>
+<div class="pages-container" id="pages-container">
+  <section class="page" data-page="pair">
+    <div class="page-title" data-i18n="page_pairs">Paare</div>
+    <div class="aggregate" data-agg="pair">
+      <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+    </div>
+    <div class="trade-list" data-list="pair"></div>
+  </section>
+  <section class="page" data-page="long">
+    <div class="page-title" data-i18n="page_longs">Longs</div>
+    <div class="aggregate" data-agg="long">
+      <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+    </div>
+    <div class="trade-list" data-list="long"></div>
+  </section>
+  <section class="page" data-page="short">
+    <div class="page-title" data-i18n="page_shorts">Shorts</div>
+    <div class="aggregate" data-agg="short">
+      <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+    </div>
+    <div class="trade-list" data-list="short"></div>
+  </section>
+  <section class="page" data-page="total">
+    <div class="page-title" data-i18n="page_total">Gesamt</div>
+    <div class="aggregate" data-agg="total">
+      <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+    </div>
+    <div class="trade-list" data-list="total"></div>
+  </section>
+</div>
+
+<div class="page-dots" id="page-dots">
+  <div class="page-dot active" data-dot="pair"></div>
+  <div class="page-dot" data-dot="long"></div>
+  <div class="page-dot" data-dot="short"></div>
+  <div class="page-dot" data-dot="total"></div>
+</div>
 
 <div class="menu-overlay" id="menu-overlay">
   <div class="menu-sheet">
@@ -234,6 +303,18 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
         <option value="en">English</option>
         <option value="it">Italiano</option>
         <option value="ru">Русский</option>
+      </select>
+    </div>
+
+    <h4 class="section-h" data-i18n="settings_start_page">Standard-Page</h4>
+    <div class="info-box" data-i18n="settings_start_page_info"></div>
+    <div class="field">
+      <label data-i18n="settings_start_page_label">Standard-Page</label>
+      <select id="start-page-select">
+        <option value="pair" data-i18n="page_pairs">Paare</option>
+        <option value="long" data-i18n="page_longs">Longs</option>
+        <option value="short" data-i18n="page_shorts">Shorts</option>
+        <option value="total" data-i18n="page_total">Gesamt</option>
       </select>
     </div>
 
@@ -285,7 +366,7 @@ const STRINGS = {
     status_sync_off: "Sync aus", status_sync_active: "Sync aktiv", status_pull: "Pull…", status_push: "Push…",
     status_sync_synced: "synchron · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
     status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
-    form_title_new: "Neuer Pair Trade", form_title_edit: "Pair Trade bearbeiten",
+    form_title_new: "Neuer Trade", form_title_edit: "Trade bearbeiten",
     form_help_currency: "Standard: Einstand wird in <strong>{ccy}</strong> interpretiert (pfadunabhängig fixiert). Häkchen setzen wenn der Einstand stattdessen in der Notierungswährung der Aktie gemeint ist. Ticker im Yahoo-Format (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
     form_trade_name: "Trade-Name (frei)", form_trade_name_ph: "z.B. SAP vs Oracle",
     form_long_position: "Long-Position", form_short_position: "Short-Position",
@@ -293,6 +374,7 @@ const STRINGS = {
     form_native_checkbox: "Einstand in Notierungswährung der Aktie (statt {ccy})",
     form_alarm_title: "🚨 Telegram-Alarm (optional)", form_alarm_pct_label: "Alarm bei Performance unter % (negative Zahl)",
     form_alarm_pct_help: "Leer = aus. Beispiel: <code>-30</code> = Alarm ab 30% Verlust auf Notional. Telegram-Wiederholung alle 3 Min bis du quittierst.",
+    form_type_label: "Trade-Typ", form_type_pair: "Paar", form_type_long: "Nur Long", form_type_short: "Nur Short",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
     card_delete_confirm: "„{name}\" löschen?",
@@ -303,6 +385,8 @@ const STRINGS = {
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
     settings_language_info: "Pro Gerät gespeichert (nicht synced).",
+    settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
+    settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
     settings_home_ccy_info: "Alle PnL-Werte und Notionals in dieser Währung. Standard für Einstand-Eingabe bei neuen Trades. Bei bestehenden Trades bleibt die Einstands-Whg pfadunabhängig fix.",
     settings_worker_title: "Live-Kurse · Cloudflare Worker", settings_worker_info: "URL deines Yahoo-Finance-Proxy-Workers (workers.dev).",
@@ -323,10 +407,13 @@ const STRINGS = {
     io_clear_confirm: "Wirklich ALLE Trades löschen?",
     err_ticker_required: "Bitte beide Ticker eingeben.", err_long_invalid: "Long: Anzahl und Einstand müssen > 0 sein.",
     err_short_invalid: "Short: Anzahl und Einstand müssen > 0 sein.",
+    err_long_ticker_required: "Bitte Long-Ticker eingeben.", err_short_ticker_required: "Bitte Short-Ticker eingeben.",
     err_alarm_invalid: "Alarm-Schwelle: ungültige Zahl. Beispiel: -30",
     err_no_ticker: "Kein Ticker", err_no_data: "Keine Daten", err_no_price_feed: "Kein Preis im Feed",
     err_no_worker_url: "Keine Worker-URL (⋯ → Einstellungen)",
-    empty_no_trades_full: "Noch keine Pair Trades. Tippe oben auf <strong>+ Neuer Trade</strong>.",
+    empty_no_trades_full: "Noch keine Trades. Tippe oben auf <strong>+ Neuer Trade</strong>.",
+    empty_no_pairs: "Noch keine Pair-Trades.", empty_no_longs: "Noch keine Long-Trades.", empty_no_shorts: "Noch keine Short-Trades.",
+    page_pairs: "Paare", page_longs: "Longs", page_shorts: "Shorts", page_total: "Gesamt",
     tranche_badge: "× {n}", tranche_panel_title: "Tranchen", tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
     tranche_delete_confirm: "Diese Tranche löschen? Es wird nur diese Tranche entfernt, der Rest des Trades bleibt bestehen.",
     leg_sum_qty: "Σ Anzahl", leg_sum_notional: "Σ Einstandsbasis", leg_sum_pnl: "Σ P&L",
@@ -353,7 +440,7 @@ const STRINGS = {
     status_sync_off: "Sync off", status_sync_active: "Sync active", status_pull: "Pull…", status_push: "Push…",
     status_sync_synced: "in sync · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
     status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
-    form_title_new: "New pair trade", form_title_edit: "Edit pair trade",
+    form_title_new: "New trade", form_title_edit: "Edit trade",
     form_help_currency: "Default: entry price is interpreted in <strong>{ccy}</strong> (locked path-independently). Tick the box if the entry price is in the stock's quoted currency instead. Tickers in Yahoo format (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
     form_trade_name: "Trade name (optional)", form_trade_name_ph: "e.g. SAP vs Oracle",
     form_long_position: "Long position", form_short_position: "Short position",
@@ -361,6 +448,7 @@ const STRINGS = {
     form_native_checkbox: "Entry price in stock's quoted currency (instead of {ccy})",
     form_alarm_title: "🚨 Telegram alert (optional)", form_alarm_pct_label: "Alert when performance below % (negative number)",
     form_alarm_pct_help: "Empty = off. Example: <code>-30</code> = alert at 30% loss on notional. Telegram repeats every 3 min until you acknowledge.",
+    form_type_label: "Trade type", form_type_pair: "Pair", form_type_long: "Long only", form_type_short: "Short only",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
     card_delete_confirm: "Delete \"{name}\"?",
@@ -371,6 +459,8 @@ const STRINGS = {
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
     settings_language_info: "Stored per device (not synced).",
+    settings_start_page: "Default page", settings_start_page_label: "Default page",
+    settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
     settings_home_ccy_info: "All P&L values and notionals shown in this currency. Default for entry input on new trades. Existing trades keep their entry currency fixed (path-independent).",
     settings_worker_title: "Live quotes · Cloudflare Worker", settings_worker_info: "URL of your Yahoo Finance proxy Worker (workers.dev).",
@@ -391,10 +481,13 @@ const STRINGS = {
     io_clear_confirm: "Really delete ALL trades?",
     err_ticker_required: "Please enter both tickers.", err_long_invalid: "Long: quantity and entry must be > 0.",
     err_short_invalid: "Short: quantity and entry must be > 0.",
+    err_long_ticker_required: "Please enter the long ticker.", err_short_ticker_required: "Please enter the short ticker.",
     err_alarm_invalid: "Alarm threshold: invalid number. Example: -30",
     err_no_ticker: "No ticker", err_no_data: "No data", err_no_price_feed: "No price in feed",
     err_no_worker_url: "No Worker URL (⋯ → Settings)",
-    empty_no_trades_full: "No pair trades yet. Tap <strong>+ New Trade</strong> at the top.",
+    empty_no_trades_full: "No trades yet. Tap <strong>+ New Trade</strong> at the top.",
+    empty_no_pairs: "No pair trades yet.", empty_no_longs: "No long trades yet.", empty_no_shorts: "No short trades yet.",
+    page_pairs: "Pairs", page_longs: "Longs", page_shorts: "Shorts", page_total: "Total",
     tranche_badge: "× {n}", tranche_panel_title: "Tranches", tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
     tranche_delete_confirm: "Delete this tranche? Only this tranche is removed, the rest of the trade stays.",
     leg_sum_qty: "Σ Quantity", leg_sum_notional: "Σ Cost basis", leg_sum_pnl: "Σ P&L",
@@ -421,7 +514,7 @@ const STRINGS = {
     status_sync_off: "Sync disattivato", status_sync_active: "Sync attivo", status_pull: "Pull…", status_push: "Push…",
     status_sync_synced: "sincronizzato · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
     status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
-    form_title_new: "Nuovo pair trade", form_title_edit: "Modifica pair trade",
+    form_title_new: "Nuovo trade", form_title_edit: "Modifica trade",
     form_help_currency: "Predefinito: il prezzo d'ingresso è interpretato in <strong>{ccy}</strong> (fissato indipendentemente dal percorso). Spunta la casella se il prezzo d'ingresso è invece nella valuta di quotazione del titolo. Ticker in formato Yahoo (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
     form_trade_name: "Nome del trade (libero)", form_trade_name_ph: "es. SAP vs Oracle",
     form_long_position: "Posizione long", form_short_position: "Posizione short",
@@ -429,6 +522,7 @@ const STRINGS = {
     form_native_checkbox: "Prezzo d'ingresso nella valuta di quotazione (invece di {ccy})",
     form_alarm_title: "🚨 Avviso Telegram (opzionale)", form_alarm_pct_label: "Avviso quando la performance scende sotto % (numero negativo)",
     form_alarm_pct_help: "Vuoto = disattivato. Esempio: <code>-30</code> = avviso al 30% di perdita sul nozionale. Ripetizione Telegram ogni 3 min finché non confermi.",
+    form_type_label: "Tipo trade", form_type_pair: "Coppia", form_type_long: "Solo Long", form_type_short: "Solo Short",
     card_notional: "Nozionale ({ccy})", card_qty_x_entry: "Qtà × Ingresso", card_current: "Attuale",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "Tasso FX non disponibile", card_loading: "carico...",
     card_delete_confirm: "Eliminare \"{name}\"?",
@@ -439,6 +533,8 @@ const STRINGS = {
     menu_export: "Esporta (copia JSON)", menu_import: "Importa (incolla JSON)", menu_clear_all: "Elimina tutti i trade",
     settings_title: "Impostazioni", settings_language: "Lingua", settings_language_label: "Lingua",
     settings_language_info: "Memorizzato per dispositivo (non sincronizzato).",
+    settings_start_page: "Page predefinita", settings_start_page_label: "Page predefinita",
+    settings_start_page_info: "Quale page mostrare all'avvio. Memorizzato per dispositivo (non sincronizzato).",
     settings_home_ccy: "Valuta principale", settings_home_ccy_label: "Codice ISO (EUR, USD, GBP, CHF, ...)",
     settings_home_ccy_info: "Tutti i valori P&L e nozionali sono mostrati in questa valuta. Predefinito per inserimento prezzo nei nuovi trade. I trade esistenti mantengono la loro valuta d'ingresso fissata (indipendente dal percorso).",
     settings_worker_title: "Quote live · Cloudflare Worker", settings_worker_info: "URL del tuo Worker proxy Yahoo Finance (workers.dev).",
@@ -459,10 +555,13 @@ const STRINGS = {
     io_clear_confirm: "Eliminare davvero TUTTI i trade?",
     err_ticker_required: "Inserisci entrambi i ticker.", err_long_invalid: "Long: quantità e ingresso devono essere > 0.",
     err_short_invalid: "Short: quantità e ingresso devono essere > 0.",
+    err_long_ticker_required: "Inserisci il ticker long.", err_short_ticker_required: "Inserisci il ticker short.",
     err_alarm_invalid: "Soglia allarme: numero non valido. Esempio: -30",
     err_no_ticker: "Nessun ticker", err_no_data: "Nessun dato", err_no_price_feed: "Nessun prezzo nel feed",
     err_no_worker_url: "Nessun URL Worker (⋯ → Impostazioni)",
-    empty_no_trades_full: "Ancora nessun pair trade. Tocca <strong>+ Nuovo Trade</strong> in alto.",
+    empty_no_trades_full: "Ancora nessun trade. Tocca <strong>+ Nuovo Trade</strong> in alto.",
+    empty_no_pairs: "Ancora nessun pair trade.", empty_no_longs: "Ancora nessun trade long.", empty_no_shorts: "Ancora nessun trade short.",
+    page_pairs: "Coppie", page_longs: "Long", page_shorts: "Short", page_total: "Totale",
     tranche_badge: "× {n}", tranche_panel_title: "Tranche", tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
     tranche_delete_confirm: "Eliminare questa tranche? Solo questa viene rimossa, il resto del trade resta.",
     leg_sum_qty: "Σ Quantità", leg_sum_notional: "Σ Base di costo", leg_sum_pnl: "Σ P&L",
@@ -489,7 +588,7 @@ const STRINGS = {
     status_sync_off: "Sync выкл", status_sync_active: "Sync активен", status_pull: "Pull…", status_push: "Push…",
     status_sync_synced: "синхронизирован · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
     status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
-    form_title_new: "Новая парная сделка", form_title_edit: "Изменить парную сделку",
+    form_title_new: "Новая сделка", form_title_edit: "Изменить сделку",
     form_help_currency: "По умолчанию: цена входа интерпретируется в <strong>{ccy}</strong> (зафиксировано независимо от пути). Поставь галочку, если цена входа в валюте котировки акции. Тикеры в формате Yahoo (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
     form_trade_name: "Название сделки (свободно)", form_trade_name_ph: "напр. SAP vs Oracle",
     form_long_position: "Long-позиция", form_short_position: "Short-позиция",
@@ -497,6 +596,7 @@ const STRINGS = {
     form_native_checkbox: "Цена входа в валюте котировки (вместо {ccy})",
     form_alarm_title: "🚨 Уведомление Telegram (опционально)", form_alarm_pct_label: "Уведомление при доходности ниже % (отрицательное число)",
     form_alarm_pct_help: "Пусто = выкл. Пример: <code>-30</code> = уведомление при 30% убытка от номинала. Повтор в Telegram каждые 3 мин до подтверждения.",
+    form_type_label: "Тип сделки", form_type_pair: "Пара", form_type_long: "Только Long", form_type_short: "Только Short",
     card_notional: "Номинал ({ccy})", card_qty_x_entry: "Кол-во × Вход", card_current: "Текущая",
     card_pnl: "P&L", card_pnl_in: "(в {ccy})", card_fx_unavailable: "FX-курс недоступен", card_loading: "загрузка...",
     card_delete_confirm: "Удалить «{name}»?",
@@ -507,6 +607,8 @@ const STRINGS = {
     menu_export: "Экспорт (копировать JSON)", menu_import: "Импорт (вставить JSON)", menu_clear_all: "Удалить все сделки",
     settings_title: "Настройки", settings_language: "Язык", settings_language_label: "Язык",
     settings_language_info: "Сохраняется на устройстве (не синхронизируется).",
+    settings_start_page: "Стартовая page", settings_start_page_label: "Стартовая page",
+    settings_start_page_info: "Какая page показывается при запуске. Сохраняется на устройстве (не синхронизируется).",
     settings_home_ccy: "Основная валюта", settings_home_ccy_label: "Код ISO (EUR, USD, GBP, CHF, ...)",
     settings_home_ccy_info: "Все значения P&L и номинала отображаются в этой валюте. По умолчанию для ввода цены в новых сделках. Существующие сделки сохраняют свою валюту входа неизменной (независимо от пути).",
     settings_worker_title: "Live-котировки · Cloudflare Worker", settings_worker_info: "URL твоего прокси-Worker для Yahoo Finance (workers.dev).",
@@ -527,10 +629,13 @@ const STRINGS = {
     io_clear_confirm: "Действительно удалить ВСЕ сделки?",
     err_ticker_required: "Введи оба тикера.", err_long_invalid: "Long: количество и цена входа должны быть > 0.",
     err_short_invalid: "Short: количество и цена входа должны быть > 0.",
+    err_long_ticker_required: "Введи Long-тикер.", err_short_ticker_required: "Введи Short-тикер.",
     err_alarm_invalid: "Порог тревоги: некорректное число. Пример: -30",
     err_no_ticker: "Нет тикера", err_no_data: "Нет данных", err_no_price_feed: "Нет цены в ленте",
     err_no_worker_url: "Нет URL Worker (⋯ → Настройки)",
-    empty_no_trades_full: "Пока нет парных сделок. Нажми <strong>+ Новая сделка</strong> сверху.",
+    empty_no_trades_full: "Пока нет сделок. Нажми <strong>+ Новая сделка</strong> сверху.",
+    empty_no_pairs: "Пока нет парных сделок.", empty_no_longs: "Пока нет long-сделок.", empty_no_shorts: "Пока нет short-сделок.",
+    page_pairs: "Пары", page_longs: "Long", page_shorts: "Short", page_total: "Всего",
     tranche_badge: "× {n}", tranche_panel_title: "Транши", tranche_label_n: "Tr {n}", tranche_isolated_short: "Иso",
     tranche_delete_confirm: "Удалить этот транш? Удаляется только этот транш, остальная часть сделки остаётся.",
     leg_sum_qty: "Σ Количество", leg_sum_notional: "Σ База стоимости", leg_sum_pnl: "Σ P&L",
@@ -559,17 +664,14 @@ function t(key, params) {
 }
 
 function applyTranslations() {
-  // Übersetzt alle Elemente mit data-i18n
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     el.textContent = t(key);
   });
-  // Übersetzt Placeholder
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
     el.setAttribute('placeholder', t(key));
   });
-  // Spezielle Elemente mit HTML-Inhalt
   const formHelp = document.getElementById('form-help-currency');
   if (formHelp) formHelp.innerHTML = t('form_help_currency', { ccy: homeCurrency });
   const longNativeLabel = document.getElementById('f-long-native-label');
@@ -578,7 +680,6 @@ function applyTranslations() {
   if (shortNativeLabel) shortNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
   const alarmHelp = document.querySelector('.form-section.alarm .help');
   if (alarmHelp) alarmHelp.innerHTML = t('form_alarm_pct_help');
-  // Re-render dynamic content
   if (typeof render === 'function') render();
   setAutoStatus();
 }
@@ -589,6 +690,7 @@ const STORAGE_KEY_OLD = "pair_trade_tracker_v1";
 const SYNC_KEY = "pair_trade_sync_v1";
 const PRICE_KEY = "pair_trade_price_v1";
 const LANG_KEY = "pair_trade_lang_v1";
+const START_PAGE_KEY = "pair_trade_start_page_v1";
 const PRICE_CACHE = new Map();
 const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
@@ -601,7 +703,7 @@ const APP_TRADING_START_HOUR = 9;
 const APP_TRADING_END_HOUR = 23;
 let autoRefreshTimer = null;
 let lastAutoRefreshAt = 0;
-let lastTotalPnlForFlash = null;
+const lastTotalPnlForFlashByAgg = { pair: null, long: null, short: null, total: null };
 
 let trades = [];
 let alertStates = {};
@@ -612,27 +714,41 @@ let homeCurrency = (priceSettings.homeCurrency || "EUR").toUpperCase();
 let editingId = null;
 let syncDebounce = null;
 
+const PAGES = ["pair", "long", "short", "total"];
+let currentPage = "pair";        // which page is visible right now (driven by scroll)
+let formType = "pair";           // form-mode for new-trade form
+let pageScrollDebounce = null;
+
 function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); return (v && STRINGS[v]) ? v : "de"; } catch { return "de"; } }
 function saveLangPreference(lang) { try { localStorage.setItem(LANG_KEY, lang); } catch {} }
+function loadStartPage() { try { const v = localStorage.getItem(START_PAGE_KEY); return PAGES.includes(v) ? v : "pair"; } catch { return "pair"; } }
+function saveStartPage(p) { try { localStorage.setItem(START_PAGE_KEY, p); } catch {} }
 
 function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
 function saveSyncSettings() { localStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); }
 function loadPriceSettings() { try { const raw = localStorage.getItem(PRICE_KEY); if (!raw) return { workerUrl: "", homeCurrency: "EUR" }; return Object.assign({ workerUrl: "", homeCurrency: "EUR" }, JSON.parse(raw)); } catch { return { workerUrl: "", homeCurrency: "EUR" }; } }
 function savePriceSettings() { localStorage.setItem(PRICE_KEY, JSON.stringify(priceSettings)); }
 
+function tradeType(tr) {
+  return (tr.type === "long" || tr.type === "short") ? tr.type : "pair";
+}
+function hasLong(tr) { const t = tradeType(tr); return t === "pair" || t === "long"; }
+function hasShort(tr) { const t = tradeType(tr); return t === "pair" || t === "short"; }
+
 function migrateTrades() {
   let changed = false;
-  for (const t of trades) {
-    if (t.longEntryCcy === undefined && !t.longEntryNative) { t.longEntryCcy = "EUR"; changed = true; }
-    if (t.shortEntryCcy === undefined && !t.shortEntryNative) { t.shortEntryCcy = "EUR"; changed = true; }
-    if (!Array.isArray(t.tranches) || t.tranches.length === 0) {
-      t.tranches = [{
-        id: "tr_" + (t.id || Date.now()) + "_0",
-        longQty: t.longQty, longEntry: t.longEntry,
-        longEntryCcy: t.longEntryCcy, longEntryNative: !!t.longEntryNative,
-        shortQty: t.shortQty, shortEntry: t.shortEntry,
-        shortEntryCcy: t.shortEntryCcy, shortEntryNative: !!t.shortEntryNative,
-        created: t.created || Date.now()
+  for (const tr of trades) {
+    if (!tr.type) { tr.type = "pair"; changed = true; }   // NEW: default existing trades to "pair"
+    if (tr.longEntryCcy === undefined && !tr.longEntryNative) { tr.longEntryCcy = "EUR"; changed = true; }
+    if (tr.shortEntryCcy === undefined && !tr.shortEntryNative) { tr.shortEntryCcy = "EUR"; changed = true; }
+    if (!Array.isArray(tr.tranches) || tr.tranches.length === 0) {
+      tr.tranches = [{
+        id: "tr_" + (tr.id || Date.now()) + "_0",
+        longQty: tr.longQty, longEntry: tr.longEntry,
+        longEntryCcy: tr.longEntryCcy, longEntryNative: !!tr.longEntryNative,
+        shortQty: tr.shortQty, shortEntry: tr.shortEntry,
+        shortEntryCcy: tr.shortEntryCcy, shortEntryNative: !!tr.shortEntryNative,
+        created: tr.created || Date.now()
       }];
       changed = true;
     }
@@ -767,18 +883,23 @@ function getCachedFx(from, to) { if (!from || !to) return null; const F = from.t
 
 async function ensureFxRatesForTrades() {
   const pairs = new Set();
-  for (const t of trades) {
-    const lp = PRICE_CACHE.get(t.longTicker.toUpperCase()); const sp = PRICE_CACHE.get(t.shortTicker.toUpperCase());
+  for (const tr of trades) {
+    const lp = hasLong(tr) ? PRICE_CACHE.get(tr.longTicker.toUpperCase()) : null;
+    const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
     const longApiCcy = (lp?.currency || homeCurrency).toUpperCase();
     const shortApiCcy = (sp?.currency || homeCurrency).toUpperCase();
-    const tranches = Array.isArray(t.tranches) ? t.tranches : [];
+    const tranches = Array.isArray(tr.tranches) ? tr.tranches : [];
     for (const tranche of tranches) {
-      const longEntryCcy = tranche.longEntryNative ? longApiCcy : (tranche.longEntryCcy || "EUR");
-      const shortEntryCcy = tranche.shortEntryNative ? shortApiCcy : (tranche.shortEntryCcy || "EUR");
-      if (longApiCcy !== longEntryCcy) pairs.add(longApiCcy + "/" + longEntryCcy);
-      if (shortApiCcy !== shortEntryCcy) pairs.add(shortApiCcy + "/" + shortEntryCcy);
-      if (longEntryCcy !== homeCurrency) pairs.add(longEntryCcy + "/" + homeCurrency);
-      if (shortEntryCcy !== homeCurrency) pairs.add(shortEntryCcy + "/" + homeCurrency);
+      if (hasLong(tr)) {
+        const longEntryCcy = tranche.longEntryNative ? longApiCcy : (tranche.longEntryCcy || "EUR");
+        if (longApiCcy !== longEntryCcy) pairs.add(longApiCcy + "/" + longEntryCcy);
+        if (longEntryCcy !== homeCurrency) pairs.add(longEntryCcy + "/" + homeCurrency);
+      }
+      if (hasShort(tr)) {
+        const shortEntryCcy = tranche.shortEntryNative ? shortApiCcy : (tranche.shortEntryCcy || "EUR");
+        if (shortApiCcy !== shortEntryCcy) pairs.add(shortApiCcy + "/" + shortEntryCcy);
+        if (shortEntryCcy !== homeCurrency) pairs.add(shortEntryCcy + "/" + homeCurrency);
+      }
     }
   }
   for (const p of pairs) { const [from, to] = p.split("/"); await fetchFxRate(from, to); }
@@ -858,8 +979,9 @@ function computeLeg(entry, qty, livePx, apiCcy, useNative, storedEntryCcy, isLon
 }
 
 function computeTrade(tr, lp, sp) {
-  const lpx = lp && !lp.error ? lp.price : null;
-  const spx = sp && !sp.error ? sp.price : null;
+  const type = tradeType(tr);
+  const lpx = (hasLong(tr) && lp && !lp.error) ? lp.price : null;
+  const spx = (hasShort(tr) && sp && !sp.error) ? sp.price : null;
   const longApiCcy = (lp?.currency || homeCurrency).toUpperCase();
   const shortApiCcy = (sp?.currency || homeCurrency).toUpperCase();
   const tranches = Array.isArray(tr.tranches) ? tr.tranches : [];
@@ -869,31 +991,44 @@ function computeTrade(tr, lp, sp) {
   let aggLongPnlHome = null, aggShortPnlHome = null;
   let aggLongNotionalHome = null, aggShortNotionalHome = null;
   for (const tranche of tranches) {
-    const longLeg = computeLeg(tranche.longEntry, tranche.longQty, lpx, longApiCcy, !!tranche.longEntryNative, tranche.longEntryCcy, true);
-    const shortLeg = computeLeg(tranche.shortEntry, tranche.shortQty, spx, shortApiCcy, !!tranche.shortEntryNative, tranche.shortEntryCcy, false);
-    const trancheNotional = (longLeg.entryNotionalInHome != null && shortLeg.entryNotionalInHome != null) ? longLeg.entryNotionalInHome + shortLeg.entryNotionalInHome : null;
-    let tranchePnl = null, tranchePct = null;
-    if (longLeg.pnlInHome != null && shortLeg.pnlInHome != null) {
-      tranchePnl = longLeg.pnlInHome + shortLeg.pnlInHome;
-      if (trancheNotional > 0) tranchePct = (tranchePnl / trancheNotional) * 100;
+    let longLeg = null, shortLeg = null;
+    if (hasLong(tr)) longLeg = computeLeg(tranche.longEntry, tranche.longQty, lpx, longApiCcy, !!tranche.longEntryNative, tranche.longEntryCcy, true);
+    if (hasShort(tr)) shortLeg = computeLeg(tranche.shortEntry, tranche.shortQty, spx, shortApiCcy, !!tranche.shortEntryNative, tranche.shortEntryCcy, false);
+
+    let trancheNotional = null, tranchePnl = null, tranchePct = null;
+    if (type === "pair") {
+      if (longLeg.entryNotionalInHome != null && shortLeg.entryNotionalInHome != null) trancheNotional = longLeg.entryNotionalInHome + shortLeg.entryNotionalInHome;
+      if (longLeg.pnlInHome != null && shortLeg.pnlInHome != null) { tranchePnl = longLeg.pnlInHome + shortLeg.pnlInHome; if (trancheNotional > 0) tranchePct = (tranchePnl / trancheNotional) * 100; }
+    } else if (type === "long") {
+      trancheNotional = longLeg.entryNotionalInHome;
+      if (longLeg.pnlInHome != null) { tranchePnl = longLeg.pnlInHome; if (trancheNotional > 0) tranchePct = (tranchePnl / trancheNotional) * 100; }
+    } else if (type === "short") {
+      trancheNotional = shortLeg.entryNotionalInHome;
+      if (shortLeg.pnlInHome != null) { tranchePnl = shortLeg.pnlInHome; if (trancheNotional > 0) tranchePct = (tranchePnl / trancheNotional) * 100; }
     }
     trancheResults.push({ tranche, long: longLeg, short: shortLeg, pnlHome: tranchePnl, notionalHome: trancheNotional, pct: tranchePct });
-    if (tranchePnl != null) {
+    if (tranchePnl != null && trancheNotional != null) {
       totalPnlHome = (totalPnlHome ?? 0) + tranchePnl;
       totalNotionalHome = (totalNotionalHome ?? 0) + trancheNotional;
     }
-    aggLongQty += tranche.longQty;
-    aggShortQty += tranche.shortQty;
-    if (longLeg.pnlInHome != null) aggLongPnlHome = (aggLongPnlHome ?? 0) + longLeg.pnlInHome;
-    if (shortLeg.pnlInHome != null) aggShortPnlHome = (aggShortPnlHome ?? 0) + shortLeg.pnlInHome;
-    if (longLeg.entryNotionalInHome != null) aggLongNotionalHome = (aggLongNotionalHome ?? 0) + longLeg.entryNotionalInHome;
-    if (shortLeg.entryNotionalInHome != null) aggShortNotionalHome = (aggShortNotionalHome ?? 0) + shortLeg.entryNotionalInHome;
+    if (hasLong(tr)) {
+      aggLongQty += tranche.longQty || 0;
+      if (longLeg?.pnlInHome != null) aggLongPnlHome = (aggLongPnlHome ?? 0) + longLeg.pnlInHome;
+      if (longLeg?.entryNotionalInHome != null) aggLongNotionalHome = (aggLongNotionalHome ?? 0) + longLeg.entryNotionalInHome;
+    }
+    if (hasShort(tr)) {
+      aggShortQty += tranche.shortQty || 0;
+      if (shortLeg?.pnlInHome != null) aggShortPnlHome = (aggShortPnlHome ?? 0) + shortLeg.pnlInHome;
+      if (shortLeg?.entryNotionalInHome != null) aggShortNotionalHome = (aggShortNotionalHome ?? 0) + shortLeg.entryNotionalInHome;
+    }
   }
   let pct = null;
   if (totalPnlHome != null && totalNotionalHome != null && totalNotionalHome > 0) pct = (totalPnlHome / totalNotionalHome) * 100;
-  const firstResult = trancheResults[0] || { long: { apiCcy: longApiCcy, entryCcy: longApiCcy, apiToEntryFx: null, entryToHomeFx: null, livePxInEntry: null, pnlInHome: null, entryNotionalInHome: null }, short: { apiCcy: shortApiCcy, entryCcy: shortApiCcy, apiToEntryFx: null, entryToHomeFx: null, livePxInEntry: null, pnlInHome: null, entryNotionalInHome: null } };
+  const firstResult = trancheResults[0] || {};
   return {
-    tranches: trancheResults, long: firstResult.long, short: firstResult.short,
+    type,
+    tranches: trancheResults,
+    long: firstResult.long || null, short: firstResult.short || null,
     totalNotionalHome, totalPnlHome, pct,
     aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome,
     aggLongNotionalHome, aggShortNotionalHome,
@@ -941,6 +1076,13 @@ function alarmPillHtml(tr) {
   return `<span class="alarm-pill ${cls}">${icon} ${ts}</span>`;
 }
 
+function typeBadgeHtml(tr) {
+  // Only relevant on the Gesamt-Page where pair/long/short are mixed
+  const type = tradeType(tr);
+  const label = type === "long" ? "L" : (type === "short" ? "S" : "L/S");
+  return `<span class="type-badge ${type}">${label}</span>`;
+}
+
 function legAggregateHtml(side, ticker, lp, c) {
   const isLong = side === "long";
   const apiCcy = isLong ? c.longApiCcy : c.shortApiCcy;
@@ -972,6 +1114,8 @@ function tranchePanelHtml(tr, c) {
     const delBtn = c.tranches.length > 1 ? `<button class="tranche-del" data-act="del-tranche" data-trade="${tr.id}" data-tranche="${tranche.id}" aria-label="delete">×</button>` : '';
     const pnlStr = tres.pnlHome != null ? (tres.pnlHome > 0 ? "+" : "") + fmtMoney(tres.pnlHome, homeCurrency) : "—";
     const pctStr = fmtPct(tres.pct);
+    const longRow  = hasLong(tr)  ? `<div class="tranche-cell"><span class="label">L ${escapeHtml(tr.longTicker)}</span><span class="v">${fmtNum(tranche.longQty)} × ${fmtMoney(tranche.longEntry, longCcy)}</span></div>` : `<div class="tranche-cell"></div>`;
+    const shortRow = hasShort(tr) ? `<div class="tranche-cell"><span class="label">S ${escapeHtml(tr.shortTicker)}</span><span class="v">${fmtNum(tranche.shortQty)} × ${fmtMoney(tranche.shortEntry, shortCcy)}</span></div>` : `<div class="tranche-cell"></div>`;
     return `
       <div class="tranche-item">
         <div class="tranche-item-head">
@@ -980,9 +1124,9 @@ function tranchePanelHtml(tr, c) {
           ${delBtn}
         </div>
         <div class="tranche-grid">
-          <div class="tranche-cell"><span class="label">L ${escapeHtml(tr.longTicker)}</span><span class="v">${fmtNum(tranche.longQty)} × ${fmtMoney(tranche.longEntry, longCcy)}</span></div>
+          ${longRow}
           <div class="tranche-cell"><span class="label">P&L</span><span class="v ${signClass(tres.pnlHome)}">${pnlStr}</span></div>
-          <div class="tranche-cell"><span class="label">S ${escapeHtml(tr.shortTicker)}</span><span class="v">${fmtNum(tranche.shortQty)} × ${fmtMoney(tranche.shortEntry, shortCcy)}</span></div>
+          ${shortRow}
           <div class="tranche-cell"><span class="label">${t("tranche_isolated_short")}</span><span class="v ${signClass(tres.pct)}">${pctStr}</span></div>
         </div>
       </div>
@@ -991,48 +1135,89 @@ function tranchePanelHtml(tr, c) {
   return `<div class="tranche-panel" id="tranche-panel-${tr.id}"><h5>${t("tranche_panel_title")}</h5>${items}</div>`;
 }
 
-function render() {
-  const list = document.getElementById("trade-list");
-  if (!list) return;
-  list.innerHTML = "";
-  if (trades.length === 0) { list.innerHTML = `<div class="empty">${t("empty_no_trades_full")}</div>`; updateAggregate([]); return; }
-  const rows = [];
-  for (const tr of trades) {
-    const lp = PRICE_CACHE.get(tr.longTicker.toUpperCase());
-    const sp = PRICE_CACHE.get(tr.shortTicker.toUpperCase());
-    const lpx = lp && !lp.error ? lp.price : null;
-    const spx = sp && !sp.error ? sp.price : null;
-    const c = computeTrade(tr, lp, sp);
-    rows.push({ trade: tr, c });
-    const card = document.createElement("div");
-    card.className = "trade-card";
-    const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
-    const firstT = (tr.tranches && tr.tranches[0]) || {};
-    const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
-    const aPill = alarmPillHtml(tr);
-    const headClass = isMulti ? "trade-head tappable" : "trade-head";
-    const legsHtml = isMulti
-      ? legAggregateHtml("long", tr.longTicker, lp, c) + legAggregateHtml("short", tr.shortTicker, sp, c)
-      : legHtml("long", tr.longTicker, firstT.longQty, firstT.longEntry, !!firstT.longEntryNative, lp, lpx, c.long) +
-        legHtml("short", tr.shortTicker, firstT.shortQty, firstT.shortEntry, !!firstT.shortEntryNative, sp, spx, c.short);
-    const panel = isMulti ? tranchePanelHtml(tr, c) : '';
-    card.innerHTML = `
-      <div class="${headClass}" data-toggle-tranches="${tr.id}">
-        <div class="trade-name">${escapeHtml(tr.name || (tr.longTicker + " / " + tr.shortTicker))}${tBadge}${aPill}</div>
-        <div class="trade-actions"><button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button><button class="icon danger" data-act="del" data-id="${tr.id}">×</button></div>
-      </div>
-      <div class="trade-perf">
-        <div class="pnl-abs ${signClass(c.totalPnlHome)}">${c.totalPnlHome != null ? (c.totalPnlHome > 0 ? "+" : "") + fmtMoney(c.totalPnlHome, homeCurrency) : "—"}</div>
-        <div class="pnl-pct ${signClass(c.pct)}">${fmtPct(c.pct)}</div>
-        <div class="meta">${t("card_notional", { ccy: homeCurrency })}: ${c.totalNotionalHome != null ? fmtMoney(c.totalNotionalHome, homeCurrency) : '—'}</div>
-      </div>
-      ${alarmStatusHtml(tr)}
-      <div class="legs">${legsHtml}</div>
-      ${panel}
-    `;
-    list.appendChild(card);
+function renderOneTradeCard(tr, c) {
+  const card = document.createElement("div");
+  card.className = "trade-card";
+  const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
+  const firstT = (tr.tranches && tr.tranches[0]) || {};
+  const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
+  const aPill = alarmPillHtml(tr);
+  const headClass = isMulti ? "trade-head tappable" : "trade-head";
+  const lp = hasLong(tr) ? PRICE_CACHE.get(tr.longTicker.toUpperCase()) : null;
+  const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
+  const lpx = lp && !lp.error ? lp.price : null;
+  const spx = sp && !sp.error ? sp.price : null;
+  // Only show the type-badge on the Gesamt-Page (currentPage === "total")
+  const typeB = (currentPage === "total") ? typeBadgeHtml(tr) : "";
+
+  let legsHtml = "";
+  if (isMulti) {
+    if (hasLong(tr))  legsHtml += legAggregateHtml("long",  tr.longTicker,  lp, c);
+    if (hasShort(tr)) legsHtml += legAggregateHtml("short", tr.shortTicker, sp, c);
+  } else {
+    if (hasLong(tr))  legsHtml += legHtml("long",  tr.longTicker,  firstT.longQty,  firstT.longEntry,  !!firstT.longEntryNative,  lp, lpx, c.long);
+    if (hasShort(tr)) legsHtml += legHtml("short", tr.shortTicker, firstT.shortQty, firstT.shortEntry, !!firstT.shortEntryNative, sp, spx, c.short);
   }
-  list.querySelectorAll("button[data-act]").forEach(btn => {
+  const panel = isMulti ? tranchePanelHtml(tr, c) : '';
+  const displayName = tr.name || (
+    tradeType(tr) === "long"  ? tr.longTicker :
+    tradeType(tr) === "short" ? tr.shortTicker :
+    (tr.longTicker + " / " + tr.shortTicker)
+  );
+  card.innerHTML = `
+    <div class="${headClass}" data-toggle-tranches="${tr.id}">
+      <div class="trade-name">${escapeHtml(displayName)}${typeB}${tBadge}${aPill}</div>
+      <div class="trade-actions"><button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button><button class="icon danger" data-act="del" data-id="${tr.id}">×</button></div>
+    </div>
+    <div class="trade-perf">
+      <div class="pnl-abs ${signClass(c.totalPnlHome)}">${c.totalPnlHome != null ? (c.totalPnlHome > 0 ? "+" : "") + fmtMoney(c.totalPnlHome, homeCurrency) : "—"}</div>
+      <div class="pnl-pct ${signClass(c.pct)}">${fmtPct(c.pct)}</div>
+      <div class="meta">${t("card_notional", { ccy: homeCurrency })}: ${c.totalNotionalHome != null ? fmtMoney(c.totalNotionalHome, homeCurrency) : '—'}</div>
+    </div>
+    ${alarmStatusHtml(tr)}
+    <div class="legs">${legsHtml}</div>
+    ${panel}
+  `;
+  return card;
+}
+
+function tradesForPage(pageKey) {
+  if (pageKey === "total") return trades.slice();
+  return trades.filter(tr => tradeType(tr) === pageKey);
+}
+
+function emptyTextForPage(pageKey) {
+  if (pageKey === "long")  return t("empty_no_longs");
+  if (pageKey === "short") return t("empty_no_shorts");
+  if (pageKey === "pair")  return t("empty_no_pairs");
+  return t("empty_no_trades_full");
+}
+
+function render() {
+  for (const pageKey of PAGES) {
+    const list = document.querySelector(`.trade-list[data-list="${pageKey}"]`);
+    if (!list) continue;
+    list.innerHTML = "";
+    const pageTrades = tradesForPage(pageKey);
+    if (pageTrades.length === 0) {
+      list.innerHTML = `<div class="empty">${emptyTextForPage(pageKey)}</div>`;
+      updatePageAggregate(pageKey, []);
+      continue;
+    }
+    const rows = [];
+    for (const tr of pageTrades) {
+      const lp = hasLong(tr) ? PRICE_CACHE.get(tr.longTicker.toUpperCase()) : null;
+      const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
+      const c = computeTrade(tr, lp, sp);
+      rows.push({ trade: tr, c });
+      list.appendChild(renderOneTradeCard(tr, c));
+    }
+    updatePageAggregate(pageKey, rows);
+  }
+  // Wire up clicks once (event-delegation per page)
+  document.querySelectorAll("button[data-act]").forEach(btn => {
+    if (btn._wired) return;
+    btn._wired = true;
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const act = btn.getAttribute("data-act");
@@ -1041,27 +1226,35 @@ function render() {
       else if (act === "del-tranche") deleteTranche(btn.getAttribute("data-trade"), btn.getAttribute("data-tranche"));
     });
   });
-  list.querySelectorAll(".trade-head.tappable").forEach(head => {
+  document.querySelectorAll(".trade-head.tappable").forEach(head => {
+    if (head._wired) return; head._wired = true;
     head.addEventListener("click", () => {
       const id = head.getAttribute("data-toggle-tranches");
       const panel = document.getElementById("tranche-panel-" + id);
       if (panel) panel.classList.toggle("open");
     });
   });
-  updateAggregate(rows);
 }
 
-function updateAggregate(rows) {
+function updatePageAggregate(pageKey, rows) {
+  const aggEl = document.querySelector(`.aggregate[data-agg="${pageKey}"]`); if (!aggEl) return;
+  const elPnl     = aggEl.querySelector("[data-agg-pnl]");
+  const elPct     = aggEl.querySelector("[data-agg-pct]");
+  const elNotional= aggEl.querySelector("[data-agg-notional]");
+  const elPnlSub  = aggEl.querySelector("[data-agg-pnl-sub]");
+  const elCount   = aggEl.querySelector("[data-agg-count]");
+
+  const totalCount = tradesForPage(pageKey).length;
   const valid = rows.filter(r => r.c.totalPnlHome != null);
   let sumPnl = 0, sumNotional = 0;
   for (const r of valid) { sumPnl += r.c.totalPnlHome; sumNotional += r.c.totalNotionalHome; }
   const pct = sumNotional > 0 ? (sumPnl / sumNotional) * 100 : null;
-  const elPnl = document.getElementById("agg-pnl"); const elPct = document.getElementById("agg-pct"); const elNotional = document.getElementById("agg-notional"); const elPnlSub = document.getElementById("agg-pnl-sub"); const elCountSub = document.getElementById("agg-count-sub");
+
   if (valid.length === 0) {
     elPnl.textContent = "—"; elPnl.className = "value tabular";
     elPct.textContent = "—"; elPct.className = "value tabular";
     elNotional.textContent = "—";
-    elPnlSub.textContent = trades.length ? t("agg_loading") : t("agg_no_trades");
+    elPnlSub.textContent = totalCount ? t("agg_loading") : t("agg_no_trades");
   } else {
     elPnl.textContent = (sumPnl > 0 ? "+" : "") + fmtMoney(sumPnl, homeCurrency);
     elPnl.className = "value tabular " + signClass(sumPnl);
@@ -1069,13 +1262,14 @@ function updateAggregate(rows) {
     elNotional.textContent = fmtMoney(sumNotional, homeCurrency);
     elPnlSub.textContent = t("agg_in_ccy_fx", { ccy: homeCurrency });
   }
-  const plural = (trades.length === 1) ? t("agg_trade_singular") : t("agg_trade_plural");
-  let countText = t("agg_trades_count", { n: trades.length, plural: plural });
-  if (valid.length < trades.length) countText += t("agg_partial", { n: trades.length - valid.length });
-  elCountSub.textContent = countText;
+  const plural = (totalCount === 1) ? t("agg_trade_singular") : t("agg_trade_plural");
+  let countText = t("agg_trades_count", { n: totalCount, plural: plural });
+  if (valid.length < totalCount) countText += t("agg_partial", { n: totalCount - valid.length });
+  elCount.textContent = countText;
 }
 
 function applyPriceFlashes() {
+  // Ticker-level flashes (cell-by-cell)
   PRICE_CACHE.forEach((data, sym) => {
     if (!data || data.error) return;
     const prev = PREVIOUS_PRICES.get(sym);
@@ -1083,8 +1277,7 @@ function applyPriceFlashes() {
       const direction = data.price > prev ? "up" : "down";
       const cells = document.querySelectorAll('[data-flash-ticker="' + sym + '"]');
       cells.forEach(cell => {
-        cell.classList.remove("flash-up", "flash-down");
-        void cell.offsetWidth;
+        cell.classList.remove("flash-up", "flash-down"); void cell.offsetWidth;
         cell.classList.add("flash-" + direction);
         setTimeout(() => cell.classList.remove("flash-" + direction), 1000);
       });
@@ -1092,29 +1285,27 @@ function applyPriceFlashes() {
     PREVIOUS_PRICES.set(sym, data.price);
   });
 
-  let currentTotalPnl = null;
-  let allValid = true;
-  for (const tr of trades) {
-    const lp = PRICE_CACHE.get(tr.longTicker.toUpperCase());
-    const sp = PRICE_CACHE.get(tr.shortTicker.toUpperCase());
-    const c = computeTrade(tr, lp, sp);
-    if (c.totalPnlHome == null) { allValid = false; break; }
-    currentTotalPnl = (currentTotalPnl || 0) + c.totalPnlHome;
-  }
-  if (allValid && currentTotalPnl != null && lastTotalPnlForFlash != null) {
-    const diff = currentTotalPnl - lastTotalPnlForFlash;
-    if (Math.abs(diff) > 0.001) {
-      const direction = diff > 0 ? "up" : "down";
-      const el = document.getElementById("agg-pnl");
-      if (el) {
-        el.classList.remove("flash-up", "flash-down");
-        void el.offsetWidth;
-        el.classList.add("flash-" + direction);
-        setTimeout(() => el.classList.remove("flash-" + direction), 1000);
+  // Per-page aggregate flashes
+  for (const pageKey of PAGES) {
+    const pageTrades = tradesForPage(pageKey);
+    let pnl = null; let allValid = true;
+    for (const tr of pageTrades) {
+      const lp = hasLong(tr)  ? PRICE_CACHE.get(tr.longTicker.toUpperCase())  : null;
+      const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
+      const c = computeTrade(tr, lp, sp);
+      if (c.totalPnlHome == null) { allValid = false; break; }
+      pnl = (pnl || 0) + c.totalPnlHome;
+    }
+    if (allValid && pnl != null && lastTotalPnlForFlashByAgg[pageKey] != null) {
+      const diff = pnl - lastTotalPnlForFlashByAgg[pageKey];
+      if (Math.abs(diff) > 0.001) {
+        const direction = diff > 0 ? "up" : "down";
+        const el = document.querySelector(`.aggregate[data-agg="${pageKey}"] [data-agg-pnl]`);
+        if (el) { el.classList.remove("flash-up", "flash-down"); void el.offsetWidth; el.classList.add("flash-" + direction); setTimeout(() => el.classList.remove("flash-" + direction), 1000); }
       }
     }
+    if (allValid) lastTotalPnlForFlashByAgg[pageKey] = pnl;
   }
-  if (allValid) lastTotalPnlForFlash = currentTotalPnl;
 }
 
 async function refreshAll(force = false) {
@@ -1122,7 +1313,10 @@ async function refreshAll(force = false) {
   status.className = "status loading"; status.textContent = t("status_loading_prices");
   if (!priceSettings.workerUrl) { status.className = "status err"; status.textContent = t("status_no_worker_url"); return; }
   const tickers = new Set();
-  trades.forEach(tr => { tickers.add(tr.longTicker.toUpperCase()); tickers.add(tr.shortTicker.toUpperCase()); });
+  trades.forEach(tr => {
+    if (hasLong(tr))  tickers.add(tr.longTicker.toUpperCase());
+    if (hasShort(tr)) tickers.add(tr.shortTicker.toUpperCase());
+  });
   const arr = [...tickers]; let errCount = 0;
   for (const tk of arr) { const r = await fetchPrice(tk, force); if (r.error) errCount++; }
   await ensureFxRatesForTrades();
@@ -1135,11 +1329,26 @@ async function refreshAll(force = false) {
   setAutoStatus();
 }
 
+// =========================== FORM ===========================
+function applyFormTypeUI(type) {
+  formType = type;
+  // Highlight active radio
+  document.querySelectorAll(".type-radio").forEach(r => {
+    r.classList.toggle("active", r.getAttribute("data-type") === type);
+  });
+  // Show/hide long/short sections
+  const longSec  = document.getElementById("form-long-section");
+  const shortSec = document.getElementById("form-short-section");
+  longSec.style.display  = (type === "pair" || type === "long")  ? "block" : "none";
+  shortSec.style.display = (type === "pair" || type === "short") ? "block" : "none";
+}
+
 function openForm(id = null) {
   editingId = id;
   const form = document.getElementById("form");
   document.getElementById("form-title").textContent = id ? t("form_title_edit") : t("form_title_new");
   applyTranslations();
+
   const tranchFields = ["f-long-qty", "f-long-entry", "f-long-native", "f-short-qty", "f-short-entry", "f-short-native", "f-long-ticker", "f-short-ticker"];
   const setMulti = (multi) => {
     tranchFields.forEach(fid => {
@@ -1154,8 +1363,18 @@ function openForm(id = null) {
       note.textContent = t("form_multitranche_note"); note.style.display = "block";
     } else if (note) note.style.display = "none";
   };
+
+  // Decide form-type:
+  // - Edit: derive from trade and lock type-section
+  // - New on pair/long/short page: implicit
+  // - New on total page: pair (default), user can change via radios
+  const typeSection = document.getElementById("form-type-section");
+
   if (id) {
     const tr = trades.find(x => x.id === id); if (!tr) return;
+    const trType = tradeType(tr);
+    applyFormTypeUI(trType);
+    typeSection.style.display = "none";  // type cannot be changed during edit
     const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
     const firstT = (tr.tranches && tr.tranches[0]) || {};
     document.getElementById("f-name").value = tr.name || "";
@@ -1177,6 +1396,10 @@ function openForm(id = null) {
     }
     alarmNote.textContent = t("alarm_supertrade_note"); alarmNote.style.display = "block";
   } else {
+    // New trade. Type from current page (or "pair" if total).
+    const initialType = (currentPage === "total") ? "pair" : currentPage;
+    applyFormTypeUI(initialType);
+    typeSection.style.display = (currentPage === "total") ? "block" : "none";
     ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct"].forEach(i => document.getElementById(i).value = "");
     document.getElementById("f-long-native").checked = false;
     document.getElementById("f-short-native").checked = false;
@@ -1204,36 +1427,76 @@ function saveForm() {
   let alertPctMin = null;
   if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = p; }
 
+  const type = formType; // current form mode
+
+  // EDIT: only name/alarm on multi; on single-tranche also legs (only the legs the type uses)
   if (editingId) {
     const existing = trades.find(x => x.id === editingId);
     if (!existing) { closeForm(); return; }
     const isMulti = Array.isArray(existing.tranches) && existing.tranches.length > 1;
     existing.name = name; existing.alertPctMin = alertPctMin; existing.updated = Date.now();
     if (!isMulti) {
-      if (!longTicker || !shortTicker) { alert(t("err_ticker_required")); return; }
-      if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
-      if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
+      const eType = tradeType(existing);
+      if (eType === "pair" || eType === "long") {
+        if (!longTicker) { alert(t("err_long_ticker_required")); return; }
+        if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
+      }
+      if (eType === "pair" || eType === "short") {
+        if (!shortTicker) { alert(t("err_short_ticker_required")); return; }
+        if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
+      }
       const oldT = existing.tranches[0] || {};
-      const longEntryCcy = longEntryNative ? null : (oldT.longEntryCcy || homeCurrency);
-      const shortEntryCcy = shortEntryNative ? null : (oldT.shortEntryCcy || homeCurrency);
-      existing.longTicker = longTicker; existing.shortTicker = shortTicker;
-      existing.tranches[0] = { ...oldT, longQty, longEntry, longEntryNative, longEntryCcy, shortQty, shortEntry, shortEntryNative, shortEntryCcy };
+      const longEntryCcy  = (eType === "pair" || eType === "long")  ? (longEntryNative  ? null : (oldT.longEntryCcy  || homeCurrency)) : null;
+      const shortEntryCcy = (eType === "pair" || eType === "short") ? (shortEntryNative ? null : (oldT.shortEntryCcy || homeCurrency)) : null;
+      if (eType === "pair" || eType === "long")  existing.longTicker  = longTicker;
+      if (eType === "pair" || eType === "short") existing.shortTicker = shortTicker;
+      existing.tranches[0] = {
+        ...oldT,
+        longQty:  (eType === "pair" || eType === "long")  ? longQty  : 0,
+        longEntry:(eType === "pair" || eType === "long")  ? longEntry: 0,
+        longEntryNative: (eType === "pair" || eType === "long")  ? longEntryNative  : false,
+        longEntryCcy,
+        shortQty: (eType === "pair" || eType === "short") ? shortQty : 0,
+        shortEntry:(eType === "pair" || eType === "short")? shortEntry:0,
+        shortEntryNative: (eType === "pair" || eType === "short") ? shortEntryNative : false,
+        shortEntryCcy,
+      };
     }
     markLocalChange(); closeForm(); refreshAll(true); return;
   }
 
-  if (!longTicker || !shortTicker) { alert(t("err_ticker_required")); return; }
-  if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
-  if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
-  const longEntryCcy = longEntryNative ? null : homeCurrency;
-  const shortEntryCcy = shortEntryNative ? null : homeCurrency;
+  // NEW trade — validate per type
+  if (type === "pair" || type === "long") {
+    if (!longTicker) { alert(t("err_long_ticker_required")); return; }
+    if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
+  }
+  if (type === "pair" || type === "short") {
+    if (!shortTicker) { alert(t("err_short_ticker_required")); return; }
+    if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
+  }
+
+  const longEntryCcy  = (type === "pair" || type === "long")  ? (longEntryNative  ? null : homeCurrency) : null;
+  const shortEntryCcy = (type === "pair" || type === "short") ? (shortEntryNative ? null : homeCurrency) : null;
   const newTranche = {
     id: "tr_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
-    longQty, longEntry, longEntryNative, longEntryCcy,
-    shortQty, shortEntry, shortEntryNative, shortEntryCcy,
+    longQty:  (type === "pair" || type === "long")  ? longQty  : 0,
+    longEntry:(type === "pair" || type === "long")  ? longEntry: 0,
+    longEntryNative: (type === "pair" || type === "long")  ? longEntryNative  : false,
+    longEntryCcy,
+    shortQty: (type === "pair" || type === "short") ? shortQty : 0,
+    shortEntry:(type === "pair" || type === "short")? shortEntry:0,
+    shortEntryNative: (type === "pair" || type === "short") ? shortEntryNative : false,
+    shortEntryCcy,
     created: Date.now()
   };
-  const matching = trades.find(x => x.longTicker === longTicker && x.shortTicker === shortTicker);
+
+  // Auto-merge with existing trade of the SAME type and matching ticker(s).
+  // Type isolation guaranteed: pair/long/short never cross-merge.
+  let matching = null;
+  if (type === "pair")  matching = trades.find(x => tradeType(x) === "pair"  && x.longTicker === longTicker && x.shortTicker === shortTicker);
+  if (type === "long")  matching = trades.find(x => tradeType(x) === "long"  && x.longTicker === longTicker);
+  if (type === "short") matching = trades.find(x => tradeType(x) === "short" && x.shortTicker === shortTicker);
+
   if (matching) {
     matching.tranches = matching.tranches || [];
     matching.tranches.push(newTranche);
@@ -1243,17 +1506,28 @@ function saveForm() {
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 100);
     return;
   }
+
   trades.push({
     id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
-    name, longTicker, shortTicker, alertPctMin,
+    type,
+    name,
+    longTicker:  (type === "pair" || type === "long")  ? longTicker  : null,
+    shortTicker: (type === "pair" || type === "short") ? shortTicker : null,
+    alertPctMin,
     created: Date.now(), updated: Date.now(),
     tranches: [newTranche]
   });
   markLocalChange(); closeForm(); refreshAll(true);
 }
+
 function deleteTrade(id) {
   const tr = trades.find(x => x.id === id); if (!tr) return;
-  if (!confirm(t("card_delete_confirm", { name: tr.name || (tr.longTicker + " / " + tr.shortTicker) }))) return;
+  const dispName = tr.name || (
+    tradeType(tr) === "long"  ? tr.longTicker :
+    tradeType(tr) === "short" ? tr.shortTicker :
+    (tr.longTicker + " / " + tr.shortTicker)
+  );
+  if (!confirm(t("card_delete_confirm", { name: dispName }))) return;
   trades = trades.filter(x => x.id !== id);
   if (alertStates[id]) delete alertStates[id];
   markLocalChange(); render();
@@ -1272,6 +1546,7 @@ function openMenu() { document.getElementById("menu-overlay").classList.add("ope
 function closeMenu() { document.getElementById("menu-overlay").classList.remove("open"); }
 function openSettings() {
   document.getElementById("lang-select").value = loadLangPreference();
+  document.getElementById("start-page-select").value = loadStartPage();
   document.getElementById("home-ccy").value = homeCurrency;
   document.getElementById("worker-url").value = priceSettings.workerUrl || "";
   document.getElementById("sync-key").value = syncSettings.apiKey || "";
@@ -1303,7 +1578,15 @@ function importData() {
     try {
       const parsed = JSON.parse(ta.value);
       if (!Array.isArray(parsed)) throw new Error("Not an array");
-      const valid = parsed.filter(x => x && x.longTicker && x.shortTicker && x.longEntry && x.shortEntry && x.longQty && x.shortQty);
+      // Validation: pair needs both legs, long needs long, short needs short
+      const valid = parsed.filter(x => {
+        if (!x) return false;
+        const tp = (x.type === "long" || x.type === "short") ? x.type : "pair";
+        if (tp === "pair")  return x.longTicker && x.shortTicker && x.longEntry && x.shortEntry && x.longQty && x.shortQty;
+        if (tp === "long")  return x.longTicker  && (x.longEntry  != null) && (x.longQty  != null);
+        if (tp === "short") return x.shortTicker && (x.shortEntry != null) && (x.shortQty != null);
+        return false;
+      });
       if (valid.length === 0) { alert(t("io_no_valid_trades")); return; }
       const replace = confirm(t("io_replace_confirm", { existing: trades.length, new: valid.length }));
       if (replace) trades = valid; else trades = trades.concat(valid);
@@ -1315,6 +1598,39 @@ function importData() {
 }
 function clearAll() { closeMenu(); if (!confirm(t("io_clear_confirm"))) return; trades = []; alertStates = {}; markLocalChange(); render(); }
 
+// =========================== PAGE NAV ===========================
+function scrollToPage(pageKey, smooth = true) {
+  const container = document.getElementById("pages-container");
+  const idx = PAGES.indexOf(pageKey);
+  if (idx < 0) return;
+  const w = container.clientWidth;
+  container.scrollTo({ left: idx * w, behavior: smooth ? "smooth" : "auto" });
+  setActiveDot(pageKey);
+  currentPage = pageKey;
+}
+function setActiveDot(pageKey) {
+  document.querySelectorAll(".page-dot").forEach(d => {
+    d.classList.toggle("active", d.getAttribute("data-dot") === pageKey);
+  });
+}
+function onPagesScroll() {
+  if (pageScrollDebounce) clearTimeout(pageScrollDebounce);
+  pageScrollDebounce = setTimeout(() => {
+    const container = document.getElementById("pages-container");
+    const w = container.clientWidth; if (w <= 0) return;
+    const idx = Math.round(container.scrollLeft / w);
+    const pageKey = PAGES[Math.max(0, Math.min(PAGES.length - 1, idx))];
+    if (pageKey !== currentPage) {
+      currentPage = pageKey;
+      setActiveDot(pageKey);
+      // If a trade-card on Gesamt page shows type-badges and others don't,
+      // we must re-render so type-badges appear/disappear correctly.
+      render();
+    }
+  }, 80);
+}
+
+// =========================== EVENT WIRING ===========================
 document.getElementById("btn-new").addEventListener("click", () => openForm(null));
 document.getElementById("btn-refresh").addEventListener("click", () => refreshAll(true));
 document.getElementById("f-cancel").addEventListener("click", closeForm);
@@ -1347,13 +1663,16 @@ document.getElementById("settings-save").addEventListener("click", async () => {
   const sk = document.getElementById("sync-key").value.trim();
   const sb = document.getElementById("sync-bin").value.trim();
   const langChoice = document.getElementById("lang-select").value;
+  const startPageChoice = document.getElementById("start-page-select").value;
   if (hc && /^[A-Z]{3}$/.test(hc)) { homeCurrency = hc; priceSettings.homeCurrency = hc; }
   priceSettings.workerUrl = wu; savePriceSettings();
   if (sk && sb) { syncSettings.apiKey = sk; syncSettings.binId = sb; syncSettings.enabled = true; saveSyncSettings(); setSyncStatus("ok", t("status_sync_active")); }
   saveLangPreference(langChoice);
+  if (PAGES.includes(startPageChoice)) saveStartPage(startPageChoice);
   setLanguage(langChoice);
   closeSettings();
-  FX_CACHE.clear(); PRICE_CACHE.clear(); PREVIOUS_PRICES.clear(); lastTotalPnlForFlash = null;
+  FX_CACHE.clear(); PRICE_CACHE.clear(); PREVIOUS_PRICES.clear();
+  for (const k of PAGES) lastTotalPnlForFlashByAgg[k] = null;
   if (trades.length > 0) refreshAll(true);
   if (syncSettings.enabled) syncFull();
   setAutoStatus();
@@ -1363,6 +1682,20 @@ document.getElementById("sync-disable").addEventListener("click", () => {
   syncSettings.enabled = false; saveSyncSettings();
   closeSettings(); setSyncStatus("off", t("status_sync_off"));
 });
+
+// Type-radio wiring
+document.querySelectorAll(".type-radio").forEach(el => {
+  el.addEventListener("click", () => applyFormTypeUI(el.getAttribute("data-type")));
+});
+
+// Page-dot click → jump
+document.querySelectorAll(".page-dot").forEach(d => {
+  d.addEventListener("click", () => scrollToPage(d.getAttribute("data-dot"), true));
+});
+
+// Scroll-position tracking
+document.getElementById("pages-container").addEventListener("scroll", onPagesScroll, { passive: true });
+window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
 // Initial setup
 const initialLang = loadLangPreference();
@@ -1375,6 +1708,10 @@ if (trades.length > 0 && priceSettings.workerUrl) refreshAll(false);
 if (syncSettings.enabled) syncFull();
 startAutoRefresh();
 setAutoStatus();
+
+// Scroll to start-page (without animation, on first paint)
+currentPage = loadStartPage();
+requestAnimationFrame(() => scrollToPage(currentPage, false));
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {

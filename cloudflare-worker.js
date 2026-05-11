@@ -1,14 +1,14 @@
-// Pair Trade Tracker — Cloudflare Worker (Super-Trade / Tranche-aware)
+// Pair Trade Tracker — Cloudflare Worker (Type-aware: pair / long / short)
 const ALERT_REPEAT_MS = 3 * 60 * 1000;
 const TRADING_START_HOUR = 9;
 const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 
 const WORKER_STRINGS = {
-  de: { alarm_title:"🚨 ALARM", pair:"Paar", performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen", ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen", ack_received:"✅ Alarm bestätigt", test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen." },
-  en: { alarm_title:"🚨 ALERT", pair:"Pair", performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches", ack_prompt:"→ Reply with any text to acknowledge the alert", ack_received:"✅ Alert acknowledged", test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge." },
-  it: { alarm_title:"🚨 ALLARME", pair:"Coppia", performance:"Performance", threshold:"Soglia", pnl:"P&L", notional_now:"Notional ora", tranches:"Tranche", ack_prompt:"→ Rispondi con qualsiasi testo per confermare l'allarme", ack_received:"✅ Allarme confermato", test_alert:"🧪 Allarme di prova", test_body:"Questo è un test. Rispondi per confermare." },
-  ru: { alarm_title:"🚨 ТРЕВОГА", pair:"Пара", performance:"Доходность", threshold:"Порог", pnl:"Прибыль/убыток", notional_now:"Номинал сейчас", tranches:"Транши", ack_prompt:"→ Ответьте любым текстом, чтобы подтвердить тревогу", ack_received:"✅ Тревога подтверждена", test_alert:"🧪 Тестовая тревога", test_body:"Это тест. Ответьте для подтверждения." }
+  de: { alarm_title:"🚨 ALARM", pair:"Paar", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen", ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen", ack_received:"✅ Alarm bestätigt", test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen." },
+  en: { alarm_title:"🚨 ALERT", pair:"Pair", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches", ack_prompt:"→ Reply with any text to acknowledge the alert", ack_received:"✅ Alert acknowledged", test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge." },
+  it: { alarm_title:"🚨 ALLARME", pair:"Coppia", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Soglia", pnl:"P&L", notional_now:"Notional ora", tranches:"Tranche", ack_prompt:"→ Rispondi con qualsiasi testo per confermare l'allarme", ack_received:"✅ Allarme confermato", test_alert:"🧪 Allarme di prova", test_body:"Questo è un test. Rispondi per confermare." },
+  ru: { alarm_title:"🚨 ТРЕВОГА", pair:"Пара", long_only:"Long", short_only:"Short", performance:"Доходность", threshold:"Порог", pnl:"Прибыль/убыток", notional_now:"Номинал сейчас", tranches:"Транши", ack_prompt:"→ Ответьте любым текстом, чтобы подтвердить тревогу", ack_received:"✅ Тревога подтверждена", test_alert:"🧪 Тестовая тревога", test_body:"Это тест. Ответьте для подтверждения." }
 };
 function workerT(lang, key) { const d = WORKER_STRINGS[lang] || WORKER_STRINGS.de; return d[key] || WORKER_STRINGS.de[key] || key; }
 
@@ -67,34 +67,52 @@ async function fetchPriceInternal(symbol) {
   return { price: m.regularMarketPrice, currency: m.currency || HOME_CCY };
 }
 
+// Backward-compat: bei fehlendem type → "pair"
+function tradeType(trade) {
+  const t = trade.type;
+  if (t === "long" || t === "short") return t;
+  return "pair";
+}
+
+// Returns array of tranches with normalized fields. For long-only / short-only,
+// the unused side fields are 0/null so callers don't need to special-case.
 function getTranches(trade) {
-  if (Array.isArray(trade.tranches) && trade.tranches.length > 0) return trade.tranches;
-  return [{
+  const arr = (Array.isArray(trade.tranches) && trade.tranches.length > 0) ? trade.tranches : [{
     longQty: trade.longQty, longEntry: trade.longEntry, longEntryCcy: trade.longEntryCcy, longEntryNative: !!trade.longEntryNative,
     shortQty: trade.shortQty, shortEntry: trade.shortEntry, shortEntryCcy: trade.shortEntryCcy, shortEntryNative: !!trade.shortEntryNative
   }];
+  return arr;
+}
+
+async function legPnl(entry, qty, live, apiCcy, entryCcy, isLong) {
+  const a2e = apiCcy === entryCcy ? 1 : await getFxRate(apiCcy, entryCcy);
+  const e2h = entryCcy === HOME_CCY ? 1 : await getFxRate(entryCcy, HOME_CCY);
+  const liveInEntry = live * a2e;
+  const pnlEntry = (isLong ? (liveInEntry - entry) : (entry - liveInEntry)) * qty;
+  return { pnlHome: pnlEntry * e2h, notionalHomeStart: entry * qty * e2h, notionalHomeNow: liveInEntry * qty * e2h };
 }
 
 async function computePerf(trade) {
-  const longLive = await fetchPriceInternal(trade.longTicker);
-  const shortLive = await fetchPriceInternal(trade.shortTicker);
+  const type = tradeType(trade);
   const tranches = getTranches(trade);
-  async function legPnl(entry, qty, live, apiCcy, entryCcy, isLong) {
-    const a2e = apiCcy === entryCcy ? 1 : await getFxRate(apiCcy, entryCcy);
-    const e2h = entryCcy === HOME_CCY ? 1 : await getFxRate(entryCcy, HOME_CCY);
-    const liveInEntry = live * a2e;
-    const pnlEntry = (isLong ? (liveInEntry - entry) : (entry - liveInEntry)) * qty;
-    return { pnlHome: pnlEntry * e2h, notionalHomeStart: entry * qty * e2h, notionalHomeNow: liveInEntry * qty * e2h };
-  }
+
+  // Fetch only the prices we actually need
+  let longLive = null, shortLive = null;
+  if (type === "pair" || type === "long")  longLive  = await fetchPriceInternal(trade.longTicker);
+  if (type === "pair" || type === "short") shortLive = await fetchPriceInternal(trade.shortTicker);
+
   let totalPnl = 0, totalNotStart = 0, totalNotNow = 0;
   for (const tr of tranches) {
-    const longEntryCcy = tr.longEntryNative ? longLive.currency : (tr.longEntryCcy || HOME_CCY);
-    const shortEntryCcy = tr.shortEntryNative ? shortLive.currency : (tr.shortEntryCcy || HOME_CCY);
-    const L = await legPnl(tr.longEntry, tr.longQty, longLive.price, longLive.currency, longEntryCcy, true);
-    const S = await legPnl(tr.shortEntry, tr.shortQty, shortLive.price, shortLive.currency, shortEntryCcy, false);
-    totalPnl += L.pnlHome + S.pnlHome;
-    totalNotStart += L.notionalHomeStart + S.notionalHomeStart;
-    totalNotNow += L.notionalHomeNow + S.notionalHomeNow;
+    if (type === "pair" || type === "long") {
+      const longEntryCcy = tr.longEntryNative ? longLive.currency : (tr.longEntryCcy || HOME_CCY);
+      const L = await legPnl(tr.longEntry, tr.longQty, longLive.price, longLive.currency, longEntryCcy, true);
+      totalPnl += L.pnlHome; totalNotStart += L.notionalHomeStart; totalNotNow += L.notionalHomeNow;
+    }
+    if (type === "pair" || type === "short") {
+      const shortEntryCcy = tr.shortEntryNative ? shortLive.currency : (tr.shortEntryCcy || HOME_CCY);
+      const S = await legPnl(tr.shortEntry, tr.shortQty, shortLive.price, shortLive.currency, shortEntryCcy, false);
+      totalPnl += S.pnlHome; totalNotStart += S.notionalHomeStart; totalNotNow += S.notionalHomeNow;
+    }
   }
   return { pnlHome: totalPnl, notionalHomeNow: totalNotNow, perfPct: totalNotStart > 0 ? (totalPnl / totalNotStart) * 100 : 0, trancheCount: tranches.length };
 }
@@ -108,9 +126,15 @@ async function sendTelegram(env, text) {
 function buildAlarmMessage(lang, trade, perfPct, pnl, notionalNow, trancheCount) {
   const sign = perfPct >= 0 ? "+" : "";
   const th = trade.alertPctMin ?? trade.alertThreshold ?? 0;
+  const type = tradeType(trade);
+  // Trade-Typ-Label oben statt fix "Paar"
+  let typeLabel, displayName;
+  if (type === "long")  { typeLabel = workerT(lang, "long_only");  displayName = trade.name || trade.longTicker; }
+  else if (type === "short") { typeLabel = workerT(lang, "short_only"); displayName = trade.name || trade.shortTicker; }
+  else                  { typeLabel = workerT(lang, "pair");       displayName = trade.name || (trade.longTicker + " / " + trade.shortTicker); }
   const lines = [
     workerT(lang, "alarm_title"), "",
-    workerT(lang, "pair") + ": " + (trade.name || (trade.longTicker + " / " + trade.shortTicker)),
+    typeLabel + ": " + displayName,
     workerT(lang, "performance") + ": " + sign + perfPct.toFixed(2) + "%",
     workerT(lang, "threshold") + ": " + Number(th).toFixed(2) + "%",
     workerT(lang, "pnl") + ": " + (pnl >= 0 ? "+" : "") + pnl.toFixed(2) + " " + HOME_CCY,
@@ -146,7 +170,7 @@ async function runAlarmCheck(env) {
     } else if (!breached && state.state !== "idle") {
       states[id] = { state: "idle", lastAlertAt: 0 }; stateChanged = true; results.push({ id, action: "reset" });
     } else {
-      results.push({ id, action: "noop", state: state.state, perf: perf.perfPct, tranches: perf.trancheCount });
+      results.push({ id, action: "noop", state: state.state, perf: perf.perfPct, tranches: perf.trancheCount, type: tradeType(trade) });
     }
   }
   if (stateChanged) await jsonbinWrite(env, { ...record, alertStates: states });
