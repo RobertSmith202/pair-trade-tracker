@@ -1,6 +1,7 @@
 // Pair Trade Tracker — Cloudflare Worker (Type-aware: pair / long / short)
 // Two-threshold alarm: alertPctMin (loss, repeating until ack) + alertPctMax (profit, one-shot)
 const ALERT_REPEAT_MS = 3 * 60 * 1000;
+const PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000;
 const TRADING_START_HOUR = 9;
 const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
@@ -11,7 +12,7 @@ const WORKER_STRINGS = {
     pair:"Paar", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen",
     ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen",
-    profit_note:"(Informativ — keine Quittierung nötig)",
+    profit_ack_prompt:"→ Antworte mit beliebigem Text, um den Gewinn-Alarm zu bestätigen (Wiederholung alle 30 Min)",
     ack_received:"✅ Alarm bestätigt",
     test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen."
   },
@@ -20,7 +21,7 @@ const WORKER_STRINGS = {
     pair:"Pair", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches",
     ack_prompt:"→ Reply with any text to acknowledge the alert",
-    profit_note:"(Informational — no acknowledgement needed)",
+    profit_ack_prompt:"→ Reply with any text to acknowledge the profit alert (repeats every 30 min)",
     ack_received:"✅ Alert acknowledged",
     test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge."
   }
@@ -158,7 +159,7 @@ function buildAlarmMessage(lang, trade, kind, perfPct, pnl, notionalNow, tranche
   ];
   if (trancheCount > 1) lines.push(workerT(lang, "tranches") + ": " + trancheCount);
   lines.push("");
-  lines.push(workerT(lang, isProfit ? "profit_note" : "ack_prompt"));
+  lines.push(workerT(lang, isProfit ? "profit_ack_prompt" : "ack_prompt"));
   return lines.join("\n");
 }
 
@@ -218,7 +219,7 @@ async function runAlarmCheck(env) {
       }
     }
 
-    // --- PROFIT alarm (one-shot, no ack) ---
+    // --- PROFIT alarm (30-min repeat, ack required) ---
     if (hasMax) {
       const threshold = Math.abs(Number(max));
       const breached = perf.perfPct >= threshold;
@@ -226,6 +227,9 @@ async function runAlarmCheck(env) {
       if (breached && cur === "idle") {
         await sendTelegram(env, buildAlarmMessage(lang, trade, "profit", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
         st.max = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "profit", action: "notified" });
+      } else if (breached && cur === "notified" && (now - st.max.lastAlertAt) >= PROFIT_ALERT_REPEAT_MS) {
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "profit", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        st.max = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "profit", action: "repeated" });
       } else if (!breached && cur !== "idle") {
         st.max = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id, kind: "profit", action: "reset" });
       }
@@ -251,13 +255,19 @@ async function handleTelegramWebhook(req, env) {
   let record, lang = "de";
   try { record = await jsonbinRead(env); lang = record.lang || "de"; } catch { await sendTelegram(env, workerT(lang, "ack_received")); return textResponse("ok (no record)"); }
   const states = record.alertStates || {}; let changed = false;
+  const ackTs = Date.now();
   for (const id of Object.keys(states)) {
     const st = ensureStateShape(states[id]);
+    let touched = false;
     if (st.min?.state === "triggered") {
-      st.min = { state: "acknowledged", lastAlertAt: Date.now() };
-      states[id] = st;
-      changed = true;
+      st.min = { state: "acknowledged", lastAlertAt: ackTs };
+      touched = true;
     }
+    if (st.max?.state === "notified") {
+      st.max = { state: "acknowledged", lastAlertAt: ackTs };
+      touched = true;
+    }
+    if (touched) { states[id] = st; changed = true; }
   }
   if (changed) { try { await jsonbinWrite(env, { ...record, alertStates: states }); } catch {} }
   await sendTelegram(env, workerT(lang, "ack_received"));

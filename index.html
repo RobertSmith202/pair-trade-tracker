@@ -105,7 +105,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .alarm-row { display: inline-block; font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-top: 4px; }
 .alarm-row.watching { background: rgba(46,125,50,0.1); color: var(--pos); }
 .alarm-row.max-watching { background: rgba(21,101,192,0.1); color: var(--info); }
-.alarm-row.max-notified { background: rgba(46,125,50,0.18); color: var(--pos); font-weight: 700; }
+.alarm-row.max-notified { background: var(--pos-bg); color: var(--pos); font-weight: 700; animation: pulse 1.5s infinite; }
+.alarm-row.max-acked { background: rgba(46,125,50,0.10); color: var(--pos); }
 .alarm-row.triggered { background: var(--neg-bg); color: var(--neg); font-weight: 700; animation: pulse 1.5s infinite; }
 .alarm-row.acked { background: rgba(120,120,120,0.15); color: var(--muted); }
 .pos { color: var(--pos); }
@@ -138,7 +139,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .alarm-pill { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 4px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.2px; font-variant-numeric: tabular-nums; }
 .alarm-pill.watching { background: rgba(46,125,50,0.18); color: var(--pos); }
 .alarm-pill.max-watching { background: rgba(21,101,192,0.18); color: var(--info); }
-.alarm-pill.max-notified { background: var(--pos-bg); color: var(--pos); font-weight: 700; }
+.alarm-pill.max-notified { background: var(--pos-bg); color: var(--pos); font-weight: 700; animation: pulse 1.5s infinite; }
+.alarm-pill.max-acked { background: rgba(46,125,50,0.12); color: var(--pos); }
 .alarm-pill.triggered { background: var(--neg-bg); color: var(--neg); animation: pulse 1.5s infinite; }
 .alarm-pill.acked { background: rgba(120,120,120,0.18); color: var(--muted); }
 .trade-head.tappable { cursor: pointer; user-select: none; }
@@ -487,7 +489,8 @@ const STRINGS = {
     alarm_triggered: "🚨 VERLUST-ALARM AUSGELÖST · Schwelle {pct} — auf Telegram quittieren",
     alarm_acknowledged: "✓ Quittiert · wird neu scharf bei Erholung über {pct}",
     alarm_max_watching: "🎯 Gewinn-Ziel wachend — Schwelle {pct}",
-    alarm_max_notified: "✅ Gewinn-Ziel erreicht · Schwelle {pct}",
+    alarm_max_notified: "🎯 GEWINN-ZIEL ERREICHT · Schwelle {pct} — auf Telegram quittieren",
+    alarm_max_acknowledged: "✓ Gewinn quittiert · neue Nachricht erst wenn unter {pct} und dann wieder darüber",
     menu_actions: "Aktionen", menu_data_mgmt: "Datenverwaltung", menu_sync_now: "Jetzt syncen",
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
@@ -565,7 +568,8 @@ const STRINGS = {
     alarm_triggered: "🚨 LOSS ALARM TRIGGERED · threshold {pct} — acknowledge on Telegram",
     alarm_acknowledged: "✓ Acknowledged · re-arms when recovers above {pct}",
     alarm_max_watching: "🎯 Profit target armed — threshold {pct}",
-    alarm_max_notified: "✅ Profit target reached · threshold {pct}",
+    alarm_max_notified: "🎯 PROFIT TARGET REACHED · threshold {pct} — acknowledge on Telegram",
+    alarm_max_acknowledged: "✓ Profit acknowledged · next message only when below {pct} and back above",
     menu_actions: "Actions", menu_data_mgmt: "Data management", menu_sync_now: "Sync now",
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
@@ -1028,8 +1032,9 @@ function alarmStatusHtml(tr) {
   if (hasMax) {
     const thr = fmtPct(Math.abs(Number(tr.alertPctMax)));
     const s = states.max;
-    if (s === "idle")           html += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
-    else if (s === "notified")  html += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
+    if (s === "idle")              html += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
+    else if (s === "notified")     html += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
+    else if (s === "acknowledged") html += `<div class="alarm-row max-acked">${t("alarm_max_acknowledged", { pct: thr })}</div>`;
   }
   return html;
 }
@@ -1068,7 +1073,8 @@ function alarmPillHtml(tr) {
   if (hasMax) {
     const s = states.max;
     let icon = "🎯", cls = "max-watching";
-    if (s === "notified") { icon = "✅"; cls = "max-notified"; }
+    if (s === "notified")          { icon = "🎯"; cls = "max-notified"; }
+    else if (s === "acknowledged") { icon = "✓";  cls = "max-acked"; }
     html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(Math.abs(Number(tr.alertPctMax)))}</span>`;
   }
   return html;
