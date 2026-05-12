@@ -21,7 +21,7 @@ Kern-Features:
 - Auto-Refresh jede Minute wenn App im Foreground während Handelszeit (Mo-Fr, 09:00-22:55 Berlin)
 - Bloomberg-style Price-Flash-Animationen (grün/rot Hintergrund-Flash bei Kursänderung)
 - **4 horizontal swipbare Pages** mit eigenen Aggregaten je Trade-Typ
-- **Tastatur-Shortcuts** auf Mac (Cmd+1..4) für direktes Springen zu einer Page
+- **Tastatur-Shortcuts** auf Mac (`Cmd+Shift+1..4`) für direktes Springen zu einer Page
 
 ---
 
@@ -56,7 +56,8 @@ Page-Reihenfolge ist hart kodiert in `const PAGES = ["pair", "long", "short", "t
 **Navigation:**
 - Wischen (Touch/Trackpad) — `scroll-snap` mit `scroll-snap-stop: always`
 - Tap auf Page-Dot — direkter Sprung mit Smooth-Scroll
-- `Cmd+1..4` auf Mac, `Ctrl+1..4` auf anderen Plattformen — globaler `keydown`-Listener mit `capture: true` + `preventDefault`, damit Safari Cmd+1 nicht als Tab-Wechsel interpretiert. Ignoriert Events aus Input/Textarea/Select, damit Form-Eingaben nicht abgegriffen werden.
+- **Tastatur-Shortcut**: `Cmd+Shift+1..4` auf Mac, `Ctrl+Shift+1..4` auf anderen Plattformen. Globaler `keydown`-Listener mit `capture: true` + `preventDefault`. **Implementation-Detail:** Listener nutzt `e.code` (Layout-unabhängig: `"Digit1".."Digit4"`) statt `e.key` — mit gedrückter Shift-Taste wäre `e.key` das Sonderzeichen (`"!"`, `'"'`, `"§"`, `"$"` je nach Layout). Ignoriert Events aus Input/Textarea/Select, damit Form-Eingaben nicht abgegriffen werden.
+- **macOS-Konflikt bei Cmd+Shift+3 und Cmd+Shift+4:** beide sind systemweit für Screenshots reserviert. macOS fängt die Events ab, bevor sie überhaupt zum Browser kommen → JavaScript-Listener feuert nicht. Workaround entweder a) die Screenshot-Shortcuts in *Systemeinstellungen → Tastatur → Tastaturkurzbefehle → Bildschirmfotos* deaktivieren/umlegen, oder b) `Ctrl+Shift+3` und `Ctrl+Shift+4` benutzen (`Ctrl` als Modifier ist von macOS für Screenshots nicht belegt).
 
 **Toolbar oben** (`+ Neuer Trade`, `↻ Kurse`, `⋯ Menü`) ist `position: sticky; top: 0` — bleibt beim vertikalen Scrollen oben. Kein Header mit App-Title mehr im Body — der wandert ins Settings-Modal als h1.
 
@@ -162,6 +163,16 @@ Performance wird wie bisher aggregiert: Σ Tranchen-P&Ls und Σ Notionals, dann 
 
 - Auf **Paare/Longs/Shorts-Page**: Typ implizit, Typ-Auswahl im Form versteckt.
 - Auf **Gesamt-Page**: Typ-Auswahl als 3-Radio-Switch (`Paar` / `Nur Long` / `Nur Short`) im Form sichtbar. Default `Paar`. Form-Sektionen für Long/Short blenden sich je nach Wahl ein/aus.
+
+### Tastatur-Shortcuts: Wahl der Modifier-Kombo
+
+Erste Version war `Cmd+1..4`. Problem: Safari (auch im PWA-Modus) reserviert `Cmd+1..9` auf System-Ebene für Tab-Switching bzw. App-internes Fenster-Navigation und gibt diese Events nicht ans JavaScript weiter. `preventDefault` half nicht. Auf Roberts Wunsch auf `Cmd+Shift+1..4` umgestellt — diese Kombo wird von Safari nicht abgegriffen.
+
+Konflikt-Hinweis: macOS reserviert `Cmd+Shift+3` (Vollbild-Screenshot) und `Cmd+Shift+4` (Auswahl-Screenshot) systemweit. Diese werden auf einer noch tieferen Ebene abgefangen als Browser-Shortcuts — JavaScript bekommt das Event gar nicht. Workarounds:
+- macOS-Screenshot-Shortcuts in den System-Einstellungen deaktivieren oder umlegen, oder
+- `Ctrl+Shift+3` und `Ctrl+Shift+4` benutzen (`Ctrl` ist auf Mac nicht für Screenshots belegt).
+
+Der Listener akzeptiert beide Modifier (`metaKey || ctrlKey`), sodass `Ctrl+Shift+1..4` als Fallback immer funktioniert.
 
 ### Pfadunabhängige Einstands-Währung
 
@@ -275,9 +286,11 @@ Bei Versions-Bumps: neue Keys vergeben (`_v3`), alte beim ersten Load migrieren.
 
 8. **Worker und HTML synchron deployen:** Bei Datenmodell- oder Compute-Änderungen erst Worker, dann HTML. Sonst rechnet der alte Worker neue Trade-Typen falsch (z.B. fragt er bei Long-only nach `shortTicker` der null ist). Bei reinen UX-Änderungen ohne Compute-Touch (Layout, Farben, Shortcuts) reicht HTML-Only.
 
-9. **Cmd+1..4 in normalem Safari-Tab:** Safari mappt Cmd+1..4 standardmäßig auf Tab 1..4. Der App-Listener läuft mit `capture: true` + `preventDefault`, was Safari respektiert — in PWA-Standalone gibt's ohnehin keine Tabs. In normalem Tab kann es in seltenen Safari-Versionen vorkommen, dass Safari trotzdem zum Tab springt. Fix: PWA installieren.
+9. **macOS-Screenshot vs. Cmd+Shift+3/4:** Diese Kombos sind auf macOS systemweit reserviert für Screenshots und werden bevor sie zum Browser kommen abgegriffen. Workaround: Screenshot-Shortcuts in den System-Einstellungen deaktivieren/umlegen, oder `Ctrl+Shift+3` und `Ctrl+Shift+4` benutzen (der Listener akzeptiert beide Modifier).
 
-10. **`scroll-snap` und Trackpad:** Horizontales Wischen mit Mac-Trackpad funktioniert mit `scroll-snap-x mandatory`, ist aber für viele User unintuitiv. Daher: Cmd+1..4 als Haupt-Bedienpfad auf Mac, Wischen als Backup.
+10. **Layout-abhängige `e.key` mit Shift:** Mit gedrückter Shift-Taste liefert `e.key` das Sonderzeichen (`"!"`, `'"'`, `"§"`, `"$"` je nach Layout) statt der Zahl. Deshalb verwendet der Shortcut-Listener `e.code` (Layout-unabhängig: `"Digit1".."Digit4"`). Niemals auf `e.key` umstellen.
+
+11. **`scroll-snap` und Trackpad:** Horizontales Wischen mit Mac-Trackpad funktioniert mit `scroll-snap-x mandatory`, ist aber für viele User unintuitiv. Daher: `Cmd+Shift+1..4` als Haupt-Bedienpfad auf Mac, Wischen als Backup.
 
 ---
 
@@ -305,7 +318,7 @@ Spezielle Strings für die neuen Features:
 - Schreibt Deutsch, versteht aber EN-Begriffe in Code (Variablen, etc.).
 - Setup ist: iPhone als primäres Mobile-Gerät, Mac als Desktop. Beide nutzen die selbe Netlify-URL (`rs-pair-tracker.netlify.app`).
 - Telegram-Alarms muss zuverlässig sein — Hauptgrund für das ganze Setup, nicht nur die Live-Anzeige.
-- Bevorzugt Tastatur-Shortcuts auf Mac (Cmd+1..4) gegenüber Trackpad-Wischen.
+- Bevorzugt Tastatur-Shortcuts auf Mac (`Cmd+Shift+1..4`) gegenüber Trackpad-Wischen.
 
 ---
 
