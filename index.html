@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de" data-theme="auto">
+<html lang="de" data-theme="midnight">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -13,11 +13,8 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 :root { color-scheme: light; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
-:root[data-theme="auto"] { color-scheme: light dark; }
 :root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="auto"] { --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
-}
+:root[data-theme="midnight"] { color-scheme: dark; --bg: #07071a; --card: #11112a; --border: #232342; --text: #e8e8f5; --muted: #8e8eac; --pos: #6bc46e; --pos-bg: #143019; --pos-soft: #0c1d12; --neg: #ff6b7d; --neg-bg: #371218; --neg-soft: #20090e; --accent: #d9d9ee; --warn: #ffc266; --info: #7fc0ee; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: calc(env(safe-area-inset-top) + 6px) 0 calc(env(safe-area-inset-bottom) + 50px) 0; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; overflow-x: hidden; }
 .aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 8px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .agg-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
@@ -156,14 +153,13 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .breakdown-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 600; }
 .breakdown-val { font-size: 16px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* THEME-CARDS (GitHub-style appearance picker) */
 .theme-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 4px; }
 .theme-card { padding: 14px 8px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--card); user-select: none; transition: border-color 0.15s, background-color 0.15s, transform 0.05s; -webkit-tap-highlight-color: transparent; }
 .theme-card:hover { border-color: var(--muted); }
 .theme-card:active { transform: scale(0.98); }
 .theme-card.active { border-color: var(--info); background: rgba(21,101,192,0.08); }
 .theme-card-icon { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 20px; line-height: 1; }
-.theme-card[data-theme-choice="auto"] .theme-card-icon { background: linear-gradient(135deg, #fafafa 50%, #1a1a1c 50%); border: 1px solid var(--border); color: transparent; }
+.theme-card[data-theme-choice="midnight"] .theme-card-icon { background: radial-gradient(circle at 30% 30%, #1d1d3e 0%, #07071a 70%); border: 1px solid #232342; color: #d9d9ee; }
 .theme-card[data-theme-choice="light"] .theme-card-icon { background: #ffffff; border: 1px solid #e5e5e5; color: #b88500; }
 .theme-card[data-theme-choice="dark"] .theme-card-icon { background: #1a1a1c; border: 1px solid #2a2a2c; color: #f0f0f0; }
 .theme-card-label { font-size: 13px; font-weight: 600; color: var(--text); }
@@ -188,9 +184,6 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .test-result { padding: 8px 12px; border-radius: 8px; font-size: 13px; }
 .test-result.ok { background: var(--pos-bg); color: var(--pos); }
 .test-result.err { background: var(--neg-bg); color: var(--neg); }
-.kbd-hint { font-size: 11px; color: var(--muted); margin-top: -2px; line-height: 1.5; }
-.kbd-hint kbd { font-family: ui-monospace, SFMono-Regular, monospace; background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px; padding: 1px 5px; border-radius: 4px; font-size: 10px; }
-.kbd-hint .warn { color: var(--warn); }
 </style>
 </head>
 <body>
@@ -348,9 +341,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
     <h4 class="section-h" data-i18n="settings_theme">Erscheinungsbild</h4>
     <div class="info-box" data-i18n="settings_theme_info"></div>
     <div class="theme-cards" id="theme-cards">
-      <div class="theme-card" data-theme-choice="auto">
-        <div class="theme-card-icon" aria-hidden="true"></div>
-        <div class="theme-card-label" data-i18n="theme_auto">Auto</div>
+      <div class="theme-card" data-theme-choice="midnight">
+        <div class="theme-card-icon" aria-hidden="true">✦</div>
+        <div class="theme-card-label" data-i18n="theme_midnight">Mitternacht</div>
       </div>
       <div class="theme-card" data-theme-choice="light">
         <div class="theme-card-icon" aria-hidden="true">☀</div>
@@ -384,7 +377,6 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
         <option value="short" data-i18n="page_shorts">Shorts</option>
         <option value="total" data-i18n="page_total">Gesamt</option>
       </select>
-      <div class="kbd-hint" id="kbd-hint">⌨︎ <kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>1</kbd>..<kbd>4</kbd> (Mac) bzw. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd>..<kbd>4</kbd> springt direkt zur jeweiligen Page.<br><span class="warn">⚠︎ <kbd>⌘⇧3</kbd>/<kbd>⌘⇧4</kbd> sind macOS-Screenshot-Shortcuts und werden vom System abgefangen — entweder in den macOS-Einstellungen deaktivieren oder als Alternativ-Modifier <kbd>⌃</kbd> (Ctrl) benutzen.</span></div>
     </div>
 
     <h4 class="section-h" data-i18n="settings_home_ccy">Heimat-Währung</h4>
@@ -451,8 +443,8 @@ const STRINGS = {
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
     settings_language_info: "Pro Gerät gespeichert (nicht synced).",
     settings_theme: "Erscheinungsbild",
-    settings_theme_info: "Sofort angewendet und gespeichert. Pro Gerät (nicht synced). „Auto“ folgt der System-Einstellung.",
-    theme_auto: "Auto", theme_light: "Hell", theme_dark: "Dunkel",
+    settings_theme_info: "Sofort angewendet und gespeichert. Pro Gerät (nicht synced).",
+    theme_midnight: "Mitternacht", theme_light: "Hell", theme_dark: "Dunkel",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -524,8 +516,8 @@ const STRINGS = {
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
     settings_language_info: "Stored per device (not synced).",
     settings_theme: "Appearance",
-    settings_theme_info: "Applied immediately and saved. Stored per device (not synced). \"Auto\" follows the system setting.",
-    theme_auto: "Auto", theme_light: "Light", theme_dark: "Dark",
+    settings_theme_info: "Applied immediately and saved. Stored per device (not synced).",
+    theme_midnight: "Midnight", theme_light: "Light", theme_dark: "Dark",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -597,8 +589,8 @@ const STRINGS = {
     settings_title: "Impostazioni", settings_language: "Lingua", settings_language_label: "Lingua",
     settings_language_info: "Memorizzato per dispositivo (non sincronizzato).",
     settings_theme: "Aspetto",
-    settings_theme_info: "Applicato immediatamente e salvato. Per dispositivo (non sincronizzato). \"Auto\" segue l'impostazione di sistema.",
-    theme_auto: "Auto", theme_light: "Chiaro", theme_dark: "Scuro",
+    settings_theme_info: "Applicato immediatamente e salvato. Per dispositivo (non sincronizzato).",
+    theme_midnight: "Mezzanotte", theme_light: "Chiaro", theme_dark: "Scuro",
     settings_start_page: "Page predefinita", settings_start_page_label: "Page predefinita",
     settings_start_page_info: "Quale page mostrare all'avvio. Memorizzato per dispositivo (non sincronizzato).",
     settings_home_ccy: "Valuta principale", settings_home_ccy_label: "Codice ISO (EUR, USD, GBP, CHF, ...)",
@@ -670,8 +662,8 @@ const STRINGS = {
     settings_title: "Настройки", settings_language: "Язык", settings_language_label: "Язык",
     settings_language_info: "Сохраняется на устройстве (не синхронизируется).",
     settings_theme: "Внешний вид",
-    settings_theme_info: "Применяется сразу и сохраняется. На устройстве (не синхронизируется). «Авто» следует системной настройке.",
-    theme_auto: "Авто", theme_light: "Светлая", theme_dark: "Тёмная",
+    settings_theme_info: "Применяется сразу и сохраняется. На устройстве (не синхронизируется).",
+    theme_midnight: "Полночь", theme_light: "Светлая", theme_dark: "Тёмная",
     settings_start_page: "Стартовая page", settings_start_page_label: "Стартовая page",
     settings_start_page_info: "Какая page показывается при запуске. Сохраняется на устройстве (не синхронизируется).",
     settings_home_ccy: "Основная валюта", settings_home_ccy_label: "Код ISO (EUR, USD, GBP, CHF, ...)",
@@ -734,7 +726,7 @@ const PRICE_CACHE = new Map();
 const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
 const PREVIOUS_PRICES = new Map();
-const THEMES = ["auto", "light", "dark"];
+const THEMES = ["midnight", "light", "dark"];
 
 const AUTO_REFRESH_INTERVAL_MS = 1 * 60 * 1000;
 const APP_TZ = "Europe/Berlin";
@@ -763,15 +755,23 @@ function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); 
 function saveLangPreference(lang) { try { localStorage.setItem(LANG_KEY, lang); } catch {} }
 function loadStartPage() { try { const v = localStorage.getItem(START_PAGE_KEY); return PAGES.includes(v) ? v : "pair"; } catch { return "pair"; } }
 function saveStartPage(p) { try { localStorage.setItem(START_PAGE_KEY, p); } catch {} }
-function loadTheme() { try { const v = localStorage.getItem(THEME_KEY); return THEMES.includes(v) ? v : "auto"; } catch { return "auto"; } }
+function loadTheme() {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    if (THEMES.includes(v)) return v;
+    // Migration: legacy "auto" value → midnight
+    if (v === "auto") return "midnight";
+    return "midnight";
+  } catch { return "midnight"; }
+}
 function saveTheme(v) { try { localStorage.setItem(THEME_KEY, v); } catch {} }
 function applyTheme(v) {
-  const theme = THEMES.includes(v) ? v : "auto";
+  const theme = THEMES.includes(v) ? v : "midnight";
   document.documentElement.setAttribute("data-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    const dark = theme === "dark" || (theme === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    meta.setAttribute("content", dark ? "#0f0f10" : "#fafafa");
+    const tone = theme === "light" ? "#fafafa" : (theme === "midnight" ? "#07071a" : "#0f0f10");
+    meta.setAttribute("content", tone);
   }
 }
 function setActiveThemeCard(theme) {
@@ -1561,7 +1561,6 @@ document.getElementById("settings-test").addEventListener("click", async () => {
   else { sEl.className = "test-result err"; sEl.textContent = t("test_sync_no_creds"); }
 });
 document.getElementById("settings-save").addEventListener("click", async () => {
-  // NOTE: Theme is applied & saved instantly via the theme-cards click-handler below, NOT here.
   const hc = document.getElementById("home-ccy").value.trim().toUpperCase().slice(0,3);
   const wu = document.getElementById("worker-url").value.trim();
   const sk = document.getElementById("sync-key").value.trim();
@@ -1587,7 +1586,6 @@ document.getElementById("sync-disable").addEventListener("click", () => {
   closeSettings(); setSyncStatus("off", t("status_sync_off"));
 });
 
-// Theme cards: instant apply & save on click
 document.querySelectorAll(".theme-card").forEach(card => {
   card.addEventListener("click", () => {
     const choice = card.getAttribute("data-theme-choice");
@@ -1603,28 +1601,7 @@ document.querySelectorAll(".page-dot").forEach(d => { d.addEventListener("click"
 document.getElementById("pages-container").addEventListener("scroll", onPagesScroll, { passive: true });
 window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
-document.addEventListener("keydown", (e) => {
-  if (!(e.metaKey || e.ctrlKey)) return;
-  if (!e.shiftKey) return;
-  if (e.altKey) return;
-  if (!/^Digit[1-4]$/.test(e.code || "")) return;
-  const tag = (e.target?.tagName || "").toUpperCase();
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target?.isContentEditable)) return;
-  e.preventDefault(); e.stopPropagation();
-  const idx = parseInt(e.code.slice(-1), 10) - 1;
-  if (idx >= 0 && idx < PAGES.length) scrollToPage(PAGES[idx], true);
-}, { capture: true });
-
-// Apply theme as early as possible (before any visible render) to avoid Flash-Of-Wrong-Theme
 applyTheme(loadTheme());
-
-// Live-update theme when "Auto" mode is active and system preference changes
-if (window.matchMedia) {
-  const mql = window.matchMedia("(prefers-color-scheme: dark)");
-  const onSysSchemeChange = () => { if (loadTheme() === "auto") applyTheme("auto"); };
-  if (mql.addEventListener) mql.addEventListener("change", onSysSchemeChange);
-  else if (mql.addListener) mql.addListener(onSysSchemeChange);
-}
 
 const initialLang = loadLangPreference();
 setLanguage(initialLang);
