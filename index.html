@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de" data-theme="midnight">
+<html lang="de" data-theme="auto">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -13,8 +13,11 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 :root { color-scheme: light; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
+:root[data-theme="auto"] { color-scheme: light dark; }
 :root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
-:root[data-theme="midnight"] { color-scheme: dark; --bg: #07071a; --card: #11112a; --border: #232342; --text: #e8e8f5; --muted: #8e8eac; --pos: #6bc46e; --pos-bg: #143019; --pos-soft: #0c1d12; --neg: #ff6b7d; --neg-bg: #371218; --neg-soft: #20090e; --accent: #d9d9ee; --warn: #ffc266; --info: #7fc0ee; }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] { --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
+}
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: calc(env(safe-area-inset-top) + 6px) 0 calc(env(safe-area-inset-bottom) + 50px) 0; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; overflow-x: hidden; }
 .aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 8px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .agg-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
@@ -159,7 +162,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .theme-card:active { transform: scale(0.98); }
 .theme-card.active { border-color: var(--info); background: rgba(21,101,192,0.08); }
 .theme-card-icon { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 20px; line-height: 1; }
-.theme-card[data-theme-choice="midnight"] .theme-card-icon { background: radial-gradient(circle at 30% 30%, #1d1d3e 0%, #07071a 70%); border: 1px solid #232342; color: #d9d9ee; }
+.theme-card[data-theme-choice="auto"] .theme-card-icon { background: linear-gradient(135deg, #fafafa 50%, #1a1a1c 50%); border: 1px solid var(--border); color: transparent; }
 .theme-card[data-theme-choice="light"] .theme-card-icon { background: #ffffff; border: 1px solid #e5e5e5; color: #b88500; }
 .theme-card[data-theme-choice="dark"] .theme-card-icon { background: #1a1a1c; border: 1px solid #2a2a2c; color: #f0f0f0; }
 .theme-card-label { font-size: 13px; font-weight: 600; color: var(--text); }
@@ -341,9 +344,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
     <h4 class="section-h" data-i18n="settings_theme">Erscheinungsbild</h4>
     <div class="info-box" data-i18n="settings_theme_info"></div>
     <div class="theme-cards" id="theme-cards">
-      <div class="theme-card" data-theme-choice="midnight">
-        <div class="theme-card-icon" aria-hidden="true">✦</div>
-        <div class="theme-card-label" data-i18n="theme_midnight">Mitternacht</div>
+      <div class="theme-card" data-theme-choice="auto">
+        <div class="theme-card-icon" aria-hidden="true"></div>
+        <div class="theme-card-label" data-i18n="theme_auto">Auto</div>
       </div>
       <div class="theme-card" data-theme-choice="light">
         <div class="theme-card-icon" aria-hidden="true">☀</div>
@@ -362,8 +365,6 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
       <select id="lang-select">
         <option value="de">Deutsch</option>
         <option value="en">English</option>
-        <option value="it">Italiano</option>
-        <option value="ru">Русский</option>
       </select>
     </div>
 
@@ -443,8 +444,8 @@ const STRINGS = {
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
     settings_language_info: "Pro Gerät gespeichert (nicht synced).",
     settings_theme: "Erscheinungsbild",
-    settings_theme_info: "Sofort angewendet und gespeichert. Pro Gerät (nicht synced).",
-    theme_midnight: "Mitternacht", theme_light: "Hell", theme_dark: "Dunkel",
+    settings_theme_info: "Sofort angewendet und gespeichert. Pro Gerät (nicht synced). „Auto“ folgt der System-Einstellung.",
+    theme_auto: "Auto", theme_light: "Hell", theme_dark: "Dunkel",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -516,8 +517,8 @@ const STRINGS = {
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
     settings_language_info: "Stored per device (not synced).",
     settings_theme: "Appearance",
-    settings_theme_info: "Applied immediately and saved. Stored per device (not synced).",
-    theme_midnight: "Midnight", theme_light: "Light", theme_dark: "Dark",
+    settings_theme_info: "Applied immediately and saved. Stored per device (not synced). \"Auto\" follows the system setting.",
+    theme_auto: "Auto", theme_light: "Light", theme_dark: "Dark",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -552,152 +553,6 @@ const STRINGS = {
     form_multitranche_note: "With multiple tranches you can only edit name and alert threshold here. Individual tranches can be deleted from the tranches view.",
     alarm_supertrade_note: "Note: when adding tranches, their thresholds are not adopted — this threshold only changes via manual edit here.",
     merged_into_super: "Added to existing trade (tranche {n}).",
-  },
-  it: {
-    html_lang: "it", app_title: "Pair Trade Tracker",
-    agg_total_pnl: "P&L totale", agg_performance: "Performance", agg_notional: "Nozionale totale",
-    agg_on_notional: "sul nozionale", agg_in_ccy_fx: "in {ccy} · convertito FX",
-    agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trade",
-    agg_partial: " · {n} incompleto", agg_loading: "Caricamento...", agg_no_trades: "Nessun trade",
-    btn_new_trade: "+ Nuovo Trade", btn_refresh: "↻ Quote", btn_save: "Salva", btn_cancel: "Annulla",
-    btn_close: "Chiudi", btn_edit: "Modifica", btn_import: "Importa", btn_test_both: "Testa entrambi", btn_settings: "Impostazioni",
-    status_ready: "Pronto", status_loading_prices: "Caricamento quote…", status_updated: "Aggiornato {time}",
-    status_no_worker_url: "Nessun URL Worker (⋯ → Impostazioni)",
-    status_ticker_errors: "{time} · {err}/{total} ticker falliti",
-    status_auto_off: "⏱ Auto-aggiornamento: spento", status_auto_outside_hours: "⏱ Auto-aggiornamento: fuori orario",
-    status_auto_next: "⏱ Prossimo auto-aggiornamento: {time}", status_auto_active: "⏱ Auto-aggiornamento: attivo (ogni 1 min)",
-    status_sync_off: "Sync disattivato", status_sync_active: "Sync attivo", status_pull: "Pull…", status_push: "Push…",
-    status_sync_synced: "sincronizzato · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
-    status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
-    form_title_new: "Nuovo trade", form_title_edit: "Modifica trade",
-    form_help_currency: "Predefinito: il prezzo d'ingresso è interpretato in <strong>{ccy}</strong> (fissato indipendentemente dal percorso). Spunta la casella se il prezzo d'ingresso è invece nella valuta di quotazione del titolo. Ticker in formato Yahoo (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
-    form_trade_name: "Nome del trade (libero)", form_trade_name_ph: "es. SAP vs Oracle",
-    form_long_position: "Posizione long", form_short_position: "Posizione short",
-    form_ticker: "Ticker (formato Yahoo)", form_qty: "Numero di azioni", form_entry: "Prezzo d'ingresso",
-    form_native_checkbox: "Prezzo d'ingresso nella valuta di quotazione (invece di {ccy})",
-    form_alarm_title: "🚨 Avviso Telegram (opzionale)", form_alarm_pct_label: "Avviso quando la performance scende sotto % (numero negativo)",
-    form_alarm_pct_help: "Vuoto = disattivato. Esempio: <code>-30</code> = avviso al 30% di perdita sul nozionale. Ripetizione Telegram ogni 3 min finché non confermi.",
-    form_type_label: "Tipo trade", form_type_pair: "Coppia", form_type_long: "Solo Long", form_type_short: "Solo Short",
-    card_notional: "Nozionale ({ccy})", card_qty_x_entry: "Qtà × Ingresso", card_current: "Attuale",
-    card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "Tasso FX non disponibile", card_loading: "carico...",
-    card_delete_confirm: "Eliminare \"{name}\"?",
-    alarm_watching: "🔔 Allarme armato — soglia {pct}",
-    alarm_triggered: "🚨 ALLARME ATTIVATO · Messaggio {n} · soglia {pct} — conferma su Telegram",
-    alarm_acknowledged: "✓ Confermato · si riattiva quando torna sopra {pct}",
-    menu_actions: "Azioni", menu_data_mgmt: "Gestione dati", menu_sync_now: "Sincronizza ora",
-    menu_export: "Esporta (copia JSON)", menu_import: "Importa (incolla JSON)", menu_clear_all: "Elimina tutti i trade",
-    settings_title: "Impostazioni", settings_language: "Lingua", settings_language_label: "Lingua",
-    settings_language_info: "Memorizzato per dispositivo (non sincronizzato).",
-    settings_theme: "Aspetto",
-    settings_theme_info: "Applicato immediatamente e salvato. Per dispositivo (non sincronizzato).",
-    theme_midnight: "Mezzanotte", theme_light: "Chiaro", theme_dark: "Scuro",
-    settings_start_page: "Page predefinita", settings_start_page_label: "Page predefinita",
-    settings_start_page_info: "Quale page mostrare all'avvio. Memorizzato per dispositivo (non sincronizzato).",
-    settings_home_ccy: "Valuta principale", settings_home_ccy_label: "Codice ISO (EUR, USD, GBP, CHF, ...)",
-    settings_home_ccy_info: "Tutti i valori P&L e nozionali sono mostrati in questa valuta. Predefinito per inserimento prezzo nei nuovi trade. I trade esistenti mantengono la loro valuta d'ingresso fissata (indipendente dal percorso).",
-    settings_worker_title: "Quote live · Cloudflare Worker", settings_worker_info: "URL del tuo Worker proxy Yahoo Finance (workers.dev).",
-    settings_worker_label: "URL Worker",
-    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master key + bin ID da jsonbin.io.",
-    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin ID",
-    settings_sync_disable: "Disattiva sync", settings_sync_disable_confirm: "Disattivare il sync? I dati locali vengono mantenuti.",
-    test_worker_loading: "Test worker…", test_sync_loading: "Test JSONBin…",
-    test_worker_ok: "OK — AAPL a {price} {ccy}", test_worker_no_price: "Risposta inattesa",
-    test_worker_no_url: "Worker: nessun URL inserito", test_sync_ok: "OK — bin contiene {n} trade",
-    test_sync_no_creds: "JSONBin: key o bin ID mancante",
-    test_worker_prefix: "Worker: ", test_sync_prefix: "JSONBin: ",
-    io_title: "Importa / Esporta", io_export_btn: "Esporta (negli appunti)",
-    io_input_label: "Incolla JSON da importare:", io_paste_title: "Incolla JSON",
-    io_clipboard_ok: "Trade copiati come JSON negli appunti.", io_clipboard_prompt: "Copia questo testo JSON:",
-    io_invalid_json: "JSON non valido: {err}", io_no_valid_trades: "Nessun trade valido trovato.",
-    io_replace_confirm: "Sostituire i {existing} trade esistenti con {new} importati? (Annulla = aggiungi)",
-    io_clear_confirm: "Eliminare davvero TUTTI i trade?",
-    err_ticker_required: "Inserisci entrambi i ticker.", err_long_invalid: "Long: quantità e ingresso devono essere > 0.",
-    err_short_invalid: "Short: quantità e ingresso devono essere > 0.",
-    err_long_ticker_required: "Inserisci il ticker long.", err_short_ticker_required: "Inserisci il ticker short.",
-    err_alarm_invalid: "Soglia allarme: numero non valido. Esempio: -30",
-    err_no_ticker: "Nessun ticker", err_no_data: "Nessun dato", err_no_price_feed: "Nessun prezzo nel feed",
-    err_no_worker_url: "Nessun URL Worker (⋯ → Impostazioni)",
-    empty_no_pairs: "Ancora nessun pair trade.", empty_no_longs: "Ancora nessun trade long.", empty_no_shorts: "Ancora nessun trade short.",
-    page_pairs: "Coppie", page_longs: "Long", page_shorts: "Short", page_total: "Totale",
-    tranche_badge: "× {n}", tranche_panel_title: "Tranche", tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
-    tranche_delete_confirm: "Eliminare questa tranche? Solo questa viene rimossa, il resto del trade resta.",
-    leg_sum_qty: "Σ Quantità", leg_sum_notional: "Σ Base di costo", leg_sum_pnl: "Σ P&L",
-    form_multitranche_note: "Con più tranche puoi modificare qui solo nome e soglia d'allarme. Le singole tranche possono essere eliminate dalla vista tranche.",
-    alarm_supertrade_note: "Nota: aggiungendo tranche, le loro soglie non vengono adottate — questa soglia cambia solo modificandola qui manualmente.",
-    merged_into_super: "Aggiunto al trade esistente (tranche {n}).",
-  },
-  ru: {
-    html_lang: "ru", app_title: "Pair Trade Tracker",
-    agg_total_pnl: "Общий P&L", agg_performance: "Доходность", agg_notional: "Общий номинал",
-    agg_on_notional: "от номинала", agg_in_ccy_fx: "в {ccy} · с конвертацией FX",
-    agg_trades_count: "{n} {plural}", agg_trade_singular: "сделка", agg_trade_plural: "сделок",
-    agg_partial: " · {n} неполных", agg_loading: "Загрузка...", agg_no_trades: "Сделок ещё нет",
-    btn_new_trade: "+ Новая сделка", btn_refresh: "↻ Котировки", btn_save: "Сохранить", btn_cancel: "Отмена",
-    btn_close: "Закрыть", btn_edit: "Изменить", btn_import: "Импорт", btn_test_both: "Проверить оба", btn_settings: "Настройки",
-    status_ready: "Готов", status_loading_prices: "Загрузка котировок…", status_updated: "Обновлено {time}",
-    status_no_worker_url: "Нет URL Worker (⋯ → Настройки)",
-    status_ticker_errors: "{time} · {err}/{total} тикеров с ошибкой",
-    status_auto_off: "⏱ Авто-обновление: выкл", status_auto_outside_hours: "⏱ Авто-обновление: вне торговых часов",
-    status_auto_next: "⏱ Следующее авто-обновление: {time}", status_auto_active: "⏱ Авто-обновление: активно (раз в 1 мин)",
-    status_sync_off: "Sync выкл", status_sync_active: "Sync активен", status_pull: "Pull…", status_push: "Push…",
-    status_sync_synced: "синхронизирован · {time}", status_sync_pulled: "↓ {time}", status_sync_pushed: "↑ {time}",
-    status_pull_err: "Pull: {err}", status_push_err: "Push: {err}",
-    form_title_new: "Новая сделка", form_title_edit: "Изменить сделку",
-    form_help_currency: "По умолчанию: цена входа интерпретируется в <strong>{ccy}</strong> (зафиксировано независимо от пути). Поставь галочку, если цена входа в валюте котировки акции. Тикеры в формате Yahoo (AAPL, SAP.DE, RY4C.DE, RYA.IR).",
-    form_trade_name: "Название сделки (свободно)", form_trade_name_ph: "напр. SAP vs Oracle",
-    form_long_position: "Long-позиция", form_short_position: "Short-позиция",
-    form_ticker: "Тикер (формат Yahoo)", form_qty: "Количество акций", form_entry: "Цена входа",
-    form_native_checkbox: "Цена входа в валюте котировки (вместо {ccy})",
-    form_alarm_title: "🚨 Уведомление Telegram (опционально)", form_alarm_pct_label: "Уведомление при доходности ниже % (отрицательное число)",
-    form_alarm_pct_help: "Пусто = выкл. Пример: <code>-30</code> = уведомление при 30% убытка от номинала. Повтор в Telegram каждые 3 мин до подтверждения.",
-    form_type_label: "Тип сделки", form_type_pair: "Пара", form_type_long: "Только Long", form_type_short: "Только Short",
-    card_notional: "Номинал ({ccy})", card_qty_x_entry: "Кол-во × Вход", card_current: "Текущая",
-    card_pnl: "P&L", card_pnl_in: "(в {ccy})", card_fx_unavailable: "FX-курс недоступен", card_loading: "загрузка...",
-    card_delete_confirm: "Удалить «{name}»?",
-    alarm_watching: "🔔 Тревога активна — порог {pct}",
-    alarm_triggered: "🚨 ТРЕВОГА · Сообщение {n} · порог {pct} — подтверди в Telegram",
-    alarm_acknowledged: "✓ Подтверждено · сработает снова при восстановлении выше {pct}",
-    menu_actions: "Действия", menu_data_mgmt: "Управление данными", menu_sync_now: "Синхронизировать сейчас",
-    menu_export: "Экспорт (копировать JSON)", menu_import: "Импорт (вставить JSON)", menu_clear_all: "Удалить все сделки",
-    settings_title: "Настройки", settings_language: "Язык", settings_language_label: "Язык",
-    settings_language_info: "Сохраняется на устройстве (не синхронизируется).",
-    settings_theme: "Внешний вид",
-    settings_theme_info: "Применяется сразу и сохраняется. На устройстве (не синхронизируется).",
-    theme_midnight: "Полночь", theme_light: "Светлая", theme_dark: "Тёмная",
-    settings_start_page: "Стартовая page", settings_start_page_label: "Стартовая page",
-    settings_start_page_info: "Какая page показывается при запуске. Сохраняется на устройстве (не синхронизируется).",
-    settings_home_ccy: "Основная валюта", settings_home_ccy_label: "Код ISO (EUR, USD, GBP, CHF, ...)",
-    settings_home_ccy_info: "Все значения P&L и номинала отображаются в этой валюте. По умолчанию для ввода цены в новых сделках. Существующие сделки сохраняют свою валюту входа неизменной (независимо от пути).",
-    settings_worker_title: "Live-котировки · Cloudflare Worker", settings_worker_info: "URL твоего прокси-Worker для Yahoo Finance (workers.dev).",
-    settings_worker_label: "URL Worker",
-    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master-ключ + bin ID от jsonbin.io.",
-    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin ID",
-    settings_sync_disable: "Отключить sync", settings_sync_disable_confirm: "Отключить sync? Локальные данные сохраняются.",
-    test_worker_loading: "Проверка worker…", test_sync_loading: "Проверка JSONBin…",
-    test_worker_ok: "OK — AAPL по {price} {ccy}", test_worker_no_price: "Неожиданный ответ",
-    test_worker_no_url: "Worker: URL не указан", test_sync_ok: "OK — bin содержит {n} сделок",
-    test_sync_no_creds: "JSONBin: нет key или bin ID",
-    test_worker_prefix: "Worker: ", test_sync_prefix: "JSONBin: ",
-    io_title: "Импорт / Экспорт", io_export_btn: "Экспорт (в буфер)",
-    io_input_label: "Вставь JSON для импорта:", io_paste_title: "Вставить JSON",
-    io_clipboard_ok: "Сделки скопированы как JSON в буфер обмена.", io_clipboard_prompt: "Скопируй этот JSON-текст:",
-    io_invalid_json: "Неверный JSON: {err}", io_no_valid_trades: "Действительных сделок не найдено.",
-    io_replace_confirm: "Заменить существующие {existing} сделок на {new} импортированных? (Отмена = добавить)",
-    io_clear_confirm: "Действительно удалить ВСЕ сделки?",
-    err_ticker_required: "Введи оба тикера.", err_long_invalid: "Long: количество и цена входа должны быть > 0.",
-    err_short_invalid: "Short: количество и цена входа должны быть > 0.",
-    err_long_ticker_required: "Введи Long-тикер.", err_short_ticker_required: "Введи Short-тикер.",
-    err_alarm_invalid: "Порог тревоги: некорректное число. Пример: -30",
-    err_no_ticker: "Нет тикера", err_no_data: "Нет данных", err_no_price_feed: "Нет цены в ленте",
-    err_no_worker_url: "Нет URL Worker (⋯ → Настройки)",
-    empty_no_pairs: "Пока нет парных сделок.", empty_no_longs: "Пока нет long-сделок.", empty_no_shorts: "Пока нет short-сделок.",
-    page_pairs: "Пары", page_longs: "Long", page_shorts: "Short", page_total: "Всего",
-    tranche_badge: "× {n}", tranche_panel_title: "Транши", tranche_label_n: "Tr {n}", tranche_isolated_short: "Иso",
-    tranche_delete_confirm: "Удалить этот транш? Удаляется только этот транш, остальная часть сделки остаётся.",
-    leg_sum_qty: "Σ Количество", leg_sum_notional: "Σ База стоимости", leg_sum_pnl: "Σ P&L",
-    form_multitranche_note: "При нескольких траншах здесь можно редактировать только имя и порог тревоги. Отдельные транши удаляются в виде траншей.",
-    alarm_supertrade_note: "Примечание: при добавлении траншей их пороги не перенимаются — этот порог меняется только вручную здесь.",
-    merged_into_super: "Добавлено в существующую сделку (транш {n}).",
   }
 };
 
@@ -726,7 +581,7 @@ const PRICE_CACHE = new Map();
 const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
 const PREVIOUS_PRICES = new Map();
-const THEMES = ["midnight", "light", "dark"];
+const THEMES = ["auto", "light", "dark"];
 
 const AUTO_REFRESH_INTERVAL_MS = 1 * 60 * 1000;
 const APP_TZ = "Europe/Berlin";
@@ -755,23 +610,15 @@ function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); 
 function saveLangPreference(lang) { try { localStorage.setItem(LANG_KEY, lang); } catch {} }
 function loadStartPage() { try { const v = localStorage.getItem(START_PAGE_KEY); return PAGES.includes(v) ? v : "pair"; } catch { return "pair"; } }
 function saveStartPage(p) { try { localStorage.setItem(START_PAGE_KEY, p); } catch {} }
-function loadTheme() {
-  try {
-    const v = localStorage.getItem(THEME_KEY);
-    if (THEMES.includes(v)) return v;
-    // Migration: legacy "auto" value → midnight
-    if (v === "auto") return "midnight";
-    return "midnight";
-  } catch { return "midnight"; }
-}
+function loadTheme() { try { const v = localStorage.getItem(THEME_KEY); return THEMES.includes(v) ? v : "auto"; } catch { return "auto"; } }
 function saveTheme(v) { try { localStorage.setItem(THEME_KEY, v); } catch {} }
 function applyTheme(v) {
-  const theme = THEMES.includes(v) ? v : "midnight";
+  const theme = THEMES.includes(v) ? v : "auto";
   document.documentElement.setAttribute("data-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    const tone = theme === "light" ? "#fafafa" : (theme === "midnight" ? "#07071a" : "#0f0f10");
-    meta.setAttribute("content", tone);
+    const dark = theme === "dark" || (theme === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    meta.setAttribute("content", dark ? "#0f0f10" : "#fafafa");
   }
 }
 function setActiveThemeCard(theme) {
@@ -1117,7 +964,7 @@ function legAggregateHtml(side, ticker, lp, c) {
 }
 
 function tranchePanelHtml(tr, c) {
-  const locale = currentLang === "de" ? "de-DE" : currentLang === "ru" ? "ru-RU" : currentLang === "it" ? "it-IT" : "en-GB";
+  const locale = currentLang === "de" ? "de-DE" : "en-GB";
   const items = c.tranches.map((tres, i) => {
     const tranche = tres.tranche;
     const dt = tranche.created ? new Date(tranche.created) : null;
@@ -1602,6 +1449,13 @@ document.getElementById("pages-container").addEventListener("scroll", onPagesScr
 window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
 applyTheme(loadTheme());
+
+if (window.matchMedia) {
+  const mql = window.matchMedia("(prefers-color-scheme: dark)");
+  const onSysSchemeChange = () => { if (loadTheme() === "auto") applyTheme("auto"); };
+  if (mql.addEventListener) mql.addEventListener("change", onSysSchemeChange);
+  else if (mql.addListener) mql.addListener(onSysSchemeChange);
+}
 
 const initialLang = loadLangPreference();
 setLanguage(initialLang);

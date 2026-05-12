@@ -6,9 +6,7 @@ const HOME_CCY = "EUR";
 
 const WORKER_STRINGS = {
   de: { alarm_title:"🚨 ALARM", pair:"Paar", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen", ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen", ack_received:"✅ Alarm bestätigt", test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen." },
-  en: { alarm_title:"🚨 ALERT", pair:"Pair", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches", ack_prompt:"→ Reply with any text to acknowledge the alert", ack_received:"✅ Alert acknowledged", test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge." },
-  it: { alarm_title:"🚨 ALLARME", pair:"Coppia", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Soglia", pnl:"P&L", notional_now:"Notional ora", tranches:"Tranche", ack_prompt:"→ Rispondi con qualsiasi testo per confermare l'allarme", ack_received:"✅ Allarme confermato", test_alert:"🧪 Allarme di prova", test_body:"Questo è un test. Rispondi per confermare." },
-  ru: { alarm_title:"🚨 ТРЕВОГА", pair:"Пара", long_only:"Long", short_only:"Short", performance:"Доходность", threshold:"Порог", pnl:"Прибыль/убыток", notional_now:"Номинал сейчас", tranches:"Транши", ack_prompt:"→ Ответьте любым текстом, чтобы подтвердить тревогу", ack_received:"✅ Тревога подтверждена", test_alert:"🧪 Тестовая тревога", test_body:"Это тест. Ответьте для подтверждения." }
+  en: { alarm_title:"🚨 ALERT", pair:"Pair", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches", ack_prompt:"→ Reply with any text to acknowledge the alert", ack_received:"✅ Alert acknowledged", test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge." }
 };
 function workerT(lang, key) { const d = WORKER_STRINGS[lang] || WORKER_STRINGS.de; return d[key] || WORKER_STRINGS.de[key] || key; }
 
@@ -74,8 +72,6 @@ function tradeType(trade) {
   return "pair";
 }
 
-// Returns array of tranches with normalized fields. For long-only / short-only,
-// the unused side fields are 0/null so callers don't need to special-case.
 function getTranches(trade) {
   const arr = (Array.isArray(trade.tranches) && trade.tranches.length > 0) ? trade.tranches : [{
     longQty: trade.longQty, longEntry: trade.longEntry, longEntryCcy: trade.longEntryCcy, longEntryNative: !!trade.longEntryNative,
@@ -96,7 +92,6 @@ async function computePerf(trade) {
   const type = tradeType(trade);
   const tranches = getTranches(trade);
 
-  // Fetch only the prices we actually need
   let longLive = null, shortLive = null;
   if (type === "pair" || type === "long")  longLive  = await fetchPriceInternal(trade.longTicker);
   if (type === "pair" || type === "short") shortLive = await fetchPriceInternal(trade.shortTicker);
@@ -127,7 +122,6 @@ function buildAlarmMessage(lang, trade, perfPct, pnl, notionalNow, trancheCount)
   const sign = perfPct >= 0 ? "+" : "";
   const th = trade.alertPctMin ?? trade.alertThreshold ?? 0;
   const type = tradeType(trade);
-  // Trade-Typ-Label oben statt fix "Paar"
   let typeLabel, displayName;
   if (type === "long")  { typeLabel = workerT(lang, "long_only");  displayName = trade.name || trade.longTicker; }
   else if (type === "short") { typeLabel = workerT(lang, "short_only"); displayName = trade.name || trade.shortTicker; }
