@@ -1,12 +1,29 @@
 // Pair Trade Tracker — Cloudflare Worker (Type-aware: pair / long / short)
+// Two-threshold alarm: alertPctMin (loss, repeating until ack) + alertPctMax (profit, one-shot)
 const ALERT_REPEAT_MS = 3 * 60 * 1000;
 const TRADING_START_HOUR = 9;
 const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 
 const WORKER_STRINGS = {
-  de: { alarm_title:"🚨 ALARM", pair:"Paar", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen", ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen", ack_received:"✅ Alarm bestätigt", test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen." },
-  en: { alarm_title:"🚨 ALERT", pair:"Pair", long_only:"Long", short_only:"Short", performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches", ack_prompt:"→ Reply with any text to acknowledge the alert", ack_received:"✅ Alert acknowledged", test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge." }
+  de: {
+    alarm_title:"🚨 ALARM", profit_title:"🎯 GEWINN-SCHWELLE ERREICHT",
+    pair:"Paar", long_only:"Long", short_only:"Short",
+    performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen",
+    ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen",
+    profit_note:"(Informativ — keine Quittierung nötig)",
+    ack_received:"✅ Alarm bestätigt",
+    test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen."
+  },
+  en: {
+    alarm_title:"🚨 ALERT", profit_title:"🎯 PROFIT THRESHOLD REACHED",
+    pair:"Pair", long_only:"Long", short_only:"Short",
+    performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches",
+    ack_prompt:"→ Reply with any text to acknowledge the alert",
+    profit_note:"(Informational — no acknowledgement needed)",
+    ack_received:"✅ Alert acknowledged",
+    test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge."
+  }
 };
 function workerT(lang, key) { const d = WORKER_STRINGS[lang] || WORKER_STRINGS.de; return d[key] || WORKER_STRINGS.de[key] || key; }
 
@@ -65,7 +82,6 @@ async function fetchPriceInternal(symbol) {
   return { price: m.regularMarketPrice, currency: m.currency || HOME_CCY };
 }
 
-// Backward-compat: bei fehlendem type → "pair"
 function tradeType(trade) {
   const t = trade.type;
   if (t === "long" || t === "short") return t;
@@ -118,25 +134,47 @@ async function sendTelegram(env, text) {
   return r.ok;
 }
 
-function buildAlarmMessage(lang, trade, perfPct, pnl, notionalNow, trancheCount) {
+// alarmKind = "loss" (alertPctMin, repeating, ack required)
+//           | "profit" (alertPctMax, one-shot, no ack)
+function buildAlarmMessage(lang, trade, kind, perfPct, pnl, notionalNow, trancheCount) {
   const sign = perfPct >= 0 ? "+" : "";
-  const th = trade.alertPctMin ?? trade.alertThreshold ?? 0;
+  const isProfit = kind === "profit";
+  const threshold = isProfit ? (trade.alertPctMax ?? 0) : (trade.alertPctMin ?? trade.alertThreshold ?? 0);
   const type = tradeType(trade);
   let typeLabel, displayName;
   if (type === "long")  { typeLabel = workerT(lang, "long_only");  displayName = trade.name || trade.longTicker; }
   else if (type === "short") { typeLabel = workerT(lang, "short_only"); displayName = trade.name || trade.shortTicker; }
   else                  { typeLabel = workerT(lang, "pair");       displayName = trade.name || (trade.longTicker + " / " + trade.shortTicker); }
+  const thresholdStr = (isProfit ? "+" : "") + Number(threshold).toFixed(2) + "%";
   const lines = [
-    workerT(lang, "alarm_title"), "",
+    workerT(lang, isProfit ? "profit_title" : "alarm_title"), "",
     typeLabel + ": " + displayName,
     workerT(lang, "performance") + ": " + sign + perfPct.toFixed(2) + "%",
-    workerT(lang, "threshold") + ": " + Number(th).toFixed(2) + "%",
+    workerT(lang, "threshold") + ": " + thresholdStr,
     workerT(lang, "pnl") + ": " + (pnl >= 0 ? "+" : "") + pnl.toFixed(2) + " " + HOME_CCY,
     workerT(lang, "notional_now") + ": " + notionalNow.toFixed(2) + " " + HOME_CCY
   ];
   if (trancheCount > 1) lines.push(workerT(lang, "tranches") + ": " + trancheCount);
-  lines.push("", workerT(lang, "ack_prompt"));
+  lines.push("");
+  lines.push(workerT(lang, isProfit ? "profit_note" : "ack_prompt"));
   return lines.join("\n");
+}
+
+// Migrate legacy alertState format to {min, max} structure
+function ensureStateShape(st) {
+  if (!st || typeof st !== "object") return { min: { state: "idle", lastAlertAt: 0 }, max: { state: "idle", lastAlertAt: 0 } };
+  // New structure already
+  if (st.min || st.max) {
+    return {
+      min: st.min || { state: "idle", lastAlertAt: 0 },
+      max: st.max || { state: "idle", lastAlertAt: 0 }
+    };
+  }
+  // Legacy flat: {state, lastAlertAt} → migrate into min, max defaults
+  return {
+    min: { state: st.state || "idle", lastAlertAt: st.lastAlertAt || 0 },
+    max: { state: "idle", lastAlertAt: 0 }
+  };
 }
 
 async function runAlarmCheck(env) {
@@ -146,26 +184,52 @@ async function runAlarmCheck(env) {
   const lang = record.lang || "de";
   const states = record.alertStates || {};
   let stateChanged = false; const results = [];
+  const now = Date.now();
+
   for (const trade of trades) {
-    const threshold = trade.alertPctMin ?? trade.alertThreshold;
-    if (threshold == null || threshold === "") continue;
     const id = trade.id;
-    const state = states[id] || { state: "idle", lastAlertAt: 0 };
+    const min = trade.alertPctMin ?? trade.alertThreshold;
+    const max = trade.alertPctMax;
+    const hasMin = min != null && min !== "";
+    const hasMax = max != null && max !== "";
+    if (!hasMin && !hasMax) continue;
+
     let perf;
     try { perf = await computePerf(trade); } catch (e) { results.push({ id, error: e.message }); continue; }
-    const breached = perf.perfPct <= -Math.abs(Number(threshold));
-    const now = Date.now();
-    if (breached && state.state === "idle") {
-      await sendTelegram(env, buildAlarmMessage(lang, trade, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
-      states[id] = { state: "triggered", lastAlertAt: now }; stateChanged = true; results.push({ id, action: "triggered" });
-    } else if (breached && state.state === "triggered" && (now - state.lastAlertAt) >= ALERT_REPEAT_MS) {
-      await sendTelegram(env, buildAlarmMessage(lang, trade, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
-      states[id] = { state: "triggered", lastAlertAt: now }; stateChanged = true; results.push({ id, action: "repeated" });
-    } else if (!breached && state.state !== "idle") {
-      states[id] = { state: "idle", lastAlertAt: 0 }; stateChanged = true; results.push({ id, action: "reset" });
-    } else {
-      results.push({ id, action: "noop", state: state.state, perf: perf.perfPct, tranches: perf.trancheCount, type: tradeType(trade) });
+
+    const st = ensureStateShape(states[id]);
+    let stChanged = false;
+
+    // --- LOSS alarm (repeating, ack required) ---
+    if (hasMin) {
+      const threshold = -Math.abs(Number(min));
+      const breached = perf.perfPct <= threshold;
+      const cur = st.min.state;
+      if (breached && cur === "idle") {
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "loss", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        st.min = { state: "triggered", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "loss", action: "triggered" });
+      } else if (breached && cur === "triggered" && (now - st.min.lastAlertAt) >= ALERT_REPEAT_MS) {
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "loss", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        st.min = { state: "triggered", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "loss", action: "repeated" });
+      } else if (!breached && cur !== "idle") {
+        st.min = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id, kind: "loss", action: "reset" });
+      }
     }
+
+    // --- PROFIT alarm (one-shot, no ack) ---
+    if (hasMax) {
+      const threshold = Math.abs(Number(max));
+      const breached = perf.perfPct >= threshold;
+      const cur = st.max.state;
+      if (breached && cur === "idle") {
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "profit", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        st.max = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "profit", action: "notified" });
+      } else if (!breached && cur !== "idle") {
+        st.max = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id, kind: "profit", action: "reset" });
+      }
+    }
+
+    if (stChanged) { states[id] = st; stateChanged = true; }
   }
   if (stateChanged) await jsonbinWrite(env, { ...record, alertStates: states });
   return { ok: true, results };
@@ -185,7 +249,14 @@ async function handleTelegramWebhook(req, env) {
   let record, lang = "de";
   try { record = await jsonbinRead(env); lang = record.lang || "de"; } catch { await sendTelegram(env, workerT(lang, "ack_received")); return textResponse("ok (no record)"); }
   const states = record.alertStates || {}; let changed = false;
-  for (const id of Object.keys(states)) { if (states[id]?.state === "triggered") { states[id] = { state: "acknowledged", lastAlertAt: Date.now() }; changed = true; } }
+  for (const id of Object.keys(states)) {
+    const st = ensureStateShape(states[id]);
+    if (st.min?.state === "triggered") {
+      st.min = { state: "acknowledged", lastAlertAt: Date.now() };
+      states[id] = st;
+      changed = true;
+    }
+  }
   if (changed) { try { await jsonbinWrite(env, { ...record, alertStates: states }); } catch {} }
   await sendTelegram(env, workerT(lang, "ack_received"));
   return textResponse("ok");

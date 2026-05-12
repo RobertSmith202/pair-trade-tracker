@@ -104,6 +104,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .trade-perf .meta { grid-column: 1 / -1; font-size: 11px; color: var(--muted); margin-top: 2px; }
 .alarm-row { display: inline-block; font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-top: 4px; }
 .alarm-row.watching { background: rgba(46,125,50,0.1); color: var(--pos); }
+.alarm-row.max-watching { background: rgba(21,101,192,0.1); color: var(--info); }
+.alarm-row.max-notified { background: rgba(46,125,50,0.18); color: var(--pos); font-weight: 700; }
 .alarm-row.triggered { background: var(--neg-bg); color: var(--neg); font-weight: 700; animation: pulse 1.5s infinite; }
 .alarm-row.acked { background: rgba(120,120,120,0.15); color: var(--muted); }
 .pos { color: var(--pos); }
@@ -135,6 +137,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .tranche-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: rgba(21,101,192,0.18); color: var(--info); margin-left: 8px; vertical-align: middle; letter-spacing: 0.3px; }
 .alarm-pill { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 4px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.2px; font-variant-numeric: tabular-nums; }
 .alarm-pill.watching { background: rgba(46,125,50,0.18); color: var(--pos); }
+.alarm-pill.max-watching { background: rgba(21,101,192,0.18); color: var(--info); }
+.alarm-pill.max-notified { background: var(--pos-bg); color: var(--pos); font-weight: 700; }
 .alarm-pill.triggered { background: var(--neg-bg); color: var(--neg); animation: pulse 1.5s infinite; }
 .alarm-pill.acked { background: rgba(120,120,120,0.18); color: var(--muted); }
 .trade-head.tappable { cursor: pointer; user-select: none; }
@@ -258,11 +262,17 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   </div>
   <div class="form-section alarm">
     <h4 data-i18n="form_alarm_title">🚨 Telegram-Alarm (optional)</h4>
-    <div class="field">
-      <label data-i18n="form_alarm_pct_label">Alarm-Schwelle (Verlust in %)</label>
-      <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="30">
-      <div class="help" data-i18n="form_alarm_pct_help"></div>
+    <div class="field-row">
+      <div class="field">
+        <label data-i18n="form_alarm_min_label">Verlust-Schwelle (%)</label>
+        <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="30">
+      </div>
+      <div class="field">
+        <label data-i18n="form_alarm_max_label">Gewinn-Schwelle (%)</label>
+        <input id="f-alert-max" type="text" inputmode="decimal" autocomplete="off" placeholder="50">
+      </div>
     </div>
+    <div class="help" data-i18n="form_alarm_pct_help"></div>
   </div>
   <div class="form-actions"><button id="f-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="f-save" data-i18n="btn_save">Speichern</button></div>
 </div>
@@ -464,15 +474,20 @@ const STRINGS = {
     form_long_position: "Long-Position", form_short_position: "Short-Position",
     form_ticker: "Ticker (Yahoo-Format)", form_qty: "Anzahl Aktien", form_entry: "Einstand",
     form_native_checkbox: "Einstand in Notierungswährung der Aktie (statt {ccy})",
-    form_alarm_title: "🚨 Telegram-Alarm (optional)", form_alarm_pct_label: "Alarm-Schwelle (Verlust in %)",
-    form_alarm_pct_help: "Leer = aus. Nur die positive Zahl eingeben — wird intern als Verlust-Schwelle behandelt. Beispiel: <code>30</code> = Alarm ab 30% Verlust auf Notional. Telegram-Wiederholung alle 3 Min bis du quittierst.",
+    form_alarm_title: "🚨 Telegram-Alarm (optional)",
+    form_alarm_pct_label: "Alarm-Schwelle (Verlust in %)",
+    form_alarm_min_label: "Verlust-Schwelle (%)",
+    form_alarm_max_label: "Gewinn-Schwelle (%)",
+    form_alarm_pct_help: "Beide Felder optional. Jeweils nur die positive Zahl eingeben. <strong>Verlust-Schwelle</strong>: Alarm bei Performance ≤ −X% — Telegram wiederholt alle 3 Min bis du quittierst. <strong>Gewinn-Schwelle</strong>: einmalige Nachricht bei Performance ≥ +Y%, keine Quittierung nötig.",
     form_type_label: "Trade-Typ", form_type_pair: "Paar", form_type_long: "Nur Long", form_type_short: "Nur Short",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
     card_delete_confirm: "„{name}\" löschen?",
-    alarm_watching: "🔔 Alarm wachend — Schwelle {pct}",
-    alarm_triggered: "🚨 ALARM AUSGELÖST · Nachricht {n} · Schwelle {pct} — auf Telegram quittieren",
+    alarm_watching: "🔔 Verlust-Alarm wachend — Schwelle {pct}",
+    alarm_triggered: "🚨 VERLUST-ALARM AUSGELÖST · Schwelle {pct} — auf Telegram quittieren",
     alarm_acknowledged: "✓ Quittiert · wird neu scharf bei Erholung über {pct}",
+    alarm_max_watching: "🎯 Gewinn-Ziel wachend — Schwelle {pct}",
+    alarm_max_notified: "✅ Gewinn-Ziel erreicht · Schwelle {pct}",
     menu_actions: "Aktionen", menu_data_mgmt: "Datenverwaltung", menu_sync_now: "Jetzt syncen",
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
@@ -537,15 +552,20 @@ const STRINGS = {
     form_long_position: "Long position", form_short_position: "Short position",
     form_ticker: "Ticker (Yahoo format)", form_qty: "Number of shares", form_entry: "Entry price",
     form_native_checkbox: "Entry price in stock's quoted currency (instead of {ccy})",
-    form_alarm_title: "🚨 Telegram alert (optional)", form_alarm_pct_label: "Alert threshold (loss in %)",
-    form_alarm_pct_help: "Empty = off. Enter the positive number only — treated internally as a loss threshold. Example: <code>30</code> = alert at 30% loss on notional. Telegram repeats every 3 min until you acknowledge.",
+    form_alarm_title: "🚨 Telegram alert (optional)",
+    form_alarm_pct_label: "Alert threshold (loss in %)",
+    form_alarm_min_label: "Loss threshold (%)",
+    form_alarm_max_label: "Profit threshold (%)",
+    form_alarm_pct_help: "Both fields optional. Enter positive numbers only. <strong>Loss threshold</strong>: alert when performance ≤ −X% — Telegram repeats every 3 min until you acknowledge. <strong>Profit threshold</strong>: one-shot notification when performance ≥ +Y%, no acknowledgement needed.",
     form_type_label: "Trade type", form_type_pair: "Pair", form_type_long: "Long only", form_type_short: "Short only",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
     card_delete_confirm: "Delete \"{name}\"?",
-    alarm_watching: "🔔 Alarm armed — threshold {pct}",
-    alarm_triggered: "🚨 ALARM TRIGGERED · Message {n} · threshold {pct} — acknowledge on Telegram",
+    alarm_watching: "🔔 Loss alarm armed — threshold {pct}",
+    alarm_triggered: "🚨 LOSS ALARM TRIGGERED · threshold {pct} — acknowledge on Telegram",
     alarm_acknowledged: "✓ Acknowledged · re-arms when recovers above {pct}",
+    alarm_max_watching: "🎯 Profit target armed — threshold {pct}",
+    alarm_max_notified: "✅ Profit target reached · threshold {pct}",
     menu_actions: "Actions", menu_data_mgmt: "Data management", menu_sync_now: "Sync now",
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
@@ -976,14 +996,42 @@ function computeTrade(tr, lp, sp) {
   return { type, tranches: trancheResults, long: firstResult.long || null, short: firstResult.short || null, totalNotionalHome, totalPnlHome, pct, aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome, aggLongNotionalHome, aggShortNotionalHome, longApiCcy, shortApiCcy, lpx, spx };
 }
 
-function alarmStatusHtml(tr) {
-  if (tr.alertPctMin == null || tr.alertPctMin === "") return "";
+// Normalize the alert-state shape: handles legacy {current/state, ...}
+// and the new {min: {...}, max: {...}} side-by-side.
+function alarmStateOf(tr) {
   const st = alertStates[tr.id];
-  const thresholdStr = fmtPct(tr.alertPctMin);
-  if (!st || st.current === "idle") return `<div class="alarm-row watching">${t("alarm_watching", { pct: thresholdStr })}</div>`;
-  if (st.current === "triggered") { const n = st.notifyCount || 1; return `<div class="alarm-row triggered">${t("alarm_triggered", { n: n, pct: thresholdStr })}</div>`; }
-  if (st.current === "acknowledged") return `<div class="alarm-row acked">${t("alarm_acknowledged", { pct: thresholdStr })}</div>`;
-  return "";
+  if (!st) return { min: "idle", max: "idle" };
+  if (st.min || st.max) {
+    return {
+      min: st.min?.state || "idle",
+      max: st.max?.state || "idle"
+    };
+  }
+  // Legacy flat structure: it referred to the loss-threshold alarm only.
+  const oldState = st.current || st.state || "idle";
+  return { min: oldState, max: "idle" };
+}
+
+function alarmStatusHtml(tr) {
+  const hasMin = tr.alertPctMin != null && tr.alertPctMin !== "";
+  const hasMax = tr.alertPctMax != null && tr.alertPctMax !== "";
+  if (!hasMin && !hasMax) return "";
+  const states = alarmStateOf(tr);
+  let html = "";
+  if (hasMin) {
+    const thr = fmtPct(tr.alertPctMin);
+    const s = states.min;
+    if (s === "idle")          html += `<div class="alarm-row watching">${t("alarm_watching", { pct: thr })}</div>`;
+    else if (s === "triggered") html += `<div class="alarm-row triggered">${t("alarm_triggered", { pct: thr })}</div>`;
+    else if (s === "acknowledged") html += `<div class="alarm-row acked">${t("alarm_acknowledged", { pct: thr })}</div>`;
+  }
+  if (hasMax) {
+    const thr = fmtPct(tr.alertPctMax);
+    const s = states.max;
+    if (s === "idle")           html += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
+    else if (s === "notified")  html += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
+  }
+  return html;
 }
 
 function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
@@ -1005,13 +1053,25 @@ function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
 }
 
 function alarmPillHtml(tr) {
-  if (tr.alertPctMin == null || tr.alertPctMin === "") return "";
-  const st = alertStates[tr.id]; const state = st?.current || "idle";
-  const ts = fmtPct(tr.alertPctMin);
-  let icon = "🔔", cls = "watching";
-  if (state === "triggered") { icon = "🚨"; cls = "triggered"; }
-  else if (state === "acknowledged") { icon = "✓"; cls = "acked"; }
-  return `<span class="alarm-pill ${cls}">${icon} ${ts}</span>`;
+  const hasMin = tr.alertPctMin != null && tr.alertPctMin !== "";
+  const hasMax = tr.alertPctMax != null && tr.alertPctMax !== "";
+  if (!hasMin && !hasMax) return "";
+  const states = alarmStateOf(tr);
+  let html = "";
+  if (hasMin) {
+    const s = states.min;
+    let icon = "🔔", cls = "watching";
+    if (s === "triggered")          { icon = "🚨"; cls = "triggered"; }
+    else if (s === "acknowledged")  { icon = "✓";  cls = "acked"; }
+    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(tr.alertPctMin)}</span>`;
+  }
+  if (hasMax) {
+    const s = states.max;
+    let icon = "🎯", cls = "max-watching";
+    if (s === "notified") { icon = "✅"; cls = "max-notified"; }
+    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(tr.alertPctMax)}</span>`;
+  }
+  return html;
 }
 
 function legAggregateHtml(side, ticker, lp, c) {
@@ -1299,6 +1359,7 @@ function openForm(id = null) {
     document.getElementById("f-short-entry").value = formatForInput(firstT.shortEntry);
     document.getElementById("f-short-native").checked = !!firstT.shortEntryNative;
     document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(Math.abs(tr.alertPctMin)) : "";
+    document.getElementById("f-alert-max").value = (tr.alertPctMax != null) ? formatForInput(Math.abs(tr.alertPctMax)) : "";
     setMulti(isMulti);
     let alarmNote = document.getElementById("form-alarm-supertrade-note");
     if (!alarmNote) { alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box"; const alarmField = document.getElementById("f-alert-pct").closest(".field"); if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling); }
@@ -1307,7 +1368,7 @@ function openForm(id = null) {
     const initialType = (currentPage === "total") ? "pair" : currentPage;
     applyFormTypeUI(initialType);
     typeSection.style.display = (currentPage === "total") ? "block" : "none";
-    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct"].forEach(i => document.getElementById(i).value = "");
+    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max"].forEach(i => document.getElementById(i).value = "");
     document.getElementById("f-long-native").checked = false;
     document.getElementById("f-short-native").checked = false;
     setMulti(false);
@@ -1331,14 +1392,16 @@ function saveForm() {
   const shortEntry = parseDecimal(document.getElementById("f-short-entry").value);
   const shortEntryNative = document.getElementById("f-short-native").checked;
   const alertPctRaw = document.getElementById("f-alert-pct").value.trim();
-  let alertPctMin = null;
+  const alertMaxRaw = document.getElementById("f-alert-max").value.trim();
+  let alertPctMin = null, alertPctMax = null;
   if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = -Math.abs(p); }
+  if (alertMaxRaw) { const p = parseDecimal(alertMaxRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; }  alertPctMax = Math.abs(p); }
   const type = formType;
   if (editingId) {
     const existing = trades.find(x => x.id === editingId);
     if (!existing) { closeForm(); return; }
     const isMulti = Array.isArray(existing.tranches) && existing.tranches.length > 1;
-    existing.name = name; existing.alertPctMin = alertPctMin; existing.updated = Date.now();
+    existing.name = name; existing.alertPctMin = alertPctMin; existing.alertPctMax = alertPctMax; existing.updated = Date.now();
     if (!isMulti) {
       const eType = tradeType(existing);
       if (eType === "pair" || eType === "long") { if (!longTicker) { alert(t("err_long_ticker_required")); return; } if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; } }
@@ -1385,12 +1448,13 @@ function saveForm() {
     matching.tranches = matching.tranches || [];
     matching.tranches.push(newTranche);
     if ((matching.alertPctMin == null || matching.alertPctMin === "") && alertPctMin != null) matching.alertPctMin = alertPctMin;
+    if ((matching.alertPctMax == null || matching.alertPctMax === "") && alertPctMax != null) matching.alertPctMax = alertPctMax;
     matching.updated = Date.now();
     markLocalChange(); closeForm(); refreshAll(true);
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 100);
     return;
   }
-  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
+  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
   markLocalChange(); closeForm(); refreshAll(true);
 }
 
