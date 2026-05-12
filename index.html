@@ -1019,14 +1019,14 @@ function alarmStatusHtml(tr) {
   const states = alarmStateOf(tr);
   let html = "";
   if (hasMin) {
-    const thr = fmtPct(tr.alertPctMin);
+    const thr = fmtPct(-Math.abs(Number(tr.alertPctMin)));
     const s = states.min;
     if (s === "idle")          html += `<div class="alarm-row watching">${t("alarm_watching", { pct: thr })}</div>`;
     else if (s === "triggered") html += `<div class="alarm-row triggered">${t("alarm_triggered", { pct: thr })}</div>`;
     else if (s === "acknowledged") html += `<div class="alarm-row acked">${t("alarm_acknowledged", { pct: thr })}</div>`;
   }
   if (hasMax) {
-    const thr = fmtPct(tr.alertPctMax);
+    const thr = fmtPct(Math.abs(Number(tr.alertPctMax)));
     const s = states.max;
     if (s === "idle")           html += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
     else if (s === "notified")  html += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
@@ -1063,13 +1063,13 @@ function alarmPillHtml(tr) {
     let icon = "🔔", cls = "watching";
     if (s === "triggered")          { icon = "🚨"; cls = "triggered"; }
     else if (s === "acknowledged")  { icon = "✓";  cls = "acked"; }
-    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(tr.alertPctMin)}</span>`;
+    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(-Math.abs(Number(tr.alertPctMin)))}</span>`;
   }
   if (hasMax) {
     const s = states.max;
     let icon = "🎯", cls = "max-watching";
     if (s === "notified") { icon = "✅"; cls = "max-notified"; }
-    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(tr.alertPctMax)}</span>`;
+    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(Math.abs(Number(tr.alertPctMax)))}</span>`;
   }
   return html;
 }

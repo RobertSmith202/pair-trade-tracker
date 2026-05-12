@@ -139,13 +139,15 @@ async function sendTelegram(env, text) {
 function buildAlarmMessage(lang, trade, kind, perfPct, pnl, notionalNow, trancheCount) {
   const sign = perfPct >= 0 ? "+" : "";
   const isProfit = kind === "profit";
-  const threshold = isProfit ? (trade.alertPctMax ?? 0) : (trade.alertPctMin ?? trade.alertThreshold ?? 0);
+  const rawThr = isProfit ? (trade.alertPctMax ?? 0) : (trade.alertPctMin ?? trade.alertThreshold ?? 0);
+  // Defensive normalization: profit is always +|X|, loss is always -|X|
+  const threshold = isProfit ? Math.abs(Number(rawThr)) : -Math.abs(Number(rawThr));
   const type = tradeType(trade);
   let typeLabel, displayName;
   if (type === "long")  { typeLabel = workerT(lang, "long_only");  displayName = trade.name || trade.longTicker; }
   else if (type === "short") { typeLabel = workerT(lang, "short_only"); displayName = trade.name || trade.shortTicker; }
   else                  { typeLabel = workerT(lang, "pair");       displayName = trade.name || (trade.longTicker + " / " + trade.shortTicker); }
-  const thresholdStr = (isProfit ? "+" : "") + Number(threshold).toFixed(2) + "%";
+  const thresholdStr = (isProfit ? "+" : "") + threshold.toFixed(2) + "%";
   const lines = [
     workerT(lang, isProfit ? "profit_title" : "alarm_title"), "",
     typeLabel + ": " + displayName,
