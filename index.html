@@ -72,14 +72,14 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px 4px; }
 .page-head .page-title { padding: 0; }
 .page-title { font-size: 30px; line-height: 1.05; font-weight: 800; color: var(--text); padding: 14px 2px 4px; letter-spacing: -0.5px; min-width: 0; flex: 1; }
-.view-toggle { display: inline-flex; gap: 2px; padding: 3px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; flex-shrink: 0; align-self: center; }
-.vt-btn { padding: 6px 10px; min-height: 0; min-width: 0; font-size: 13px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 6px; cursor: pointer; font-weight: 600; }
+.view-toggle { display: inline-flex; gap: 3px; padding: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 11px; flex-shrink: 0; align-self: center; }
+.vt-btn { padding: 10px 16px; min-height: 0; min-width: 0; font-size: 17px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 8px; cursor: pointer; font-weight: 600; touch-action: manipulation; }
 .vt-btn:active { transform: scale(0.95); }
 .vt-btn.active { background: var(--info); color: white; }
-.thr-label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; min-height: 22px; }
+.thr-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; min-height: 38px; flex-wrap: wrap; }
 .thr-label-row > label { margin-bottom: 0; }
-.thr-toggle { display: inline-flex; gap: 2px; padding: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; flex-shrink: 0; }
-.tt-btn { padding: 3px 7px; min-height: 0; min-width: 0; font-size: 10px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 5px; cursor: pointer; font-weight: 700; letter-spacing: 0.3px; }
+.thr-toggle { display: inline-flex; gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; flex-shrink: 0; }
+.tt-btn { padding: 8px 14px; min-height: 0; min-width: 0; font-size: 14px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 7px; cursor: pointer; font-weight: 700; letter-spacing: 0.3px; touch-action: manipulation; }
 .tt-btn:active { transform: scale(0.95); }
 .tt-btn.active { background: var(--info); color: white; }
 .trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
@@ -544,6 +544,12 @@ const STRINGS = {
     err_short_invalid: "Short: Anzahl und Einstand müssen > 0 sein.",
     err_long_ticker_required: "Bitte Long-Ticker eingeben.", err_short_ticker_required: "Bitte Short-Ticker eingeben.",
     err_alarm_invalid: "Alarm-Schwelle: ungültige Zahl. Beispiel: -30",
+    save_warn_intro: "⚠ Folgende Schwellen würden beim aktuellen Kurs sofort auslösen:",
+    save_warn_line_min_pct: "• Verlust-Schwelle {thr} (Performance jetzt: {cur})",
+    save_warn_line_max_pct: "• Gewinn-Schwelle {thr} (Performance jetzt: {cur})",
+    save_warn_line_min_price: "• Verlust-Schwelle {thr} (Kurs jetzt: {cur})",
+    save_warn_line_max_price: "• Gewinn-Schwelle {thr} (Kurs jetzt: {cur})",
+    save_warn_proceed: "Telegram-Alarme würden ab sofort wiederholt feuern. Trotzdem speichern?",
     err_no_ticker: "Kein Ticker", err_no_data: "Keine Daten", err_no_price_feed: "Kein Preis im Feed",
     err_no_worker_url: "Keine Worker-URL (⋯ → Einstellungen)",
     empty_no_pairs: "Noch keine Pair-Trades.", empty_no_longs: "Noch keine Long-Trades.", empty_no_shorts: "Noch keine Short-Trades.",
@@ -627,6 +633,12 @@ const STRINGS = {
     err_short_invalid: "Short: quantity and entry must be > 0.",
     err_long_ticker_required: "Please enter the long ticker.", err_short_ticker_required: "Please enter the short ticker.",
     err_alarm_invalid: "Alarm threshold: invalid number. Example: -30",
+    save_warn_intro: "⚠ The following thresholds would trigger immediately at current prices:",
+    save_warn_line_min_pct: "• Loss threshold {thr} (performance now: {cur})",
+    save_warn_line_max_pct: "• Profit threshold {thr} (performance now: {cur})",
+    save_warn_line_min_price: "• Loss threshold {thr} (price now: {cur})",
+    save_warn_line_max_price: "• Profit threshold {thr} (price now: {cur})",
+    save_warn_proceed: "Telegram alerts would start firing repeatedly. Save anyway?",
     err_no_ticker: "No ticker", err_no_data: "No data", err_no_price_feed: "No price in feed",
     err_no_worker_url: "No Worker URL (⋯ → Settings)",
     empty_no_pairs: "No pair trades yet.", empty_no_longs: "No long trades yet.", empty_no_shorts: "No short trades yet.",
@@ -1525,6 +1537,63 @@ function openForm(id = null) {
 }
 function closeForm() { document.getElementById("form").classList.remove("open"); editingId = null; }
 
+// Builds a minimal trade-shaped object from the in-flight form values, suitable
+// for passing into computeTrade() so we can preview the trade's current perfPct
+// and live price.
+function buildProbeTradeFromForm(type, longTicker, longQty, longEntry, longEntryNative, longEntryCcy, shortTicker, shortQty, shortEntry, shortEntryNative, shortEntryCcy) {
+  return {
+    type, longTicker, shortTicker,
+    tranches: [{
+      longQty:  (type === "pair" || type === "long")  ? longQty  : 0,
+      longEntry:(type === "pair" || type === "long")  ? longEntry: 0,
+      longEntryNative: (type === "pair" || type === "long")  ? longEntryNative  : false,
+      longEntryCcy:    (type === "pair" || type === "long")  ? longEntryCcy : null,
+      shortQty: (type === "pair" || type === "short") ? shortQty : 0,
+      shortEntry:(type === "pair" || type === "short")? shortEntry:0,
+      shortEntryNative: (type === "pair" || type === "short") ? shortEntryNative : false,
+      shortEntryCcy:   (type === "pair" || type === "short") ? shortEntryCcy : null,
+    }]
+  };
+}
+
+// Returns true if the save may proceed (either no warning, or the user confirmed it).
+// Returns false if the user cancelled.
+function confirmAlertWouldFire(probeTrade, alertPctMin, alertPriceMin, alertPctMax, alertPriceMax, minMode, maxMode) {
+  const tType = tradeType(probeTrade);
+  const lp = hasLong(probeTrade)  ? PRICE_CACHE.get((probeTrade.longTicker  || "").toUpperCase()) : null;
+  const sp = hasShort(probeTrade) ? PRICE_CACHE.get((probeTrade.shortTicker || "").toUpperCase()) : null;
+  let c;
+  try { c = computeTrade(probeTrade, lp, sp); } catch { return true; }
+  const livePx  = (tType === "short") ? c.spx : c.lpx;
+  const liveCcy = (tType === "short") ? c.shortApiCcy : c.longApiCcy;
+  const perfPct = c.pct;
+  const lines = [];
+
+  // Loss-threshold check
+  if (minMode === "price" && alertPriceMin != null && livePx != null && isFinite(livePx)) {
+    const thr = Math.abs(Number(alertPriceMin));
+    const triggers = (tType === "short") ? (livePx >= thr) : (livePx <= thr);
+    if (triggers) lines.push(t("save_warn_line_min_price", { thr: fmtMoney(thr, liveCcy), cur: fmtMoney(livePx, liveCcy) }));
+  } else if (minMode === "pct" && alertPctMin != null && perfPct != null && isFinite(perfPct)) {
+    const thr = -Math.abs(Number(alertPctMin));
+    if (perfPct <= thr) lines.push(t("save_warn_line_min_pct", { thr: fmtPct(thr), cur: fmtPct(perfPct) }));
+  }
+
+  // Profit-threshold check
+  if (maxMode === "price" && alertPriceMax != null && livePx != null && isFinite(livePx)) {
+    const thr = Math.abs(Number(alertPriceMax));
+    const triggers = (tType === "short") ? (livePx <= thr) : (livePx >= thr);
+    if (triggers) lines.push(t("save_warn_line_max_price", { thr: fmtMoney(thr, liveCcy), cur: fmtMoney(livePx, liveCcy) }));
+  } else if (maxMode === "pct" && alertPctMax != null && perfPct != null && isFinite(perfPct)) {
+    const thr = Math.abs(Number(alertPctMax));
+    if (perfPct >= thr) lines.push(t("save_warn_line_max_pct", { thr: fmtPct(thr), cur: fmtPct(perfPct) }));
+  }
+
+  if (lines.length === 0) return true;
+  const msg = t("save_warn_intro") + "\n\n" + lines.join("\n") + "\n\n" + t("save_warn_proceed");
+  return confirm(msg);
+}
+
 function saveForm() {
   const name = document.getElementById("f-name").value.trim();
   const longTicker = document.getElementById("f-long-ticker").value.trim().toUpperCase();
@@ -1559,15 +1628,33 @@ function saveForm() {
     const existing = trades.find(x => x.id === editingId);
     if (!existing) { closeForm(); return; }
     const isMulti = Array.isArray(existing.tranches) && existing.tranches.length > 1;
+    const eType = tradeType(existing);
+    // Validate required fields BEFORE mutating anything, so failed validation
+    // leaves the trade exactly as it was.
+    if (!isMulti) {
+      if (eType === "pair" || eType === "long") { if (!longTicker) { alert(t("err_long_ticker_required")); return; } if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; } }
+      if (eType === "pair" || eType === "short") { if (!shortTicker) { alert(t("err_short_ticker_required")); return; } if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; } }
+    }
+    // Warn if the new thresholds would already be breached by the current price.
+    let probeForWarn;
+    if (isMulti) {
+      probeForWarn = existing; // tranches stay unchanged → use existing
+    } else {
+      const oldT = existing.tranches[0] || {};
+      const longEntryCcyProbe  = (eType === "pair" || eType === "long")  ? (longEntryNative  ? null : (oldT.longEntryCcy  || homeCurrency)) : null;
+      const shortEntryCcyProbe = (eType === "pair" || eType === "short") ? (shortEntryNative ? null : (oldT.shortEntryCcy || homeCurrency)) : null;
+      probeForWarn = buildProbeTradeFromForm(eType,
+        (eType === "pair" || eType === "long")  ? longTicker  : null, longQty, longEntry, longEntryNative, longEntryCcyProbe,
+        (eType === "pair" || eType === "short") ? shortTicker : null, shortQty, shortEntry, shortEntryNative, shortEntryCcyProbe);
+    }
+    if (!confirmAlertWouldFire(probeForWarn, alertPctMin, alertPriceMin, alertPctMax, alertPriceMax, minMode, maxMode)) return;
+    // OK — now apply the edit
     existing.name = name;
     existing.alertPctMin = alertPctMin; existing.alertPctMax = alertPctMax;
     existing.alertPriceMin = alertPriceMin; existing.alertPriceMax = alertPriceMax;
     existing.alertMinMode = minMode; existing.alertMaxMode = maxMode;
     existing.updated = Date.now();
     if (!isMulti) {
-      const eType = tradeType(existing);
-      if (eType === "pair" || eType === "long") { if (!longTicker) { alert(t("err_long_ticker_required")); return; } if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; } }
-      if (eType === "pair" || eType === "short") { if (!shortTicker) { alert(t("err_short_ticker_required")); return; } if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; } }
       const oldT = existing.tranches[0] || {};
       const longEntryCcy  = (eType === "pair" || eType === "long")  ? (longEntryNative  ? null : (oldT.longEntryCcy  || homeCurrency)) : null;
       const shortEntryCcy = (eType === "pair" || eType === "short") ? (shortEntryNative ? null : (oldT.shortEntryCcy || homeCurrency)) : null;
@@ -1590,6 +1677,11 @@ function saveForm() {
   if (type === "pair" || type === "short") { if (!shortTicker) { alert(t("err_short_ticker_required")); return; } if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; } }
   const longEntryCcy  = (type === "pair" || type === "long")  ? (longEntryNative  ? null : homeCurrency) : null;
   const shortEntryCcy = (type === "pair" || type === "short") ? (shortEntryNative ? null : homeCurrency) : null;
+  // Warn if the new thresholds would already be breached by the current price.
+  const probeForWarn = buildProbeTradeFromForm(type,
+    (type === "pair" || type === "long")  ? longTicker  : null, longQty, longEntry, longEntryNative, longEntryCcy,
+    (type === "pair" || type === "short") ? shortTicker : null, shortQty, shortEntry, shortEntryNative, shortEntryCcy);
+  if (!confirmAlertWouldFire(probeForWarn, alertPctMin, alertPriceMin, alertPctMax, alertPriceMax, minMode, maxMode)) return;
   const newTranche = {
     id: "tr_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
     longQty:  (type === "pair" || type === "long")  ? longQty  : 0,
