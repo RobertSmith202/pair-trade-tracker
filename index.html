@@ -76,6 +76,12 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .vt-btn { padding: 6px 10px; min-height: 0; min-width: 0; font-size: 13px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 6px; cursor: pointer; font-weight: 600; }
 .vt-btn:active { transform: scale(0.95); }
 .vt-btn.active { background: var(--info); color: white; }
+.thr-label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; min-height: 22px; }
+.thr-label-row > label { margin-bottom: 0; }
+.thr-toggle { display: inline-flex; gap: 2px; padding: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; flex-shrink: 0; }
+.tt-btn { padding: 3px 7px; min-height: 0; min-width: 0; font-size: 10px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 5px; cursor: pointer; font-weight: 700; letter-spacing: 0.3px; }
+.tt-btn:active { transform: scale(0.95); }
+.tt-btn.active { background: var(--info); color: white; }
 .trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
 .trade-list[data-view="list"] { gap: 6px; }
 .trade-list[data-view="list"] .trade-card { padding: 10px 12px; }
@@ -266,11 +272,23 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
     <h4 data-i18n="form_alarm_title">🚨 Telegram-Alarm (optional)</h4>
     <div class="field-row">
       <div class="field">
-        <label data-i18n="form_alarm_min_label">Verlust-Schwelle (%)</label>
+        <div class="thr-label-row">
+          <label id="f-alert-pct-label" data-i18n="form_alarm_min_label">Verlust-Schwelle (%)</label>
+          <div class="thr-toggle" data-thr-for="min" style="display:none">
+            <button type="button" class="tt-btn active" data-thr-mode="pct">%</button>
+            <button type="button" class="tt-btn" data-thr-mode="price" data-i18n="thr_mode_price">Preis</button>
+          </div>
+        </div>
         <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="30">
       </div>
       <div class="field">
-        <label data-i18n="form_alarm_max_label">Gewinn-Schwelle (%)</label>
+        <div class="thr-label-row">
+          <label id="f-alert-max-label" data-i18n="form_alarm_max_label">Gewinn-Schwelle (%)</label>
+          <div class="thr-toggle" data-thr-for="max" style="display:none">
+            <button type="button" class="tt-btn active" data-thr-mode="pct">%</button>
+            <button type="button" class="tt-btn" data-thr-mode="price" data-i18n="thr_mode_price">Preis</button>
+          </div>
+        </div>
         <input id="f-alert-max" type="text" inputmode="decimal" autocomplete="off" placeholder="50">
       </div>
     </div>
@@ -480,7 +498,11 @@ const STRINGS = {
     form_alarm_pct_label: "Alarm-Schwelle (Verlust in %)",
     form_alarm_min_label: "Verlust-Schwelle (%)",
     form_alarm_max_label: "Gewinn-Schwelle (%)",
-    form_alarm_pct_help: "Beide Felder optional. Jeweils nur die positive Zahl eingeben. <strong>Verlust-Schwelle</strong>: Alarm bei Performance ≤ −X% — Telegram wiederholt alle 3 Min bis du quittierst. <strong>Gewinn-Schwelle</strong>: einmalige Nachricht bei Performance ≥ +Y%, keine Quittierung nötig.",
+    form_alarm_min_label_price: "Verlust-Schwelle ({ccy})",
+    form_alarm_max_label_price: "Gewinn-Schwelle ({ccy})",
+    thr_mode_price: "Preis",
+    thr_currency_unknown: "Preis",
+    form_alarm_pct_help: "Beide Felder optional. Jeweils nur die positive Zahl eingeben. <strong>Verlust-Schwelle</strong>: Alarm bei Performance ≤ −X% — Telegram wiederholt alle 3 Min bis du quittierst. <strong>Gewinn-Schwelle</strong>: Alarm bei Performance ≥ +Y% — Telegram wiederholt alle 30 Min bis du quittierst. <em>Bei Long-/Short-Trades alternativ als absoluter Preis in der Notierungswährung des Tickers (Umschalter rechts).</em>",
     form_type_label: "Trade-Typ", form_type_pair: "Paar", form_type_long: "Nur Long", form_type_short: "Nur Short",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
@@ -559,7 +581,11 @@ const STRINGS = {
     form_alarm_pct_label: "Alert threshold (loss in %)",
     form_alarm_min_label: "Loss threshold (%)",
     form_alarm_max_label: "Profit threshold (%)",
-    form_alarm_pct_help: "Both fields optional. Enter positive numbers only. <strong>Loss threshold</strong>: alert when performance ≤ −X% — Telegram repeats every 3 min until you acknowledge. <strong>Profit threshold</strong>: one-shot notification when performance ≥ +Y%, no acknowledgement needed.",
+    form_alarm_min_label_price: "Loss threshold ({ccy})",
+    form_alarm_max_label_price: "Profit threshold ({ccy})",
+    thr_mode_price: "Price",
+    thr_currency_unknown: "Price",
+    form_alarm_pct_help: "Both fields optional. Enter positive numbers only. <strong>Loss threshold</strong>: alert when performance ≤ −X% — Telegram repeats every 3 min until you acknowledge. <strong>Profit threshold</strong>: alert when performance ≥ +Y% — Telegram repeats every 30 min until you acknowledge. <em>For long/short trades, you can switch to absolute price in the ticker's quoted currency (toggle on the right).</em>",
     form_type_label: "Trade type", form_type_pair: "Pair", form_type_long: "Long only", form_type_short: "Short only",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
@@ -664,6 +690,8 @@ let syncDebounce = null;
 const PAGES = ["pair", "long", "short", "total"];
 let currentPage = "pair";
 let formType = "pair";
+let formAlertMinMode = "pct"; // "pct" | "price"  (per current form session)
+let formAlertMaxMode = "pct";
 let pageScrollDebounce = null;
 let viewModes = { pair: "grid", long: "grid", short: "grid", total: "grid" };
 
@@ -1016,21 +1044,56 @@ function alarmStateOf(tr) {
   return { min: oldState, max: "idle" };
 }
 
+// Returns the API/quoted currency for a single-leg trade ("long"/"short").
+// Falls back to homeCurrency if no live-price entry is cached yet.
+function tickerCcyForTrade(tr) {
+  const type = tradeType(tr);
+  if (type === "long" && tr.longTicker) {
+    const lp = PRICE_CACHE.get(tr.longTicker.toUpperCase());
+    return (lp?.currency || homeCurrency).toUpperCase();
+  }
+  if (type === "short" && tr.shortTicker) {
+    const sp = PRICE_CACHE.get(tr.shortTicker.toUpperCase());
+    return (sp?.currency || homeCurrency).toUpperCase();
+  }
+  return homeCurrency;
+}
+
+// Returns true if this threshold is set (any mode) for this trade.
+function hasMinThreshold(tr) {
+  if (tr.alertMinMode === "price") return tr.alertPriceMin != null && tr.alertPriceMin !== "";
+  return tr.alertPctMin != null && tr.alertPctMin !== "";
+}
+function hasMaxThreshold(tr) {
+  if (tr.alertMaxMode === "price") return tr.alertPriceMax != null && tr.alertPriceMax !== "";
+  return tr.alertPctMax != null && tr.alertPctMax !== "";
+}
+
+// Returns a formatted string for a threshold of a given trade (loss or profit), respecting mode.
+function fmtThresholdMin(tr) {
+  if (tr.alertMinMode === "price") return fmtMoney(Math.abs(Number(tr.alertPriceMin)), tickerCcyForTrade(tr));
+  return fmtPct(-Math.abs(Number(tr.alertPctMin)));
+}
+function fmtThresholdMax(tr) {
+  if (tr.alertMaxMode === "price") return fmtMoney(Math.abs(Number(tr.alertPriceMax)), tickerCcyForTrade(tr));
+  return fmtPct(Math.abs(Number(tr.alertPctMax)));
+}
+
 function alarmStatusHtml(tr) {
-  const hasMin = tr.alertPctMin != null && tr.alertPctMin !== "";
-  const hasMax = tr.alertPctMax != null && tr.alertPctMax !== "";
+  const hasMin = hasMinThreshold(tr);
+  const hasMax = hasMaxThreshold(tr);
   if (!hasMin && !hasMax) return "";
   const states = alarmStateOf(tr);
   let html = "";
   if (hasMin) {
-    const thr = fmtPct(-Math.abs(Number(tr.alertPctMin)));
+    const thr = fmtThresholdMin(tr);
     const s = states.min;
     if (s === "idle")          html += `<div class="alarm-row watching">${t("alarm_watching", { pct: thr })}</div>`;
     else if (s === "triggered") html += `<div class="alarm-row triggered">${t("alarm_triggered", { pct: thr })}</div>`;
     else if (s === "acknowledged") html += `<div class="alarm-row acked">${t("alarm_acknowledged", { pct: thr })}</div>`;
   }
   if (hasMax) {
-    const thr = fmtPct(Math.abs(Number(tr.alertPctMax)));
+    const thr = fmtThresholdMax(tr);
     const s = states.max;
     if (s === "idle")              html += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
     else if (s === "notified")     html += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
@@ -1058,8 +1121,8 @@ function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
 }
 
 function alarmPillHtml(tr) {
-  const hasMin = tr.alertPctMin != null && tr.alertPctMin !== "";
-  const hasMax = tr.alertPctMax != null && tr.alertPctMax !== "";
+  const hasMin = hasMinThreshold(tr);
+  const hasMax = hasMaxThreshold(tr);
   if (!hasMin && !hasMax) return "";
   const states = alarmStateOf(tr);
   let html = "";
@@ -1068,14 +1131,14 @@ function alarmPillHtml(tr) {
     let icon = "🔔", cls = "watching";
     if (s === "triggered")          { icon = "🚨"; cls = "triggered"; }
     else if (s === "acknowledged")  { icon = "✓";  cls = "acked"; }
-    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(-Math.abs(Number(tr.alertPctMin)))}</span>`;
+    html += `<span class="alarm-pill ${cls}">${icon} ${fmtThresholdMin(tr)}</span>`;
   }
   if (hasMax) {
     const s = states.max;
     let icon = "🎯", cls = "max-watching";
     if (s === "notified")          { icon = "🎯"; cls = "max-notified"; }
     else if (s === "acknowledged") { icon = "✓";  cls = "max-acked"; }
-    html += `<span class="alarm-pill ${cls}">${icon} ${fmtPct(Math.abs(Number(tr.alertPctMax)))}</span>`;
+    html += `<span class="alarm-pill ${cls}">${icon} ${fmtThresholdMax(tr)}</span>`;
   }
   return html;
 }
@@ -1333,6 +1396,63 @@ function applyFormTypeUI(type) {
   const shortSec = document.getElementById("form-short-section");
   longSec.style.display = (type === "pair" || type === "long") ? "block" : "none";
   shortSec.style.display = (type === "pair" || type === "short") ? "block" : "none";
+  // Threshold mode toggles: only show for single-leg (long/short), never for pair
+  const showToggle = (type === "long" || type === "short");
+  document.querySelectorAll('.thr-toggle').forEach(el => { el.style.display = showToggle ? "inline-flex" : "none"; });
+  if (!showToggle) {
+    formAlertMinMode = "pct";
+    formAlertMaxMode = "pct";
+  }
+  applyThresholdModeUI("min", formAlertMinMode);
+  applyThresholdModeUI("max", formAlertMaxMode);
+}
+
+// Returns the API/quoted currency for the ticker currently typed into the form.
+// For long-only: uses f-long-ticker; for short-only: f-short-ticker. Falls back to ticker
+// itself if no price cache entry exists yet. Returns null if no ticker entered.
+function currencyForFormSide() {
+  const side = (formType === "short") ? "short" : "long"; // single-leg-only call site
+  const inp = document.getElementById(side === "long" ? "f-long-ticker" : "f-short-ticker");
+  const tk = (inp?.value || "").trim().toUpperCase();
+  if (!tk) return null;
+  const lp = PRICE_CACHE.get(tk);
+  if (lp && lp.currency) return lp.currency.toUpperCase();
+  return null;
+}
+
+function applyThresholdModeUI(which, mode) {
+  const toggle = document.querySelector(`.thr-toggle[data-thr-for="${which}"]`);
+  if (toggle) {
+    toggle.querySelectorAll(".tt-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-thr-mode") === mode));
+  }
+  const labelEl = document.getElementById(`f-alert-${which === "min" ? "pct" : "max"}-label`);
+  const inputEl = document.getElementById(`f-alert-${which === "min" ? "pct" : "max"}`);
+  if (mode === "price") {
+    const ccy = currencyForFormSide();
+    const ccyLabel = ccy || t("thr_currency_unknown");
+    if (labelEl) labelEl.textContent = t(which === "min" ? "form_alarm_min_label_price" : "form_alarm_max_label_price", { ccy: ccyLabel });
+    if (inputEl) inputEl.placeholder = ccy ? "150,00" : "—";
+  } else {
+    if (labelEl) labelEl.textContent = t(which === "min" ? "form_alarm_min_label" : "form_alarm_max_label");
+    if (inputEl) inputEl.placeholder = (which === "min") ? "30" : "50";
+  }
+}
+
+function setFormAlertMode(which, mode) {
+  // Switching modes wipes the now-stale value for that threshold so the user
+  // never accidentally submits "30" interpreted as 30 € instead of 30%.
+  if (which === "min") {
+    if (formAlertMinMode !== mode) {
+      document.getElementById("f-alert-pct").value = "";
+      formAlertMinMode = mode;
+    }
+  } else {
+    if (formAlertMaxMode !== mode) {
+      document.getElementById("f-alert-max").value = "";
+      formAlertMaxMode = mode;
+    }
+  }
+  applyThresholdModeUI(which, mode);
 }
 
 function openForm(id = null) {
@@ -1351,6 +1471,11 @@ function openForm(id = null) {
   if (id) {
     const tr = trades.find(x => x.id === id); if (!tr) return;
     const trType = tradeType(tr);
+    // Read stored modes BEFORE applyFormTypeUI (which would reset them for non-single-leg)
+    const minMode = (trType === "long" || trType === "short") ? (tr.alertMinMode === "price" ? "price" : "pct") : "pct";
+    const maxMode = (trType === "long" || trType === "short") ? (tr.alertMaxMode === "price" ? "price" : "pct") : "pct";
+    formAlertMinMode = minMode;
+    formAlertMaxMode = maxMode;
     applyFormTypeUI(trType);
     typeSection.style.display = "none";
     const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
@@ -1364,14 +1489,27 @@ function openForm(id = null) {
     document.getElementById("f-short-qty").value = formatForInput(firstT.shortQty);
     document.getElementById("f-short-entry").value = formatForInput(firstT.shortEntry);
     document.getElementById("f-short-native").checked = !!firstT.shortEntryNative;
-    document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(Math.abs(tr.alertPctMin)) : "";
-    document.getElementById("f-alert-max").value = (tr.alertPctMax != null) ? formatForInput(Math.abs(tr.alertPctMax)) : "";
+    // Populate threshold inputs based on each threshold's stored mode
+    if (minMode === "price") {
+      document.getElementById("f-alert-pct").value = (tr.alertPriceMin != null) ? formatForInput(Math.abs(tr.alertPriceMin)) : "";
+    } else {
+      document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(Math.abs(tr.alertPctMin)) : "";
+    }
+    if (maxMode === "price") {
+      document.getElementById("f-alert-max").value = (tr.alertPriceMax != null) ? formatForInput(Math.abs(tr.alertPriceMax)) : "";
+    } else {
+      document.getElementById("f-alert-max").value = (tr.alertPctMax != null) ? formatForInput(Math.abs(tr.alertPctMax)) : "";
+    }
+    applyThresholdModeUI("min", formAlertMinMode);
+    applyThresholdModeUI("max", formAlertMaxMode);
     setMulti(isMulti);
     let alarmNote = document.getElementById("form-alarm-supertrade-note");
     if (!alarmNote) { alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box"; const alarmField = document.getElementById("f-alert-pct").closest(".field"); if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling); }
     alarmNote.textContent = t("alarm_supertrade_note"); alarmNote.style.display = "block";
   } else {
     const initialType = (currentPage === "total") ? "pair" : currentPage;
+    formAlertMinMode = "pct";
+    formAlertMaxMode = "pct";
     applyFormTypeUI(initialType);
     typeSection.style.display = (currentPage === "total") ? "block" : "none";
     ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max"].forEach(i => document.getElementById(i).value = "");
@@ -1399,15 +1537,33 @@ function saveForm() {
   const shortEntryNative = document.getElementById("f-short-native").checked;
   const alertPctRaw = document.getElementById("f-alert-pct").value.trim();
   const alertMaxRaw = document.getElementById("f-alert-max").value.trim();
-  let alertPctMin = null, alertPctMax = null;
-  if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = -Math.abs(p); }
-  if (alertMaxRaw) { const p = parseDecimal(alertMaxRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; }  alertPctMax = Math.abs(p); }
   const type = formType;
+  // For pair-trades, force pct mode (price thresholds make no sense on a spread).
+  const minMode = (type === "long" || type === "short") ? formAlertMinMode : "pct";
+  const maxMode = (type === "long" || type === "short") ? formAlertMaxMode : "pct";
+  let alertPctMin = null, alertPctMax = null;
+  let alertPriceMin = null, alertPriceMax = null;
+  if (alertPctRaw) {
+    const p = parseDecimal(alertPctRaw);
+    if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; }
+    if (minMode === "price") { alertPriceMin = Math.abs(p); }
+    else                     { alertPctMin   = -Math.abs(p); }
+  }
+  if (alertMaxRaw) {
+    const p = parseDecimal(alertMaxRaw);
+    if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; }
+    if (maxMode === "price") { alertPriceMax = Math.abs(p); }
+    else                     { alertPctMax   = Math.abs(p); }
+  }
   if (editingId) {
     const existing = trades.find(x => x.id === editingId);
     if (!existing) { closeForm(); return; }
     const isMulti = Array.isArray(existing.tranches) && existing.tranches.length > 1;
-    existing.name = name; existing.alertPctMin = alertPctMin; existing.alertPctMax = alertPctMax; existing.updated = Date.now();
+    existing.name = name;
+    existing.alertPctMin = alertPctMin; existing.alertPctMax = alertPctMax;
+    existing.alertPriceMin = alertPriceMin; existing.alertPriceMax = alertPriceMax;
+    existing.alertMinMode = minMode; existing.alertMaxMode = maxMode;
+    existing.updated = Date.now();
     if (!isMulti) {
       const eType = tradeType(existing);
       if (eType === "pair" || eType === "long") { if (!longTicker) { alert(t("err_long_ticker_required")); return; } if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; } }
@@ -1453,14 +1609,25 @@ function saveForm() {
   if (matching) {
     matching.tranches = matching.tranches || [];
     matching.tranches.push(newTranche);
-    if ((matching.alertPctMin == null || matching.alertPctMin === "") && alertPctMin != null) matching.alertPctMin = alertPctMin;
-    if ((matching.alertPctMax == null || matching.alertPctMax === "") && alertPctMax != null) matching.alertPctMax = alertPctMax;
+    // Inherit thresholds + modes only if matching has none yet for that side.
+    const matchingHasMin = (matching.alertPctMin != null && matching.alertPctMin !== "") || (matching.alertPriceMin != null && matching.alertPriceMin !== "");
+    const matchingHasMax = (matching.alertPctMax != null && matching.alertPctMax !== "") || (matching.alertPriceMax != null && matching.alertPriceMax !== "");
+    if (!matchingHasMin && (alertPctMin != null || alertPriceMin != null)) {
+      matching.alertPctMin = alertPctMin;
+      matching.alertPriceMin = alertPriceMin;
+      matching.alertMinMode = minMode;
+    }
+    if (!matchingHasMax && (alertPctMax != null || alertPriceMax != null)) {
+      matching.alertPctMax = alertPctMax;
+      matching.alertPriceMax = alertPriceMax;
+      matching.alertMaxMode = maxMode;
+    }
     matching.updated = Date.now();
     markLocalChange(); closeForm(); refreshAll(true);
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 100);
     return;
   }
-  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
+  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
   markLocalChange(); closeForm(); refreshAll(true);
 }
 
@@ -1621,6 +1788,22 @@ document.querySelectorAll(".theme-card").forEach(card => {
 });
 
 document.querySelectorAll(".type-radio").forEach(el => { el.addEventListener("click", () => applyFormTypeUI(el.getAttribute("data-type"))); });
+document.querySelectorAll(".thr-toggle .tt-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const toggle = btn.closest(".thr-toggle"); if (!toggle) return;
+    const which = toggle.getAttribute("data-thr-for"); // "min" or "max"
+    const mode  = btn.getAttribute("data-thr-mode");   // "pct" or "price"
+    setFormAlertMode(which, mode);
+  });
+});
+// Keep the price-mode currency label fresh when the user types a new ticker.
+["f-long-ticker", "f-short-ticker"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", () => {
+    if (formAlertMinMode === "price") applyThresholdModeUI("min", "price");
+    if (formAlertMaxMode === "price") applyThresholdModeUI("max", "price");
+  });
+});
 document.querySelectorAll(".page-dot").forEach(d => { d.addEventListener("click", () => scrollToPage(d.getAttribute("data-dot"), true)); });
 document.querySelectorAll(".view-toggle").forEach(toggle => {
   const pageKey = toggle.getAttribute("data-view-for");

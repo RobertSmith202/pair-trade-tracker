@@ -1,5 +1,8 @@
 // Pair Trade Tracker — Cloudflare Worker (Type-aware: pair / long / short)
-// Two-threshold alarm: alertPctMin (loss, repeating until ack) + alertPctMax (profit, one-shot)
+// Two-threshold alarm with per-threshold mode (single-leg trades only):
+//   • Loss  threshold — alertPctMin (mode "pct") or alertPriceMin (mode "price"), repeats every 3 min until ack
+//   • Profit threshold — alertPctMax (mode "pct") or alertPriceMax (mode "price"), repeats every 30 min until ack
+// Pair trades only support pct mode (no single quoted price for a spread).
 const ALERT_REPEAT_MS = 3 * 60 * 1000;
 const PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000;
 const TRADING_START_HOUR = 9;
@@ -11,6 +14,7 @@ const WORKER_STRINGS = {
     alarm_title:"🚨 ALARM", profit_title:"🎯 GEWINN-SCHWELLE ERREICHT",
     pair:"Paar", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen",
+    current_price:"Aktueller Kurs",
     ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen",
     profit_ack_prompt:"→ Antworte mit beliebigem Text, um den Gewinn-Alarm zu bestätigen (Wiederholung alle 30 Min)",
     ack_received:"✅ Alarm bestätigt",
@@ -20,6 +24,7 @@ const WORKER_STRINGS = {
     alarm_title:"🚨 ALERT", profit_title:"🎯 PROFIT THRESHOLD REACHED",
     pair:"Pair", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches",
+    current_price:"Current price",
     ack_prompt:"→ Reply with any text to acknowledge the alert",
     profit_ack_prompt:"→ Reply with any text to acknowledge the profit alert (repeats every 30 min)",
     ack_received:"✅ Alert acknowledged",
@@ -126,7 +131,14 @@ async function computePerf(trade) {
       totalPnl += S.pnlHome; totalNotStart += S.notionalHomeStart; totalNotNow += S.notionalHomeNow;
     }
   }
-  return { pnlHome: totalPnl, notionalHomeNow: totalNotNow, perfPct: totalNotStart > 0 ? (totalPnl / totalNotStart) * 100 : 0, trancheCount: tranches.length };
+  return {
+    pnlHome: totalPnl,
+    notionalHomeNow: totalNotNow,
+    perfPct: totalNotStart > 0 ? (totalPnl / totalNotStart) * 100 : 0,
+    trancheCount: tranches.length,
+    // Raw live data for price-mode threshold comparisons (single-leg trades)
+    longLive, shortLive
+  };
 }
 
 async function sendTelegram(env, text) {
@@ -135,28 +147,42 @@ async function sendTelegram(env, text) {
   return r.ok;
 }
 
-// alarmKind = "loss" (alertPctMin, repeating, ack required)
-//           | "profit" (alertPctMax, one-shot, no ack)
-function buildAlarmMessage(lang, trade, kind, perfPct, pnl, notionalNow, trancheCount) {
+// alarmKind = "loss" (loss threshold, repeating until ack)
+//           | "profit" (profit threshold, repeating until ack, every 30 min)
+// mode      = "pct" (compare on perfPct) | "price" (compare on raw live price in ticker's quoted ccy)
+function buildAlarmMessage(lang, trade, kind, mode, perfPct, pnl, notionalNow, trancheCount, livePrice, liveCcy) {
   const sign = perfPct >= 0 ? "+" : "";
   const isProfit = kind === "profit";
-  const rawThr = isProfit ? (trade.alertPctMax ?? 0) : (trade.alertPctMin ?? trade.alertThreshold ?? 0);
-  // Defensive normalization: profit is always +|X|, loss is always -|X|
-  const threshold = isProfit ? Math.abs(Number(rawThr)) : -Math.abs(Number(rawThr));
   const type = tradeType(trade);
   let typeLabel, displayName;
   if (type === "long")  { typeLabel = workerT(lang, "long_only");  displayName = trade.name || trade.longTicker; }
   else if (type === "short") { typeLabel = workerT(lang, "short_only"); displayName = trade.name || trade.shortTicker; }
   else                  { typeLabel = workerT(lang, "pair");       displayName = trade.name || (trade.longTicker + " / " + trade.shortTicker); }
-  const thresholdStr = (isProfit ? "+" : "") + threshold.toFixed(2) + "%";
+
+  let thresholdStr;
+  if (mode === "price") {
+    const rawThr = isProfit ? (trade.alertPriceMax ?? 0) : (trade.alertPriceMin ?? 0);
+    const thr = Math.abs(Number(rawThr));
+    thresholdStr = thr.toFixed(2) + " " + (liveCcy || "");
+  } else {
+    const rawThr = isProfit ? (trade.alertPctMax ?? 0) : (trade.alertPctMin ?? trade.alertThreshold ?? 0);
+    const thr = isProfit ? Math.abs(Number(rawThr)) : -Math.abs(Number(rawThr));
+    thresholdStr = (isProfit ? "+" : "") + thr.toFixed(2) + "%";
+  }
+
   const lines = [
     workerT(lang, isProfit ? "profit_title" : "alarm_title"), "",
     typeLabel + ": " + displayName,
-    workerT(lang, "performance") + ": " + sign + perfPct.toFixed(2) + "%",
+    workerT(lang, "performance") + ": " + sign + perfPct.toFixed(2) + "%"
+  ];
+  if (mode === "price" && livePrice != null && isFinite(livePrice)) {
+    lines.push(workerT(lang, "current_price") + ": " + livePrice.toFixed(2) + " " + (liveCcy || ""));
+  }
+  lines.push(
     workerT(lang, "threshold") + ": " + thresholdStr,
     workerT(lang, "pnl") + ": " + (pnl >= 0 ? "+" : "") + pnl.toFixed(2) + " " + HOME_CCY,
     workerT(lang, "notional_now") + ": " + notionalNow.toFixed(2) + " " + HOME_CCY
-  ];
+  );
   if (trancheCount > 1) lines.push(workerT(lang, "tranches") + ": " + trancheCount);
   lines.push("");
   lines.push(workerT(lang, isProfit ? "profit_ack_prompt" : "ack_prompt"));
@@ -191,44 +217,80 @@ async function runAlarmCheck(env) {
 
   for (const trade of trades) {
     const id = trade.id;
-    const min = trade.alertPctMin ?? trade.alertThreshold;
-    const max = trade.alertPctMax;
-    const hasMin = min != null && min !== "";
-    const hasMax = max != null && max !== "";
+    const type = tradeType(trade);
+    // For pair-trades, price mode makes no sense (a spread has no single quoted price).
+    // Force pct semantics there.
+    const minMode = (type === "long" || type === "short") && trade.alertMinMode === "price" ? "price" : "pct";
+    const maxMode = (type === "long" || type === "short") && trade.alertMaxMode === "price" ? "price" : "pct";
+    const minPct = trade.alertPctMin ?? trade.alertThreshold;
+    const maxPct = trade.alertPctMax;
+    const minPrice = trade.alertPriceMin;
+    const maxPrice = trade.alertPriceMax;
+    const hasMin = minMode === "price"
+      ? (minPrice != null && minPrice !== "")
+      : (minPct != null && minPct !== "");
+    const hasMax = maxMode === "price"
+      ? (maxPrice != null && maxPrice !== "")
+      : (maxPct != null && maxPct !== "");
     if (!hasMin && !hasMax) continue;
 
     let perf;
     try { perf = await computePerf(trade); } catch (e) { results.push({ id, error: e.message }); continue; }
 
+    // Pick the relevant live leg for price-mode comparisons.
+    const live = type === "short" ? perf.shortLive : perf.longLive;
+    const livePrice = live?.price;
+    const liveCcy = (live?.currency || HOME_CCY).toUpperCase();
+
     const st = ensureStateShape(states[id]);
     let stChanged = false;
 
-    // --- LOSS alarm (repeating, ack required) ---
+    // --- LOSS alarm (repeating every 3 min until ack) ---
     if (hasMin) {
-      const threshold = -Math.abs(Number(min));
-      const breached = perf.perfPct <= threshold;
+      let breached = false;
+      if (minMode === "price") {
+        const thr = Math.abs(Number(minPrice));
+        // Long: loss when current price has FALLEN below threshold
+        // Short: loss when current price has RISEN above threshold
+        if (livePrice != null && isFinite(livePrice)) {
+          breached = (type === "short") ? (livePrice >= thr) : (livePrice <= thr);
+        }
+      } else {
+        const threshold = -Math.abs(Number(minPct));
+        breached = perf.perfPct <= threshold;
+      }
       const cur = st.min.state;
       if (breached && cur === "idle") {
-        await sendTelegram(env, buildAlarmMessage(lang, trade, "loss", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "loss", minMode, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount, livePrice, liveCcy));
         st.min = { state: "triggered", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "loss", action: "triggered" });
       } else if (breached && cur === "triggered" && (now - st.min.lastAlertAt) >= ALERT_REPEAT_MS) {
-        await sendTelegram(env, buildAlarmMessage(lang, trade, "loss", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "loss", minMode, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount, livePrice, liveCcy));
         st.min = { state: "triggered", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "loss", action: "repeated" });
       } else if (!breached && cur !== "idle") {
         st.min = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id, kind: "loss", action: "reset" });
       }
     }
 
-    // --- PROFIT alarm (30-min repeat, ack required) ---
+    // --- PROFIT alarm (repeating every 30 min until ack) ---
     if (hasMax) {
-      const threshold = Math.abs(Number(max));
-      const breached = perf.perfPct >= threshold;
+      let breached = false;
+      if (maxMode === "price") {
+        const thr = Math.abs(Number(maxPrice));
+        // Long: profit when current price has RISEN above threshold
+        // Short: profit when current price has FALLEN below threshold
+        if (livePrice != null && isFinite(livePrice)) {
+          breached = (type === "short") ? (livePrice <= thr) : (livePrice >= thr);
+        }
+      } else {
+        const threshold = Math.abs(Number(maxPct));
+        breached = perf.perfPct >= threshold;
+      }
       const cur = st.max.state;
       if (breached && cur === "idle") {
-        await sendTelegram(env, buildAlarmMessage(lang, trade, "profit", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "profit", maxMode, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount, livePrice, liveCcy));
         st.max = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "profit", action: "notified" });
       } else if (breached && cur === "notified" && (now - st.max.lastAlertAt) >= PROFIT_ALERT_REPEAT_MS) {
-        await sendTelegram(env, buildAlarmMessage(lang, trade, "profit", perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount));
+        await sendTelegram(env, buildAlarmMessage(lang, trade, "profit", maxMode, perf.perfPct, perf.pnlHome, perf.notionalHomeNow, perf.trancheCount, livePrice, liveCcy));
         st.max = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id, kind: "profit", action: "repeated" });
       } else if (!breached && cur !== "idle") {
         st.max = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id, kind: "profit", action: "reset" });
