@@ -12,8 +12,6 @@
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231a1a1a'/><text x='50%25' y='62%25' text-anchor='middle' fill='white' font-size='28' font-weight='700' font-family='sans-serif'>L|S</text></svg>">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-/* THEME: Light defaults applied to :root. Dark applied via :root[data-theme="dark"] or
-   :root[data-theme="auto"] under prefers-color-scheme:dark. */
 :root { color-scheme: light; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
 :root[data-theme="auto"] { color-scheme: light dark; }
 :root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
@@ -157,6 +155,19 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .breakdown-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .breakdown-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 600; }
 .breakdown-val { font-size: 16px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* THEME-CARDS (GitHub-style appearance picker) */
+.theme-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 4px; }
+.theme-card { padding: 14px 8px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--card); user-select: none; transition: border-color 0.15s, background-color 0.15s, transform 0.05s; -webkit-tap-highlight-color: transparent; }
+.theme-card:hover { border-color: var(--muted); }
+.theme-card:active { transform: scale(0.98); }
+.theme-card.active { border-color: var(--info); background: rgba(21,101,192,0.08); }
+.theme-card-icon { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 20px; line-height: 1; }
+.theme-card[data-theme-choice="auto"] .theme-card-icon { background: linear-gradient(135deg, #fafafa 50%, #1a1a1c 50%); border: 1px solid var(--border); color: transparent; }
+.theme-card[data-theme-choice="light"] .theme-card-icon { background: #ffffff; border: 1px solid #e5e5e5; color: #b88500; }
+.theme-card[data-theme-choice="dark"] .theme-card-icon { background: #1a1a1c; border: 1px solid #2a2a2c; color: #f0f0f0; }
+.theme-card-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.theme-card.active .theme-card-label { color: var(--info); }
 
 .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 100; align-items: flex-end; }
 .menu-overlay.open { display: flex; }
@@ -336,13 +347,19 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 
     <h4 class="section-h" data-i18n="settings_theme">Erscheinungsbild</h4>
     <div class="info-box" data-i18n="settings_theme_info"></div>
-    <div class="field">
-      <label data-i18n="settings_theme_label">Theme</label>
-      <select id="theme-select">
-        <option value="auto" data-i18n="theme_auto">Auto (System)</option>
-        <option value="light" data-i18n="theme_light">Hell</option>
-        <option value="dark" data-i18n="theme_dark">Dunkel</option>
-      </select>
+    <div class="theme-cards" id="theme-cards">
+      <div class="theme-card" data-theme-choice="auto">
+        <div class="theme-card-icon" aria-hidden="true"></div>
+        <div class="theme-card-label" data-i18n="theme_auto">Auto</div>
+      </div>
+      <div class="theme-card" data-theme-choice="light">
+        <div class="theme-card-icon" aria-hidden="true">☀</div>
+        <div class="theme-card-label" data-i18n="theme_light">Hell</div>
+      </div>
+      <div class="theme-card" data-theme-choice="dark">
+        <div class="theme-card-icon" aria-hidden="true">☾</div>
+        <div class="theme-card-label" data-i18n="theme_dark">Dunkel</div>
+      </div>
     </div>
 
     <h4 class="section-h" data-i18n="settings_language">Sprache</h4>
@@ -433,9 +450,9 @@ const STRINGS = {
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
     settings_language_info: "Pro Gerät gespeichert (nicht synced).",
-    settings_theme: "Erscheinungsbild", settings_theme_label: "Theme",
-    settings_theme_info: "Pro Gerät gespeichert (nicht synced). Auto folgt der System-Einstellung.",
-    theme_auto: "Auto (System)", theme_light: "Hell", theme_dark: "Dunkel",
+    settings_theme: "Erscheinungsbild",
+    settings_theme_info: "Sofort angewendet und gespeichert. Pro Gerät (nicht synced). „Auto“ folgt der System-Einstellung.",
+    theme_auto: "Auto", theme_light: "Hell", theme_dark: "Dunkel",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -506,9 +523,9 @@ const STRINGS = {
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
     settings_language_info: "Stored per device (not synced).",
-    settings_theme: "Appearance", settings_theme_label: "Theme",
-    settings_theme_info: "Stored per device (not synced). Auto follows the system setting.",
-    theme_auto: "Auto (System)", theme_light: "Light", theme_dark: "Dark",
+    settings_theme: "Appearance",
+    settings_theme_info: "Applied immediately and saved. Stored per device (not synced). \"Auto\" follows the system setting.",
+    theme_auto: "Auto", theme_light: "Light", theme_dark: "Dark",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -579,9 +596,9 @@ const STRINGS = {
     menu_export: "Esporta (copia JSON)", menu_import: "Importa (incolla JSON)", menu_clear_all: "Elimina tutti i trade",
     settings_title: "Impostazioni", settings_language: "Lingua", settings_language_label: "Lingua",
     settings_language_info: "Memorizzato per dispositivo (non sincronizzato).",
-    settings_theme: "Aspetto", settings_theme_label: "Tema",
-    settings_theme_info: "Memorizzato per dispositivo (non sincronizzato). Auto segue l'impostazione di sistema.",
-    theme_auto: "Auto (sistema)", theme_light: "Chiaro", theme_dark: "Scuro",
+    settings_theme: "Aspetto",
+    settings_theme_info: "Applicato immediatamente e salvato. Per dispositivo (non sincronizzato). \"Auto\" segue l'impostazione di sistema.",
+    theme_auto: "Auto", theme_light: "Chiaro", theme_dark: "Scuro",
     settings_start_page: "Page predefinita", settings_start_page_label: "Page predefinita",
     settings_start_page_info: "Quale page mostrare all'avvio. Memorizzato per dispositivo (non sincronizzato).",
     settings_home_ccy: "Valuta principale", settings_home_ccy_label: "Codice ISO (EUR, USD, GBP, CHF, ...)",
@@ -652,9 +669,9 @@ const STRINGS = {
     menu_export: "Экспорт (копировать JSON)", menu_import: "Импорт (вставить JSON)", menu_clear_all: "Удалить все сделки",
     settings_title: "Настройки", settings_language: "Язык", settings_language_label: "Язык",
     settings_language_info: "Сохраняется на устройстве (не синхронизируется).",
-    settings_theme: "Внешний вид", settings_theme_label: "Тема",
-    settings_theme_info: "Сохраняется на устройстве (не синхронизируется). Авто следует системной настройке.",
-    theme_auto: "Авто (система)", theme_light: "Светлая", theme_dark: "Тёмная",
+    settings_theme: "Внешний вид",
+    settings_theme_info: "Применяется сразу и сохраняется. На устройстве (не синхронизируется). «Авто» следует системной настройке.",
+    theme_auto: "Авто", theme_light: "Светлая", theme_dark: "Тёмная",
     settings_start_page: "Стартовая page", settings_start_page_label: "Стартовая page",
     settings_start_page_info: "Какая page показывается при запуске. Сохраняется на устройстве (не синхронизируется).",
     settings_home_ccy: "Основная валюта", settings_home_ccy_label: "Код ISO (EUR, USD, GBP, CHF, ...)",
@@ -751,12 +768,16 @@ function saveTheme(v) { try { localStorage.setItem(THEME_KEY, v); } catch {} }
 function applyTheme(v) {
   const theme = THEMES.includes(v) ? v : "auto";
   document.documentElement.setAttribute("data-theme", theme);
-  // Update <meta name="theme-color"> for the PWA title-bar / Safari chrome
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
     const dark = theme === "dark" || (theme === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
     meta.setAttribute("content", dark ? "#0f0f10" : "#fafafa");
   }
+}
+function setActiveThemeCard(theme) {
+  document.querySelectorAll(".theme-card").forEach(c => {
+    c.classList.toggle("active", c.getAttribute("data-theme-choice") === theme);
+  });
 }
 
 function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
@@ -1442,7 +1463,7 @@ function closeMenu() { document.getElementById("menu-overlay").classList.remove(
 function openSettings() {
   document.getElementById("lang-select").value = loadLangPreference();
   document.getElementById("start-page-select").value = loadStartPage();
-  document.getElementById("theme-select").value = loadTheme();
+  setActiveThemeCard(loadTheme());
   document.getElementById("home-ccy").value = homeCurrency;
   document.getElementById("worker-url").value = priceSettings.workerUrl || "";
   document.getElementById("sync-key").value = syncSettings.apiKey || "";
@@ -1540,19 +1561,18 @@ document.getElementById("settings-test").addEventListener("click", async () => {
   else { sEl.className = "test-result err"; sEl.textContent = t("test_sync_no_creds"); }
 });
 document.getElementById("settings-save").addEventListener("click", async () => {
+  // NOTE: Theme is applied & saved instantly via the theme-cards click-handler below, NOT here.
   const hc = document.getElementById("home-ccy").value.trim().toUpperCase().slice(0,3);
   const wu = document.getElementById("worker-url").value.trim();
   const sk = document.getElementById("sync-key").value.trim();
   const sb = document.getElementById("sync-bin").value.trim();
   const langChoice = document.getElementById("lang-select").value;
   const startPageChoice = document.getElementById("start-page-select").value;
-  const themeChoice = document.getElementById("theme-select").value;
   if (hc && /^[A-Z]{3}$/.test(hc)) { homeCurrency = hc; priceSettings.homeCurrency = hc; }
   priceSettings.workerUrl = wu; savePriceSettings();
   if (sk && sb) { syncSettings.apiKey = sk; syncSettings.binId = sb; syncSettings.enabled = true; saveSyncSettings(); setSyncStatus("ok", t("status_sync_active")); }
   saveLangPreference(langChoice);
   if (PAGES.includes(startPageChoice)) saveStartPage(startPageChoice);
-  if (THEMES.includes(themeChoice)) { saveTheme(themeChoice); applyTheme(themeChoice); }
   setLanguage(langChoice);
   closeSettings();
   FX_CACHE.clear(); PRICE_CACHE.clear(); PREVIOUS_PRICES.clear();
@@ -1565,6 +1585,17 @@ document.getElementById("sync-disable").addEventListener("click", () => {
   if (!confirm(t("settings_sync_disable_confirm"))) return;
   syncSettings.enabled = false; saveSyncSettings();
   closeSettings(); setSyncStatus("off", t("status_sync_off"));
+});
+
+// Theme cards: instant apply & save on click
+document.querySelectorAll(".theme-card").forEach(card => {
+  card.addEventListener("click", () => {
+    const choice = card.getAttribute("data-theme-choice");
+    if (!THEMES.includes(choice)) return;
+    saveTheme(choice);
+    applyTheme(choice);
+    setActiveThemeCard(choice);
+  });
 });
 
 document.querySelectorAll(".type-radio").forEach(el => { el.addEventListener("click", () => applyFormTypeUI(el.getAttribute("data-type"))); });
@@ -1584,7 +1615,7 @@ document.addEventListener("keydown", (e) => {
   if (idx >= 0 && idx < PAGES.length) scrollToPage(PAGES[idx], true);
 }, { capture: true });
 
-// Apply theme as early as possible (before any visible render)
+// Apply theme as early as possible (before any visible render) to avoid Flash-Of-Wrong-Theme
 applyTheme(loadTheme());
 
 // Live-update theme when "Auto" mode is active and system preference changes
