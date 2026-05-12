@@ -69,8 +69,27 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .pages-container { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; width: 100%; scrollbar-width: none; align-items: flex-start; }
 .pages-container::-webkit-scrollbar { display: none; }
 .page { flex: 0 0 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; padding: 0 14px; }
-.page-title { font-size: 30px; line-height: 1.05; font-weight: 800; color: var(--text); padding: 14px 2px 4px; letter-spacing: -0.5px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px 4px; }
+.page-head .page-title { padding: 0; }
+.page-title { font-size: 30px; line-height: 1.05; font-weight: 800; color: var(--text); padding: 14px 2px 4px; letter-spacing: -0.5px; min-width: 0; flex: 1; }
+.view-toggle { display: inline-flex; gap: 2px; padding: 3px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; flex-shrink: 0; align-self: center; }
+.vt-btn { padding: 6px 10px; min-height: 0; min-width: 0; font-size: 13px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 6px; cursor: pointer; font-weight: 600; }
+.vt-btn:active { transform: scale(0.95); }
+.vt-btn.active { background: var(--info); color: white; }
 .trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
+.trade-list[data-view="list"] { gap: 6px; }
+.trade-list[data-view="list"] .trade-card { padding: 10px 12px; }
+.trade-row { display: grid; grid-template-columns: 1fr auto auto; column-gap: 10px; row-gap: 4px; align-items: center; }
+.trade-row-line1 { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.trade-row-name { font-weight: 700; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.trade-row-tickers { grid-column: 1; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trade-row-nums { grid-column: 2; display: flex; align-items: baseline; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
+.trade-row-pnl { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.trade-row-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+.trade-row-actions { grid-column: 3; display: flex; gap: 4px; flex-shrink: 0; }
+.trade-row-actions button { padding: 6px 9px; min-height: 0; font-size: 11px; border-radius: 6px; }
+.trade-row.tappable { cursor: pointer; user-select: none; }
+.trade-row.tappable:hover .trade-row-name { opacity: 0.85; }
 .page-dots { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; padding: 12px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(to top, var(--bg) 60%, transparent); z-index: 40; pointer-events: none; }
 .page-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); cursor: pointer; transition: background-color 0.15s, transform 0.15s; pointer-events: auto; }
 .page-dot.active { background: var(--accent); transform: scale(1.3); }
@@ -250,7 +269,13 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 
 <div class="pages-container" id="pages-container">
   <section class="page" data-page="pair">
-    <div class="page-title" data-i18n="page_pairs">Paare</div>
+    <div class="page-head">
+      <div class="page-title" data-i18n="page_pairs">Paare</div>
+      <div class="view-toggle" data-view-for="pair">
+        <button class="vt-btn" data-view-mode="grid" aria-label="Grid">⊞</button>
+        <button class="vt-btn" data-view-mode="list" aria-label="List">☰</button>
+      </div>
+    </div>
     <div class="aggregate" data-agg="pair">
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
@@ -259,7 +284,13 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
     <div class="trade-list" data-list="pair"></div>
   </section>
   <section class="page" data-page="long">
-    <div class="page-title" data-i18n="page_longs">Longs</div>
+    <div class="page-head">
+      <div class="page-title" data-i18n="page_longs">Longs</div>
+      <div class="view-toggle" data-view-for="long">
+        <button class="vt-btn" data-view-mode="grid" aria-label="Grid">⊞</button>
+        <button class="vt-btn" data-view-mode="list" aria-label="List">☰</button>
+      </div>
+    </div>
     <div class="aggregate" data-agg="long">
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
@@ -268,7 +299,13 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
     <div class="trade-list" data-list="long"></div>
   </section>
   <section class="page" data-page="short">
-    <div class="page-title" data-i18n="page_shorts">Shorts</div>
+    <div class="page-head">
+      <div class="page-title" data-i18n="page_shorts">Shorts</div>
+      <div class="view-toggle" data-view-for="short">
+        <button class="vt-btn" data-view-mode="grid" aria-label="Grid">⊞</button>
+        <button class="vt-btn" data-view-mode="list" aria-label="List">☰</button>
+      </div>
+    </div>
     <div class="aggregate" data-agg="short">
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
@@ -574,6 +611,8 @@ const PRICE_KEY = "pair_trade_price_v1";
 const LANG_KEY = "pair_trade_lang_v1";
 const START_PAGE_KEY = "pair_trade_start_page_v1";
 const THEME_KEY = "pair_trade_theme_v1";
+const VIEW_MODE_KEY = "pair_trade_view_v1";
+const VIEW_MODES = ["grid", "list"];
 const PRICE_CACHE = new Map();
 const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
@@ -602,11 +641,38 @@ const PAGES = ["pair", "long", "short", "total"];
 let currentPage = "pair";
 let formType = "pair";
 let pageScrollDebounce = null;
+let viewModes = { pair: "grid", long: "grid", short: "grid", total: "grid" };
 
 function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); return (v && STRINGS[v]) ? v : "de"; } catch { return "de"; } }
 function saveLangPreference(lang) { try { localStorage.setItem(LANG_KEY, lang); } catch {} }
 function loadStartPage() { try { const v = localStorage.getItem(START_PAGE_KEY); return PAGES.includes(v) ? v : "pair"; } catch { return "pair"; } }
 function saveStartPage(p) { try { localStorage.setItem(START_PAGE_KEY, p); } catch {} }
+function loadViewModes() {
+  try {
+    const raw = localStorage.getItem(VIEW_MODE_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    const out = {};
+    for (const k of PAGES) out[k] = VIEW_MODES.includes(obj[k]) ? obj[k] : "grid";
+    return out;
+  } catch { return { pair: "grid", long: "grid", short: "grid", total: "grid" }; }
+}
+function saveViewModes(modes) { try { localStorage.setItem(VIEW_MODE_KEY, JSON.stringify(modes)); } catch {} }
+function setViewMode(pageKey, mode) {
+  if (!PAGES.includes(pageKey) || !VIEW_MODES.includes(mode)) return;
+  viewModes[pageKey] = mode;
+  saveViewModes(viewModes);
+  applyViewModeUI(pageKey);
+  render();
+}
+function applyViewModeUI(pageKey) {
+  const mode = viewModes[pageKey] || "grid";
+  // Mark active button in toggle
+  const toggle = document.querySelector(`.view-toggle[data-view-for="${pageKey}"]`);
+  if (toggle) toggle.querySelectorAll(".vt-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-view-mode") === mode));
+  // Set data-view attr on trade-list (CSS swaps layout)
+  const list = document.querySelector(`.trade-list[data-list="${pageKey}"]`);
+  if (list) list.setAttribute("data-view", mode);
+}
 function loadTheme() {
   try {
     const v = localStorage.getItem(THEME_KEY);
@@ -989,6 +1055,40 @@ function tranchePanelHtml(tr, c) {
   return `<div class="tranche-panel" id="tranche-panel-${tr.id}"><h5>${t("tranche_panel_title")}</h5>${items}</div>`;
 }
 
+function renderOneTradeRow(tr, c) {
+  const card = document.createElement("div");
+  card.className = "trade-card";
+  const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
+  const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
+  const aPill = alarmPillHtml(tr);
+  const displayName = tr.name || (tradeType(tr) === "long" ? tr.longTicker : tradeType(tr) === "short" ? tr.shortTicker : (tr.longTicker + " / " + tr.shortTicker));
+  const tickers = tradeType(tr) === "long" ? escapeHtml(tr.longTicker || "")
+                : tradeType(tr) === "short" ? escapeHtml(tr.shortTicker || "")
+                : escapeHtml((tr.longTicker || "") + " / " + (tr.shortTicker || ""));
+  const pnlStr = c.totalPnlHome != null ? (c.totalPnlHome > 0 ? "+" : "") + fmtMoney(c.totalPnlHome, homeCurrency) : "—";
+  const pctStr = fmtPct(c.pct);
+  const rowClass = isMulti ? "trade-row tappable" : "trade-row";
+  const tappableAttr = isMulti ? ` data-toggle-tranches="${tr.id}"` : "";
+  const panel = isMulti ? tranchePanelHtml(tr, c) : '';
+  card.innerHTML = `
+    <div class="${rowClass}"${tappableAttr}>
+      <div class="trade-row-line1">
+        <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}${aPill}
+      </div>
+      <div class="trade-row-tickers">${tickers}</div>
+      <div class="trade-row-nums">
+        <span class="trade-row-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+        <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
+      </div>
+      <div class="trade-row-actions">
+        <button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button>
+        <button class="icon danger" data-act="del" data-id="${tr.id}">×</button>
+      </div>
+    </div>
+    ${panel}`;
+  return card;
+}
+
 function renderOneTradeCard(tr, c) {
   const card = document.createElement("div"); card.className = "trade-card";
   const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
@@ -1033,11 +1133,14 @@ function computeRowsFor(pageTrades) { return pageTrades.map(tr => { const lp = h
 function render() {
   for (const pageKey of ["pair", "long", "short"]) {
     const list = document.querySelector(`.trade-list[data-list="${pageKey}"]`); if (!list) continue;
+    const mode = viewModes[pageKey] || "grid";
+    list.setAttribute("data-view", mode);
     list.innerHTML = "";
     const pageTrades = tradesForPage(pageKey);
     if (pageTrades.length === 0) { list.innerHTML = `<div class="empty">${emptyTextForPage(pageKey)}</div>`; updatePageAggregate(pageKey, []); continue; }
     const rows = computeRowsFor(pageTrades);
-    for (const row of rows) list.appendChild(renderOneTradeCard(row.trade, row.c));
+    const renderFn = mode === "list" ? renderOneTradeRow : renderOneTradeCard;
+    for (const row of rows) list.appendChild(renderFn(row.trade, row.c));
     updatePageAggregate(pageKey, rows);
   }
   const totalRows = computeRowsFor(trades);
@@ -1046,7 +1149,7 @@ function render() {
   document.querySelectorAll("button[data-act]").forEach(btn => {
     btn.addEventListener("click", (e) => { e.stopPropagation(); const act = btn.getAttribute("data-act"); if (act === "edit") openForm(btn.getAttribute("data-id")); else if (act === "del") deleteTrade(btn.getAttribute("data-id")); else if (act === "del-tranche") deleteTranche(btn.getAttribute("data-trade"), btn.getAttribute("data-tranche")); });
   });
-  document.querySelectorAll(".trade-head.tappable").forEach(head => {
+  document.querySelectorAll(".trade-head.tappable, .trade-row.tappable").forEach(head => {
     head.addEventListener("click", () => { const id = head.getAttribute("data-toggle-tranches"); const panel = document.getElementById("tranche-panel-" + id); if (panel) panel.classList.toggle("open"); });
   });
 }
@@ -1449,10 +1552,18 @@ document.querySelectorAll(".theme-card").forEach(card => {
 
 document.querySelectorAll(".type-radio").forEach(el => { el.addEventListener("click", () => applyFormTypeUI(el.getAttribute("data-type"))); });
 document.querySelectorAll(".page-dot").forEach(d => { d.addEventListener("click", () => scrollToPage(d.getAttribute("data-dot"), true)); });
+document.querySelectorAll(".view-toggle").forEach(toggle => {
+  const pageKey = toggle.getAttribute("data-view-for");
+  toggle.querySelectorAll(".vt-btn").forEach(btn => {
+    btn.addEventListener("click", () => setViewMode(pageKey, btn.getAttribute("data-view-mode")));
+  });
+});
 document.getElementById("pages-container").addEventListener("scroll", onPagesScroll, { passive: true });
 window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
 applyTheme(loadTheme());
+viewModes = loadViewModes();
+for (const k of PAGES) applyViewModeUI(k);
 
 const initialLang = loadLangPreference();
 setLanguage(initialLang);
