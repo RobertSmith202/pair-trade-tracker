@@ -259,8 +259,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   <div class="form-section alarm">
     <h4 data-i18n="form_alarm_title">🚨 Telegram-Alarm (optional)</h4>
     <div class="field">
-      <label data-i18n="form_alarm_pct_label">Alarm bei Performance unter % (negative Zahl)</label>
-      <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="-30">
+      <label data-i18n="form_alarm_pct_label">Alarm-Schwelle (Verlust in %)</label>
+      <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="30">
       <div class="help" data-i18n="form_alarm_pct_help"></div>
     </div>
   </div>
@@ -464,8 +464,8 @@ const STRINGS = {
     form_long_position: "Long-Position", form_short_position: "Short-Position",
     form_ticker: "Ticker (Yahoo-Format)", form_qty: "Anzahl Aktien", form_entry: "Einstand",
     form_native_checkbox: "Einstand in Notierungswährung der Aktie (statt {ccy})",
-    form_alarm_title: "🚨 Telegram-Alarm (optional)", form_alarm_pct_label: "Alarm bei Performance unter % (negative Zahl)",
-    form_alarm_pct_help: "Leer = aus. Beispiel: <code>-30</code> = Alarm ab 30% Verlust auf Notional. Telegram-Wiederholung alle 3 Min bis du quittierst.",
+    form_alarm_title: "🚨 Telegram-Alarm (optional)", form_alarm_pct_label: "Alarm-Schwelle (Verlust in %)",
+    form_alarm_pct_help: "Leer = aus. Nur die positive Zahl eingeben — wird intern als Verlust-Schwelle behandelt. Beispiel: <code>30</code> = Alarm ab 30% Verlust auf Notional. Telegram-Wiederholung alle 3 Min bis du quittierst.",
     form_type_label: "Trade-Typ", form_type_pair: "Paar", form_type_long: "Nur Long", form_type_short: "Nur Short",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
@@ -537,8 +537,8 @@ const STRINGS = {
     form_long_position: "Long position", form_short_position: "Short position",
     form_ticker: "Ticker (Yahoo format)", form_qty: "Number of shares", form_entry: "Entry price",
     form_native_checkbox: "Entry price in stock's quoted currency (instead of {ccy})",
-    form_alarm_title: "🚨 Telegram alert (optional)", form_alarm_pct_label: "Alert when performance below % (negative number)",
-    form_alarm_pct_help: "Empty = off. Example: <code>-30</code> = alert at 30% loss on notional. Telegram repeats every 3 min until you acknowledge.",
+    form_alarm_title: "🚨 Telegram alert (optional)", form_alarm_pct_label: "Alert threshold (loss in %)",
+    form_alarm_pct_help: "Empty = off. Enter the positive number only — treated internally as a loss threshold. Example: <code>30</code> = alert at 30% loss on notional. Telegram repeats every 3 min until you acknowledge.",
     form_type_label: "Trade type", form_type_pair: "Pair", form_type_long: "Long only", form_type_short: "Short only",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
@@ -1298,7 +1298,7 @@ function openForm(id = null) {
     document.getElementById("f-short-qty").value = formatForInput(firstT.shortQty);
     document.getElementById("f-short-entry").value = formatForInput(firstT.shortEntry);
     document.getElementById("f-short-native").checked = !!firstT.shortEntryNative;
-    document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(tr.alertPctMin) : "";
+    document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(Math.abs(tr.alertPctMin)) : "";
     setMulti(isMulti);
     let alarmNote = document.getElementById("form-alarm-supertrade-note");
     if (!alarmNote) { alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box"; const alarmField = document.getElementById("f-alert-pct").closest(".field"); if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling); }
@@ -1332,7 +1332,7 @@ function saveForm() {
   const shortEntryNative = document.getElementById("f-short-native").checked;
   const alertPctRaw = document.getElementById("f-alert-pct").value.trim();
   let alertPctMin = null;
-  if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = p; }
+  if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = -Math.abs(p); }
   const type = formType;
   if (editingId) {
     const existing = trades.find(x => x.id === editingId);
