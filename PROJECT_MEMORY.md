@@ -22,6 +22,7 @@ Kern-Features:
 - Bloomberg-style Price-Flash-Animationen (grün/rot Hintergrund-Flash bei Kursänderung)
 - **4 horizontal swipbare Pages** mit eigenen Aggregaten je Trade-Typ
 - **Tastatur-Shortcuts** auf Mac (`Cmd+Shift+1..4`) für direktes Springen zu einer Page
+- **Theme-Wahl** in den Einstellungen (Auto folgt System / Hell / Dunkel)
 
 ---
 
@@ -174,6 +175,20 @@ Konflikt-Hinweis: macOS reserviert `Cmd+Shift+3` (Vollbild-Screenshot) und `Cmd+
 
 Der Listener akzeptiert beide Modifier (`metaKey || ctrlKey`), sodass `Ctrl+Shift+1..4` als Fallback immer funktioniert.
 
+### Theme-Wahl: Auto / Hell / Dunkel
+
+In den Einstellungen ganz oben gibt es eine Section "Erscheinungsbild" mit Select **Auto (System) / Hell / Dunkel**. Default ist `auto` — folgt der System-Einstellung von macOS/iOS automatisch (wie das vorherige Verhalten via `@media (prefers-color-scheme: dark)`).
+
+**Implementation:**
+- Das `<html>`-Element trägt ein `data-theme="auto"|"light"|"dark"`-Attribut.
+- CSS: Light-Werte als Default in `:root`. Dark-Werte werden via `:root[data-theme="dark"]` aktiv gesetzt, plus via `@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { ...dark... } }` für den Auto-Modus.
+- `color-scheme` ist pro Theme explizit gesetzt (`light` / `dark` / `light dark`), sodass Browser-native UI (Scrollbars, Form-Controls) farblich mit der Wahl mitgeht.
+- Das `<meta name="theme-color">` wird beim Theme-Switch dynamisch aktualisiert (#0f0f10 für Dunkel, #fafafa für Hell). Sorgt dafür, dass die PWA-Titlebar-Farbe oben auf dem iPhone zur Wahl passt.
+- **Live-Update bei Auto-Modus:** `matchMedia("(prefers-color-scheme: dark)").addEventListener("change", …)` reagiert auf System-Wechsel und re-rendert sofort. Kein Reload nötig.
+- `applyTheme()` wird **vor dem ersten sichtbaren Render** ausgeführt, damit kein Flash-of-wrong-theme auftritt.
+
+**Speicherung:** lokal pro Gerät in `localStorage["pair_trade_theme_v1"]` — **nicht** über JSONBin synced. Begründung: User möchte vielleicht das iPhone bei Tageshelligkeit hell, den Mac am Abend dunkel — analog zur Sprache und Standard-Page-Logik.
+
 ### Pfadunabhängige Einstands-Währung
 
 Jede Tranche speichert ihre Entry-Currency explizit als `longEntryCcy` / `shortEntryCcy`. Wenn der User später die Heimat-Währung wechselt (z.B. EUR → CHF), bleiben Entry-Preise korrekt interpretiert. Migration alter Daten: fehlende `*EntryCcy`-Felder werden zu "EUR" defaultet.
@@ -263,6 +278,7 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 - `pair_trade_price_v1` — Worker-URL und Home-Currency
 - `pair_trade_lang_v1` — gewählte Sprache (geräteabhängig)
 - `pair_trade_start_page_v1` — Standard-Page beim App-Start (geräteabhängig, Werte `pair`/`long`/`short`/`total`)
+- `pair_trade_theme_v1` — Theme-Wahl (geräteabhängig, Werte `auto`/`light`/`dark`, Default `auto`)
 
 Bei Versions-Bumps: neue Keys vergeben (`_v3`), alte beim ersten Load migrieren.
 
@@ -284,7 +300,7 @@ Bei Versions-Bumps: neue Keys vergeben (`_v3`), alte beim ersten Load migrieren.
 
 7. **Auto-Merge bei identischen Tickern:** Wenn der User glaubt einen separaten Trade anzulegen, aber Type und Ticker identisch zu einem bestehenden — wird automatisch gemerged. Alert-Box bestätigt mit "Aufstockung zu bestehendem Trade hinzugefügt (Tranche N)". Wenn der User das nicht will, muss er den vorherigen Trade umbenennen/löschen vor dem neuen. **Type-Mismatch verhindert Merge** — neuer Long-AAPL wird nicht in Pair-Trade AAPL/MSFT gemerged.
 
-8. **Worker und HTML synchron deployen:** Bei Datenmodell- oder Compute-Änderungen erst Worker, dann HTML. Sonst rechnet der alte Worker neue Trade-Typen falsch (z.B. fragt er bei Long-only nach `shortTicker` der null ist). Bei reinen UX-Änderungen ohne Compute-Touch (Layout, Farben, Shortcuts) reicht HTML-Only.
+8. **Worker und HTML synchron deployen:** Bei Datenmodell- oder Compute-Änderungen erst Worker, dann HTML. Sonst rechnet der alte Worker neue Trade-Typen falsch (z.B. fragt er bei Long-only nach `shortTicker` der null ist). Bei reinen UX-Änderungen ohne Compute-Touch (Layout, Farben, Shortcuts, Theme) reicht HTML-Only.
 
 9. **macOS-Screenshot vs. Cmd+Shift+3/4:** Diese Kombos sind auf macOS systemweit reserviert für Screenshots und werden bevor sie zum Browser kommen abgegriffen. Workaround: Screenshot-Shortcuts in den System-Einstellungen deaktivieren/umlegen, oder `Ctrl+Shift+3` und `Ctrl+Shift+4` benutzen (der Listener akzeptiert beide Modifier).
 
@@ -292,11 +308,15 @@ Bei Versions-Bumps: neue Keys vergeben (`_v3`), alte beim ersten Load migrieren.
 
 11. **`scroll-snap` und Trackpad:** Horizontales Wischen mit Mac-Trackpad funktioniert mit `scroll-snap-x mandatory`, ist aber für viele User unintuitiv. Daher: `Cmd+Shift+1..4` als Haupt-Bedienpfad auf Mac, Wischen als Backup.
 
+12. **Theme bei Auto-Modus reagiert live:** Wenn der User auf System-Ebene zwischen hell und dunkel umschaltet während die App offen ist, schaltet `applyTheme("auto")` automatisch mit (via `matchMedia` change-event). Wenn der User explizit Hell oder Dunkel gewählt hat, ignoriert die App den System-Wechsel — bewusst, da dies die "Override"-Semantik der Wahl ist.
+
+13. **`applyTheme()` vor erstem Render:** Wenn beim App-Start die Reihenfolge umgedreht würde (erst render, dann theme), gäbe es einen Flash-of-wrong-theme (FOWT) — sichtbarer kurzer Helligkeits-Sprung. Daher: `applyTheme(loadTheme())` läuft als allererste DOM-Operation im Script, **bevor** `setLanguage`, `loadStorage` oder `render` aufgerufen werden.
+
 ---
 
 ## Internationalisierung
 
-`STRINGS` ist ein zentrales Dictionary mit ~100 Keys × 4 Sprachen. `t(key, params)` für Lookups mit `{param}`-Interpolation. DOM-Elemente mit `data-i18n="key"` werden via `applyTranslations()` beim Sprachwechsel re-rendert.
+`STRINGS` ist ein zentrales Dictionary mit ~105 Keys × 4 Sprachen. `t(key, params)` für Lookups mit `{param}`-Interpolation. DOM-Elemente mit `data-i18n="key"` werden via `applyTranslations()` beim Sprachwechsel re-rendert.
 
 Worker hat sein eigenes (kleineres) `WORKER_STRINGS`-Dictionary nur für Telegram-Nachrichten. Neu seit Type-Update: `long_only` und `short_only` als Labels neben dem alten `pair`.
 
@@ -305,7 +325,8 @@ Beim Hinzufügen neuer UI-Strings: in alle 4 Sprachen einpflegen. DE als Fallbac
 Spezielle Strings für die neuen Features:
 - `page_pairs`, `page_longs`, `page_shorts`, `page_total` — die großen Page-Titel
 - `form_type_label`, `form_type_pair`, `form_type_long`, `form_type_short` — Typ-Switch im Form
-- `settings_start_page`, `settings_start_page_label`, `settings_start_page_info` — Settings-Section
+- `settings_start_page`, `settings_start_page_label`, `settings_start_page_info` — Settings-Section "Standard-Page"
+- `settings_theme`, `settings_theme_label`, `settings_theme_info`, `theme_auto`, `theme_light`, `theme_dark` — Settings-Section "Erscheinungsbild"
 - `empty_no_pairs`, `empty_no_longs`, `empty_no_shorts` — Empty-State pro Page
 - `err_long_ticker_required`, `err_short_ticker_required` — Validation für Single-Leg
 

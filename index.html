@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-theme="auto">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -12,8 +12,14 @@
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231a1a1a'/><text x='50%25' y='62%25' text-anchor='middle' fill='white' font-size='28' font-weight='700' font-family='sans-serif'>L|S</text></svg>">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-:root { color-scheme: light dark; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
-@media (prefers-color-scheme: dark) { :root { --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; } }
+/* THEME: Light defaults applied to :root. Dark applied via :root[data-theme="dark"] or
+   :root[data-theme="auto"] under prefers-color-scheme:dark. */
+:root { color-scheme: light; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
+:root[data-theme="auto"] { color-scheme: light dark; }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] { --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
+}
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: calc(env(safe-area-inset-top) + 6px) 0 calc(env(safe-area-inset-bottom) + 50px) 0; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; overflow-x: hidden; }
 .aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 8px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .agg-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
@@ -65,7 +71,6 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .form-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .form-actions button { flex: 1; min-width: 100px; }
 
-/* PAGES */
 .pages-container { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; width: 100%; scrollbar-width: none; align-items: flex-start; }
 .pages-container::-webkit-scrollbar { display: none; }
 .page { flex: 0 0 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; padding: 0 14px; }
@@ -137,7 +142,6 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .muted { color: var(--muted); }
 .tabular { font-variant-numeric: tabular-nums; }
 
-/* TOTAL-PAGE BREAKDOWN */
 .total-breakdown { display: flex; flex-direction: column; gap: 12px; padding-bottom: 14px; }
 .breakdown-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
 .breakdown-card.bd-pair  { border-left: 3px solid var(--info); }
@@ -173,6 +177,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .test-result { padding: 8px 12px; border-radius: 8px; font-size: 13px; }
 .test-result.ok { background: var(--pos-bg); color: var(--pos); }
 .test-result.err { background: var(--neg-bg); color: var(--neg); }
+.kbd-hint { font-size: 11px; color: var(--muted); margin-top: -2px; line-height: 1.5; }
+.kbd-hint kbd { font-family: ui-monospace, SFMono-Regular, monospace; background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px; padding: 1px 5px; border-radius: 4px; font-size: 10px; }
+.kbd-hint .warn { color: var(--warn); }
 </style>
 </head>
 <body>
@@ -327,6 +334,17 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
     <h1 data-i18n="app_title">Pair Trade Tracker</h1>
     <div class="modal-sub" data-i18n="settings_title">Einstellungen</div>
 
+    <h4 class="section-h" data-i18n="settings_theme">Erscheinungsbild</h4>
+    <div class="info-box" data-i18n="settings_theme_info"></div>
+    <div class="field">
+      <label data-i18n="settings_theme_label">Theme</label>
+      <select id="theme-select">
+        <option value="auto" data-i18n="theme_auto">Auto (System)</option>
+        <option value="light" data-i18n="theme_light">Hell</option>
+        <option value="dark" data-i18n="theme_dark">Dunkel</option>
+      </select>
+    </div>
+
     <h4 class="section-h" data-i18n="settings_language">Sprache</h4>
     <div class="info-box" data-i18n="settings_language_info"></div>
     <div class="field">
@@ -349,6 +367,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
         <option value="short" data-i18n="page_shorts">Shorts</option>
         <option value="total" data-i18n="page_total">Gesamt</option>
       </select>
+      <div class="kbd-hint" id="kbd-hint">⌨︎ <kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>1</kbd>..<kbd>4</kbd> (Mac) bzw. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd>..<kbd>4</kbd> springt direkt zur jeweiligen Page.<br><span class="warn">⚠︎ <kbd>⌘⇧3</kbd>/<kbd>⌘⇧4</kbd> sind macOS-Screenshot-Shortcuts und werden vom System abgefangen — entweder in den macOS-Einstellungen deaktivieren oder als Alternativ-Modifier <kbd>⌃</kbd> (Ctrl) benutzen.</span></div>
     </div>
 
     <h4 class="section-h" data-i18n="settings_home_ccy">Heimat-Währung</h4>
@@ -378,18 +397,15 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 </div>
 
 <script>
-// =========================== I18N STRINGS DICTIONARY ===========================
 const STRINGS = {
   de: {
-    html_lang: "de",
-    app_title: "Pair Trade Tracker",
+    html_lang: "de", app_title: "Pair Trade Tracker",
     agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
     agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "Trade", agg_trade_plural: "Trades",
     agg_partial: " · {n} unvollständig", agg_loading: "Lädt...", agg_no_trades: "Noch keine Trades",
     btn_new_trade: "+ Neuer Trade", btn_refresh: "↻ Kurse", btn_save: "Speichern", btn_cancel: "Abbrechen",
-    btn_close: "Schließen", btn_edit: "Bearbeiten", btn_import: "Importieren", btn_test_both: "Beides testen",
-    btn_settings: "Einstellungen",
+    btn_close: "Schließen", btn_edit: "Bearbeiten", btn_import: "Importieren", btn_test_both: "Beides testen", btn_settings: "Einstellungen",
     status_ready: "Bereit", status_loading_prices: "Lade Kurse…", status_updated: "Aktualisiert {time}",
     status_no_worker_url: "Keine Worker-URL (⋯ → Einstellungen)",
     status_ticker_errors: "{time} · {err}/{total} Ticker fehlerhaft",
@@ -417,6 +433,9 @@ const STRINGS = {
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
     settings_language_info: "Pro Gerät gespeichert (nicht synced).",
+    settings_theme: "Erscheinungsbild", settings_theme_label: "Theme",
+    settings_theme_info: "Pro Gerät gespeichert (nicht synced). Auto folgt der System-Einstellung.",
+    theme_auto: "Auto (System)", theme_light: "Hell", theme_dark: "Dunkel",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -453,15 +472,13 @@ const STRINGS = {
     merged_into_super: "Aufstockung zu bestehendem Trade hinzugefügt (Tranche {n}).",
   },
   en: {
-    html_lang: "en",
-    app_title: "Pair Trade Tracker",
+    html_lang: "en", app_title: "Pair Trade Tracker",
     agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
     agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trades",
     agg_partial: " · {n} incomplete", agg_loading: "Loading...", agg_no_trades: "No trades yet",
     btn_new_trade: "+ New Trade", btn_refresh: "↻ Quotes", btn_save: "Save", btn_cancel: "Cancel",
-    btn_close: "Close", btn_edit: "Edit", btn_import: "Import", btn_test_both: "Test both",
-    btn_settings: "Settings",
+    btn_close: "Close", btn_edit: "Edit", btn_import: "Import", btn_test_both: "Test both", btn_settings: "Settings",
     status_ready: "Ready", status_loading_prices: "Loading quotes…", status_updated: "Updated {time}",
     status_no_worker_url: "No Worker URL (⋯ → Settings)",
     status_ticker_errors: "{time} · {err}/{total} tickers failed",
@@ -489,6 +506,9 @@ const STRINGS = {
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
     settings_language_info: "Stored per device (not synced).",
+    settings_theme: "Appearance", settings_theme_label: "Theme",
+    settings_theme_info: "Stored per device (not synced). Auto follows the system setting.",
+    theme_auto: "Auto (System)", theme_light: "Light", theme_dark: "Dark",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -525,15 +545,13 @@ const STRINGS = {
     merged_into_super: "Added to existing trade (tranche {n}).",
   },
   it: {
-    html_lang: "it",
-    app_title: "Pair Trade Tracker",
+    html_lang: "it", app_title: "Pair Trade Tracker",
     agg_total_pnl: "P&L totale", agg_performance: "Performance", agg_notional: "Nozionale totale",
     agg_on_notional: "sul nozionale", agg_in_ccy_fx: "in {ccy} · convertito FX",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trade",
     agg_partial: " · {n} incompleto", agg_loading: "Caricamento...", agg_no_trades: "Nessun trade",
     btn_new_trade: "+ Nuovo Trade", btn_refresh: "↻ Quote", btn_save: "Salva", btn_cancel: "Annulla",
-    btn_close: "Chiudi", btn_edit: "Modifica", btn_import: "Importa", btn_test_both: "Testa entrambi",
-    btn_settings: "Impostazioni",
+    btn_close: "Chiudi", btn_edit: "Modifica", btn_import: "Importa", btn_test_both: "Testa entrambi", btn_settings: "Impostazioni",
     status_ready: "Pronto", status_loading_prices: "Caricamento quote…", status_updated: "Aggiornato {time}",
     status_no_worker_url: "Nessun URL Worker (⋯ → Impostazioni)",
     status_ticker_errors: "{time} · {err}/{total} ticker falliti",
@@ -561,6 +579,9 @@ const STRINGS = {
     menu_export: "Esporta (copia JSON)", menu_import: "Importa (incolla JSON)", menu_clear_all: "Elimina tutti i trade",
     settings_title: "Impostazioni", settings_language: "Lingua", settings_language_label: "Lingua",
     settings_language_info: "Memorizzato per dispositivo (non sincronizzato).",
+    settings_theme: "Aspetto", settings_theme_label: "Tema",
+    settings_theme_info: "Memorizzato per dispositivo (non sincronizzato). Auto segue l'impostazione di sistema.",
+    theme_auto: "Auto (sistema)", theme_light: "Chiaro", theme_dark: "Scuro",
     settings_start_page: "Page predefinita", settings_start_page_label: "Page predefinita",
     settings_start_page_info: "Quale page mostrare all'avvio. Memorizzato per dispositivo (non sincronizzato).",
     settings_home_ccy: "Valuta principale", settings_home_ccy_label: "Codice ISO (EUR, USD, GBP, CHF, ...)",
@@ -597,15 +618,13 @@ const STRINGS = {
     merged_into_super: "Aggiunto al trade esistente (tranche {n}).",
   },
   ru: {
-    html_lang: "ru",
-    app_title: "Pair Trade Tracker",
+    html_lang: "ru", app_title: "Pair Trade Tracker",
     agg_total_pnl: "Общий P&L", agg_performance: "Доходность", agg_notional: "Общий номинал",
     agg_on_notional: "от номинала", agg_in_ccy_fx: "в {ccy} · с конвертацией FX",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "сделка", agg_trade_plural: "сделок",
     agg_partial: " · {n} неполных", agg_loading: "Загрузка...", agg_no_trades: "Сделок ещё нет",
     btn_new_trade: "+ Новая сделка", btn_refresh: "↻ Котировки", btn_save: "Сохранить", btn_cancel: "Отмена",
-    btn_close: "Закрыть", btn_edit: "Изменить", btn_import: "Импорт", btn_test_both: "Проверить оба",
-    btn_settings: "Настройки",
+    btn_close: "Закрыть", btn_edit: "Изменить", btn_import: "Импорт", btn_test_both: "Проверить оба", btn_settings: "Настройки",
     status_ready: "Готов", status_loading_prices: "Загрузка котировок…", status_updated: "Обновлено {time}",
     status_no_worker_url: "Нет URL Worker (⋯ → Настройки)",
     status_ticker_errors: "{time} · {err}/{total} тикеров с ошибкой",
@@ -633,6 +652,9 @@ const STRINGS = {
     menu_export: "Экспорт (копировать JSON)", menu_import: "Импорт (вставить JSON)", menu_clear_all: "Удалить все сделки",
     settings_title: "Настройки", settings_language: "Язык", settings_language_label: "Язык",
     settings_language_info: "Сохраняется на устройстве (не синхронизируется).",
+    settings_theme: "Внешний вид", settings_theme_label: "Тема",
+    settings_theme_info: "Сохраняется на устройстве (не синхронизируется). Авто следует системной настройке.",
+    theme_auto: "Авто (система)", theme_light: "Светлая", theme_dark: "Тёмная",
     settings_start_page: "Стартовая page", settings_start_page_label: "Стартовая page",
     settings_start_page_info: "Какая page показывается при запуске. Сохраняется на устройстве (не синхронизируется).",
     settings_home_ccy: "Основная валюта", settings_home_ccy_label: "Код ISO (EUR, USD, GBP, CHF, ...)",
@@ -671,55 +693,31 @@ const STRINGS = {
 };
 
 let currentLang = "de";
-function setLanguage(langKey) {
-  currentLang = STRINGS[langKey] ? langKey : "de";
-  document.documentElement.lang = STRINGS[currentLang].html_lang;
-  applyTranslations();
-}
-
-function t(key, params) {
-  const dict = STRINGS[currentLang] || STRINGS.de;
-  let s = dict[key] || STRINGS.de[key] || key;
-  if (params) {
-    Object.keys(params).forEach(k => {
-      s = s.split("{" + k + "}").join(String(params[k]));
-    });
-  }
-  return s;
-}
-
+function setLanguage(langKey) { currentLang = STRINGS[langKey] ? langKey : "de"; document.documentElement.lang = STRINGS[currentLang].html_lang; applyTranslations(); }
+function t(key, params) { const dict = STRINGS[currentLang] || STRINGS.de; let s = dict[key] || STRINGS.de[key] || key; if (params) Object.keys(params).forEach(k => { s = s.split("{" + k + "}").join(String(params[k])); }); return s; }
 function applyTranslations() {
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    el.textContent = t(key);
-  });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.getAttribute('data-i18n-placeholder');
-    el.setAttribute('placeholder', t(key));
-  });
-  const formHelp = document.getElementById('form-help-currency');
-  if (formHelp) formHelp.innerHTML = t('form_help_currency', { ccy: homeCurrency });
-  const longNativeLabel = document.getElementById('f-long-native-label');
-  if (longNativeLabel) longNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
-  const shortNativeLabel = document.getElementById('f-short-native-label');
-  if (shortNativeLabel) shortNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
-  const alarmHelp = document.querySelector('.form-section.alarm .help');
-  if (alarmHelp) alarmHelp.innerHTML = t('form_alarm_pct_help');
+  document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); el.textContent = t(key); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const key = el.getAttribute('data-i18n-placeholder'); el.setAttribute('placeholder', t(key)); });
+  const formHelp = document.getElementById('form-help-currency'); if (formHelp) formHelp.innerHTML = t('form_help_currency', { ccy: homeCurrency });
+  const longNativeLabel = document.getElementById('f-long-native-label'); if (longNativeLabel) longNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
+  const shortNativeLabel = document.getElementById('f-short-native-label'); if (shortNativeLabel) shortNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
+  const alarmHelp = document.querySelector('.form-section.alarm .help'); if (alarmHelp) alarmHelp.innerHTML = t('form_alarm_pct_help');
   if (typeof render === 'function') render();
   setAutoStatus();
 }
 
-// =========================== APP STATE ===========================
 const STORAGE_KEY = "pair_trade_tracker_v2";
 const STORAGE_KEY_OLD = "pair_trade_tracker_v1";
 const SYNC_KEY = "pair_trade_sync_v1";
 const PRICE_KEY = "pair_trade_price_v1";
 const LANG_KEY = "pair_trade_lang_v1";
 const START_PAGE_KEY = "pair_trade_start_page_v1";
+const THEME_KEY = "pair_trade_theme_v1";
 const PRICE_CACHE = new Map();
 const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
 const PREVIOUS_PRICES = new Map();
+const THEMES = ["auto", "light", "dark"];
 
 const AUTO_REFRESH_INTERVAL_MS = 1 * 60 * 1000;
 const APP_TZ = "Europe/Berlin";
@@ -748,6 +746,18 @@ function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); 
 function saveLangPreference(lang) { try { localStorage.setItem(LANG_KEY, lang); } catch {} }
 function loadStartPage() { try { const v = localStorage.getItem(START_PAGE_KEY); return PAGES.includes(v) ? v : "pair"; } catch { return "pair"; } }
 function saveStartPage(p) { try { localStorage.setItem(START_PAGE_KEY, p); } catch {} }
+function loadTheme() { try { const v = localStorage.getItem(THEME_KEY); return THEMES.includes(v) ? v : "auto"; } catch { return "auto"; } }
+function saveTheme(v) { try { localStorage.setItem(THEME_KEY, v); } catch {} }
+function applyTheme(v) {
+  const theme = THEMES.includes(v) ? v : "auto";
+  document.documentElement.setAttribute("data-theme", theme);
+  // Update <meta name="theme-color"> for the PWA title-bar / Safari chrome
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    const dark = theme === "dark" || (theme === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    meta.setAttribute("content", dark ? "#0f0f10" : "#fafafa");
+  }
+}
 
 function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
 function saveSyncSettings() { localStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); }
@@ -765,14 +775,7 @@ function migrateTrades() {
     if (tr.longEntryCcy === undefined && !tr.longEntryNative) { tr.longEntryCcy = "EUR"; changed = true; }
     if (tr.shortEntryCcy === undefined && !tr.shortEntryNative) { tr.shortEntryCcy = "EUR"; changed = true; }
     if (!Array.isArray(tr.tranches) || tr.tranches.length === 0) {
-      tr.tranches = [{
-        id: "tr_" + (tr.id || Date.now()) + "_0",
-        longQty: tr.longQty, longEntry: tr.longEntry,
-        longEntryCcy: tr.longEntryCcy, longEntryNative: !!tr.longEntryNative,
-        shortQty: tr.shortQty, shortEntry: tr.shortEntry,
-        shortEntryCcy: tr.shortEntryCcy, shortEntryNative: !!tr.shortEntryNative,
-        created: tr.created || Date.now()
-      }];
+      tr.tranches = [{ id: "tr_" + (tr.id || Date.now()) + "_0", longQty: tr.longQty, longEntry: tr.longEntry, longEntryCcy: tr.longEntryCcy, longEntryNative: !!tr.longEntryNative, shortQty: tr.shortQty, shortEntry: tr.shortEntry, shortEntryCcy: tr.shortEntryCcy, shortEntryNative: !!tr.shortEntryNative, created: tr.created || Date.now() }];
       changed = true;
     }
   }
@@ -809,16 +812,11 @@ function isAppWithinTradingHours() {
 }
 
 function setAutoStatus() {
-  const el = document.getElementById("auto-status");
-  if (!el) return;
+  const el = document.getElementById("auto-status"); if (!el) return;
   if (!priceSettings.workerUrl || trades.length === 0) { el.textContent = t("status_auto_off"); return; }
   if (!isAppWithinTradingHours()) { el.textContent = t("status_auto_outside_hours"); return; }
-  if (lastAutoRefreshAt > 0) {
-    const next = new Date(lastAutoRefreshAt + AUTO_REFRESH_INTERVAL_MS);
-    el.textContent = t("status_auto_next", { time: next.toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) });
-  } else {
-    el.textContent = t("status_auto_active");
-  }
+  if (lastAutoRefreshAt > 0) { const next = new Date(lastAutoRefreshAt + AUTO_REFRESH_INTERVAL_MS); el.textContent = t("status_auto_next", { time: next.toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }); }
+  else { el.textContent = t("status_auto_active"); }
 }
 
 function startAutoRefresh() {
@@ -836,23 +834,16 @@ function startAutoRefresh() {
   setAutoStatus();
 }
 
-function workerBase() {
-  let u = (priceSettings.workerUrl || "").trim();
-  if (!u) return "";
-  u = u.replace(/[?#].*$/, "").replace(/\/$/, "");
-  return u;
-}
+function workerBase() { let u = (priceSettings.workerUrl || "").trim(); if (!u) return ""; u = u.replace(/[?#].*$/, "").replace(/\/$/, ""); return u; }
 
 async function fetchYahooSymbol(symbol) {
-  const base = workerBase();
-  if (!base) throw new Error(t("err_no_worker_url"));
+  const base = workerBase(); if (!base) throw new Error(t("err_no_worker_url"));
   const url = base + "/?symbol=" + encodeURIComponent(symbol);
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) { let txt = ""; try { txt = await res.text(); } catch {} throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); }
   const data = await res.json();
   if (data.error || data?.chart?.error) throw new Error(data.error || data.chart.error.description || "API error");
-  const result = data?.chart?.result?.[0];
-  if (!result) throw new Error(t("err_no_data"));
+  const result = data?.chart?.result?.[0]; if (!result) throw new Error(t("err_no_data"));
   return result;
 }
 
@@ -1017,7 +1008,6 @@ function computeTrade(tr, lp, sp) {
     let longLeg = null, shortLeg = null;
     if (hasLong(tr)) longLeg = computeLeg(tranche.longEntry, tranche.longQty, lpx, longApiCcy, !!tranche.longEntryNative, tranche.longEntryCcy, true);
     if (hasShort(tr)) shortLeg = computeLeg(tranche.shortEntry, tranche.shortQty, spx, shortApiCcy, !!tranche.shortEntryNative, tranche.shortEntryCcy, false);
-
     let trancheNotional = null, tranchePnl = null, tranchePct = null;
     if (type === "pair") {
       if (longLeg.entryNotionalInHome != null && shortLeg.entryNotionalInHome != null) trancheNotional = longLeg.entryNotionalInHome + shortLeg.entryNotionalInHome;
@@ -1030,10 +1020,7 @@ function computeTrade(tr, lp, sp) {
       if (shortLeg.pnlInHome != null) { tranchePnl = shortLeg.pnlInHome; if (trancheNotional > 0) tranchePct = (tranchePnl / trancheNotional) * 100; }
     }
     trancheResults.push({ tranche, long: longLeg, short: shortLeg, pnlHome: tranchePnl, notionalHome: trancheNotional, pct: tranchePct });
-    if (tranchePnl != null && trancheNotional != null) {
-      totalPnlHome = (totalPnlHome ?? 0) + tranchePnl;
-      totalNotionalHome = (totalNotionalHome ?? 0) + trancheNotional;
-    }
+    if (tranchePnl != null && trancheNotional != null) { totalPnlHome = (totalPnlHome ?? 0) + tranchePnl; totalNotionalHome = (totalNotionalHome ?? 0) + trancheNotional; }
     if (hasLong(tr)) {
       aggLongQty += tranche.longQty || 0;
       if (longLeg?.pnlInHome != null) aggLongPnlHome = (aggLongPnlHome ?? 0) + longLeg.pnlInHome;
@@ -1048,15 +1035,7 @@ function computeTrade(tr, lp, sp) {
   let pct = null;
   if (totalPnlHome != null && totalNotionalHome != null && totalNotionalHome > 0) pct = (totalPnlHome / totalNotionalHome) * 100;
   const firstResult = trancheResults[0] || {};
-  return {
-    type,
-    tranches: trancheResults,
-    long: firstResult.long || null, short: firstResult.short || null,
-    totalNotionalHome, totalPnlHome, pct,
-    aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome,
-    aggLongNotionalHome, aggShortNotionalHome,
-    longApiCcy, shortApiCcy, lpx, spx
-  };
+  return { type, tranches: trancheResults, long: firstResult.long || null, short: firstResult.short || null, totalNotionalHome, totalPnlHome, pct, aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome, aggLongNotionalHome, aggShortNotionalHome, longApiCcy, shortApiCcy, lpx, spx };
 }
 
 function alarmStatusHtml(tr) {
@@ -1071,8 +1050,7 @@ function alarmStatusHtml(tr) {
 
 function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
   const isLong = side === "long";
-  const apiCcy = leg.apiCcy;
-  const entryCcy = leg.entryCcy;
+  const apiCcy = leg.apiCcy; const entryCcy = leg.entryCcy;
   const fxNote = (apiCcy !== entryCcy) ? `<span class="fx-note">(${apiCcy}→${entryCcy}${leg.apiToEntryFx != null ? ' · ' + leg.apiToEntryFx.toFixed(4) : ''})</span>` : '';
   const fxMissing = (leg.apiToEntryFx == null) || (leg.entryToHomeFx == null);
   const homeNote = (entryCcy !== homeCurrency) ? `<span class="fx-note">${t("card_pnl_in", { ccy: homeCurrency })}</span>` : '';
@@ -1085,8 +1063,7 @@ function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
       <div class="row" data-flash-ticker="${tickerUpper}"><span>${t("card_current")} ${fxNote}</span><span class="v">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (leg.livePxInEntry != null ? fmtMoney(leg.livePxInEntry, entryCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
       ${fxMissing && !lp?.error ? `<div class="row"><span class="neg">${t("card_fx_unavailable")}</span><span></span></div>` : ''}
       <div class="row pnl-line ${signClass(leg.pnlInHome)}"><span>${t("card_pnl")} ${homeNote}</span><span class="v">${leg.pnlInHome != null ? (leg.pnlInHome > 0 ? "+" : "") + fmtMoney(leg.pnlInHome, homeCurrency) : "—"}</span></div>
-    </div>
-  `;
+    </div>`;
 }
 
 function alarmPillHtml(tr) {
@@ -1115,8 +1092,7 @@ function legAggregateHtml(side, ticker, lp, c) {
       <div class="row"><span>${t("leg_sum_notional")}</span><span class="v">${aggNotional != null ? fmtMoney(aggNotional, homeCurrency) : "—"}</span></div>
       <div class="row" data-flash-ticker="${tickerUpper}"><span>${t("card_current")}</span><span class="v">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (livePx != null ? fmtMoney(livePx, apiCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
       <div class="row pnl-line ${signClass(aggPnl)}"><span>${t("leg_sum_pnl")}</span><span class="v">${aggPnl != null ? (aggPnl > 0 ? "+" : "") + fmtMoney(aggPnl, homeCurrency) : "—"}</span></div>
-    </div>
-  `;
+    </div>`;
 }
 
 function tranchePanelHtml(tr, c) {
@@ -1134,26 +1110,15 @@ function tranchePanelHtml(tr, c) {
     const shortRow = hasShort(tr) ? `<div class="tranche-cell"><span class="label">S ${escapeHtml(tr.shortTicker)}</span><span class="v">${fmtNum(tranche.shortQty)} × ${fmtMoney(tranche.shortEntry, shortCcy)}</span></div>` : `<div class="tranche-cell"></div>`;
     return `
       <div class="tranche-item">
-        <div class="tranche-item-head">
-          <span class="tranche-label">${t("tranche_label_n", { n: i + 1 })}</span>
-          <span class="tr-meta">${dtStr}</span>
-          ${delBtn}
-        </div>
-        <div class="tranche-grid">
-          ${longRow}
-          <div class="tranche-cell"><span class="label">P&L</span><span class="v ${signClass(tres.pnlHome)}">${pnlStr}</span></div>
-          ${shortRow}
-          <div class="tranche-cell"><span class="label">${t("tranche_isolated_short")}</span><span class="v ${signClass(tres.pct)}">${pctStr}</span></div>
-        </div>
-      </div>
-    `;
+        <div class="tranche-item-head"><span class="tranche-label">${t("tranche_label_n", { n: i + 1 })}</span><span class="tr-meta">${dtStr}</span>${delBtn}</div>
+        <div class="tranche-grid">${longRow}<div class="tranche-cell"><span class="label">P&L</span><span class="v ${signClass(tres.pnlHome)}">${pnlStr}</span></div>${shortRow}<div class="tranche-cell"><span class="label">${t("tranche_isolated_short")}</span><span class="v ${signClass(tres.pct)}">${pctStr}</span></div></div>
+      </div>`;
   }).join("");
   return `<div class="tranche-panel" id="tranche-panel-${tr.id}"><h5>${t("tranche_panel_title")}</h5>${items}</div>`;
 }
 
 function renderOneTradeCard(tr, c) {
-  const card = document.createElement("div");
-  card.className = "trade-card";
+  const card = document.createElement("div"); card.className = "trade-card";
   const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
   const firstT = (tr.tranches && tr.tranches[0]) || {};
   const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
@@ -1163,7 +1128,6 @@ function renderOneTradeCard(tr, c) {
   const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
   const lpx = lp && !lp.error ? lp.price : null;
   const spx = sp && !sp.error ? sp.price : null;
-
   let legsHtml = "";
   if (isMulti) {
     if (hasLong(tr))  legsHtml += legAggregateHtml("long",  tr.longTicker,  lp, c);
@@ -1173,11 +1137,7 @@ function renderOneTradeCard(tr, c) {
     if (hasShort(tr)) legsHtml += legHtml("short", tr.shortTicker, firstT.shortQty, firstT.shortEntry, !!firstT.shortEntryNative, sp, spx, c.short);
   }
   const panel = isMulti ? tranchePanelHtml(tr, c) : '';
-  const displayName = tr.name || (
-    tradeType(tr) === "long"  ? tr.longTicker :
-    tradeType(tr) === "short" ? tr.shortTicker :
-    (tr.longTicker + " / " + tr.shortTicker)
-  );
+  const displayName = tr.name || (tradeType(tr) === "long" ? tr.longTicker : tradeType(tr) === "short" ? tr.shortTicker : (tr.longTicker + " / " + tr.shortTicker));
   card.innerHTML = `
     <div class="${headClass}" data-toggle-tranches="${tr.id}">
       <div class="trade-name">${escapeHtml(displayName)}${tBadge}${aPill}</div>
@@ -1190,84 +1150,47 @@ function renderOneTradeCard(tr, c) {
     </div>
     ${alarmStatusHtml(tr)}
     <div class="legs">${legsHtml}</div>
-    ${panel}
-  `;
+    ${panel}`;
   return card;
 }
 
-function tradesForPage(pageKey) {
-  if (pageKey === "total") return trades.slice();
-  return trades.filter(tr => tradeType(tr) === pageKey);
-}
-
-function emptyTextForPage(pageKey) {
-  if (pageKey === "long")  return t("empty_no_longs");
-  if (pageKey === "short") return t("empty_no_shorts");
-  return t("empty_no_pairs");
-}
-
-function computeRowsFor(pageTrades) {
-  return pageTrades.map(tr => {
-    const lp = hasLong(tr)  ? PRICE_CACHE.get(tr.longTicker.toUpperCase())  : null;
-    const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
-    return { trade: tr, c: computeTrade(tr, lp, sp) };
-  });
-}
+function tradesForPage(pageKey) { if (pageKey === "total") return trades.slice(); return trades.filter(tr => tradeType(tr) === pageKey); }
+function emptyTextForPage(pageKey) { if (pageKey === "long") return t("empty_no_longs"); if (pageKey === "short") return t("empty_no_shorts"); return t("empty_no_pairs"); }
+function computeRowsFor(pageTrades) { return pageTrades.map(tr => { const lp = hasLong(tr) ? PRICE_CACHE.get(tr.longTicker.toUpperCase()) : null; const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null; return { trade: tr, c: computeTrade(tr, lp, sp) }; }); }
 
 function render() {
-  // Trade-Cards for pair/long/short pages
   for (const pageKey of ["pair", "long", "short"]) {
-    const list = document.querySelector(`.trade-list[data-list="${pageKey}"]`);
-    if (!list) continue;
+    const list = document.querySelector(`.trade-list[data-list="${pageKey}"]`); if (!list) continue;
     list.innerHTML = "";
     const pageTrades = tradesForPage(pageKey);
-    if (pageTrades.length === 0) {
-      list.innerHTML = `<div class="empty">${emptyTextForPage(pageKey)}</div>`;
-      updatePageAggregate(pageKey, []);
-      continue;
-    }
+    if (pageTrades.length === 0) { list.innerHTML = `<div class="empty">${emptyTextForPage(pageKey)}</div>`; updatePageAggregate(pageKey, []); continue; }
     const rows = computeRowsFor(pageTrades);
     for (const row of rows) list.appendChild(renderOneTradeCard(row.trade, row.c));
     updatePageAggregate(pageKey, rows);
   }
-  // Total page: big aggregate + 3 breakdown cards. No individual trades.
   const totalRows = computeRowsFor(trades);
   updatePageAggregate("total", totalRows);
   updateTotalBreakdown();
-
-  // Wire up event handlers on freshly-built buttons / headers
   document.querySelectorAll("button[data-act]").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const act = btn.getAttribute("data-act");
-      if (act === "edit") openForm(btn.getAttribute("data-id"));
-      else if (act === "del") deleteTrade(btn.getAttribute("data-id"));
-      else if (act === "del-tranche") deleteTranche(btn.getAttribute("data-trade"), btn.getAttribute("data-tranche"));
-    });
+    btn.addEventListener("click", (e) => { e.stopPropagation(); const act = btn.getAttribute("data-act"); if (act === "edit") openForm(btn.getAttribute("data-id")); else if (act === "del") deleteTrade(btn.getAttribute("data-id")); else if (act === "del-tranche") deleteTranche(btn.getAttribute("data-trade"), btn.getAttribute("data-tranche")); });
   });
   document.querySelectorAll(".trade-head.tappable").forEach(head => {
-    head.addEventListener("click", () => {
-      const id = head.getAttribute("data-toggle-tranches");
-      const panel = document.getElementById("tranche-panel-" + id);
-      if (panel) panel.classList.toggle("open");
-    });
+    head.addEventListener("click", () => { const id = head.getAttribute("data-toggle-tranches"); const panel = document.getElementById("tranche-panel-" + id); if (panel) panel.classList.toggle("open"); });
   });
 }
 
 function updatePageAggregate(pageKey, rows) {
   const aggEl = document.querySelector(`.aggregate[data-agg="${pageKey}"]`); if (!aggEl) return;
-  const elPnl     = aggEl.querySelector("[data-agg-pnl]");
-  const elPct     = aggEl.querySelector("[data-agg-pct]");
-  const elNotional= aggEl.querySelector("[data-agg-notional]");
-  const elPnlSub  = aggEl.querySelector("[data-agg-pnl-sub]");
-  const elCount   = aggEl.querySelector("[data-agg-count]");
-
+  const elPnl = aggEl.querySelector("[data-agg-pnl]");
+  const elPct = aggEl.querySelector("[data-agg-pct]");
+  const elNotional = aggEl.querySelector("[data-agg-notional]");
+  const elPnlSub = aggEl.querySelector("[data-agg-pnl-sub]");
+  const elCount = aggEl.querySelector("[data-agg-count]");
   const totalCount = tradesForPage(pageKey).length;
   const valid = rows.filter(r => r.c.totalPnlHome != null);
   let sumPnl = 0, sumNotional = 0;
   for (const r of valid) { sumPnl += r.c.totalPnlHome; sumNotional += r.c.totalNotionalHome; }
   const pct = sumNotional > 0 ? (sumPnl / sumNotional) * 100 : null;
-
   if (valid.length === 0) {
     elPnl.textContent = "—"; elPnl.className = "value tabular";
     elPct.textContent = "—"; elPct.className = "value tabular";
@@ -1288,35 +1211,23 @@ function updatePageAggregate(pageKey, rows) {
 
 function updateTotalBreakdown() {
   for (const subType of ["pair", "long", "short"]) {
-    const card = document.querySelector(`.breakdown-card[data-bd="${subType}"]`);
-    if (!card) continue;
-    const pnlEl      = card.querySelector("[data-bd-pnl]");
-    const pctEl      = card.querySelector("[data-bd-pct]");
+    const card = document.querySelector(`.breakdown-card[data-bd="${subType}"]`); if (!card) continue;
+    const pnlEl = card.querySelector("[data-bd-pnl]");
+    const pctEl = card.querySelector("[data-bd-pct]");
     const notionalEl = card.querySelector("[data-bd-notional]");
-    const countEl    = card.querySelector("[data-bd-count]");
-
+    const countEl = card.querySelector("[data-bd-count]");
     const subTrades = trades.filter(tr => tradeType(tr) === subType);
     const rows = computeRowsFor(subTrades);
     const valid = rows.filter(r => r.c.totalPnlHome != null);
     let sumPnl = 0, sumNotional = 0;
     for (const r of valid) { sumPnl += r.c.totalPnlHome; sumNotional += r.c.totalNotionalHome; }
     const pct = sumNotional > 0 ? (sumPnl / sumNotional) * 100 : null;
-
-    if (subTrades.length === 0) {
-      pnlEl.textContent = "—";       pnlEl.className = "breakdown-val";
-      pctEl.textContent = "—";       pctEl.className = "breakdown-val";
-      notionalEl.textContent = "—";  notionalEl.className = "breakdown-val";
-    } else if (valid.length === 0) {
-      pnlEl.textContent = t("agg_loading"); pnlEl.className = "breakdown-val muted";
-      pctEl.textContent = "—";              pctEl.className = "breakdown-val";
-      notionalEl.textContent = "—";         notionalEl.className = "breakdown-val";
-    } else {
-      pnlEl.textContent = (sumPnl > 0 ? "+" : "") + fmtMoney(sumPnl, homeCurrency);
-      pnlEl.className = "breakdown-val " + signClass(sumPnl);
-      pctEl.textContent = fmtPct(pct);
-      pctEl.className = "breakdown-val " + signClass(pct);
-      notionalEl.textContent = fmtMoney(sumNotional, homeCurrency);
-      notionalEl.className = "breakdown-val";
+    if (subTrades.length === 0) { pnlEl.textContent = "—"; pnlEl.className = "breakdown-val"; pctEl.textContent = "—"; pctEl.className = "breakdown-val"; notionalEl.textContent = "—"; notionalEl.className = "breakdown-val"; }
+    else if (valid.length === 0) { pnlEl.textContent = t("agg_loading"); pnlEl.className = "breakdown-val muted"; pctEl.textContent = "—"; pctEl.className = "breakdown-val"; notionalEl.textContent = "—"; notionalEl.className = "breakdown-val"; }
+    else {
+      pnlEl.textContent = (sumPnl > 0 ? "+" : "") + fmtMoney(sumPnl, homeCurrency); pnlEl.className = "breakdown-val " + signClass(sumPnl);
+      pctEl.textContent = fmtPct(pct); pctEl.className = "breakdown-val " + signClass(pct);
+      notionalEl.textContent = fmtMoney(sumNotional, homeCurrency); notionalEl.className = "breakdown-val";
     }
     const plural = (subTrades.length === 1) ? t("agg_trade_singular") : t("agg_trade_plural");
     countEl.textContent = t("agg_trades_count", { n: subTrades.length, plural: plural });
@@ -1330,20 +1241,15 @@ function applyPriceFlashes() {
     if (prev != null && prev !== data.price) {
       const direction = data.price > prev ? "up" : "down";
       const cells = document.querySelectorAll('[data-flash-ticker="' + sym + '"]');
-      cells.forEach(cell => {
-        cell.classList.remove("flash-up", "flash-down"); void cell.offsetWidth;
-        cell.classList.add("flash-" + direction);
-        setTimeout(() => cell.classList.remove("flash-" + direction), 1000);
-      });
+      cells.forEach(cell => { cell.classList.remove("flash-up", "flash-down"); void cell.offsetWidth; cell.classList.add("flash-" + direction); setTimeout(() => cell.classList.remove("flash-" + direction), 1000); });
     }
     PREVIOUS_PRICES.set(sym, data.price);
   });
-
   for (const pageKey of PAGES) {
     const pageTrades = tradesForPage(pageKey);
     let pnl = null; let allValid = true;
     for (const tr of pageTrades) {
-      const lp = hasLong(tr)  ? PRICE_CACHE.get(tr.longTicker.toUpperCase())  : null;
+      const lp = hasLong(tr) ? PRICE_CACHE.get(tr.longTicker.toUpperCase()) : null;
       const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
       const c = computeTrade(tr, lp, sp);
       if (c.totalPnlHome == null) { allValid = false; break; }
@@ -1366,10 +1272,7 @@ async function refreshAll(force = false) {
   status.className = "status loading"; status.textContent = t("status_loading_prices");
   if (!priceSettings.workerUrl) { status.className = "status err"; status.textContent = t("status_no_worker_url"); return; }
   const tickers = new Set();
-  trades.forEach(tr => {
-    if (hasLong(tr))  tickers.add(tr.longTicker.toUpperCase());
-    if (hasShort(tr)) tickers.add(tr.shortTicker.toUpperCase());
-  });
+  trades.forEach(tr => { if (hasLong(tr)) tickers.add(tr.longTicker.toUpperCase()); if (hasShort(tr)) tickers.add(tr.shortTicker.toUpperCase()); });
   const arr = [...tickers]; let errCount = 0;
   for (const tk of arr) { const r = await fetchPrice(tk, force); if (r.error) errCount++; }
   await ensureFxRatesForTrades();
@@ -1382,15 +1285,12 @@ async function refreshAll(force = false) {
   setAutoStatus();
 }
 
-// =========================== FORM ===========================
 function applyFormTypeUI(type) {
   formType = type;
-  document.querySelectorAll(".type-radio").forEach(r => {
-    r.classList.toggle("active", r.getAttribute("data-type") === type);
-  });
-  const longSec  = document.getElementById("form-long-section");
+  document.querySelectorAll(".type-radio").forEach(r => { r.classList.toggle("active", r.getAttribute("data-type") === type); });
+  const longSec = document.getElementById("form-long-section");
   const shortSec = document.getElementById("form-short-section");
-  longSec.style.display  = (type === "pair" || type === "long")  ? "block" : "none";
+  longSec.style.display = (type === "pair" || type === "long") ? "block" : "none";
   shortSec.style.display = (type === "pair" || type === "short") ? "block" : "none";
 }
 
@@ -1399,24 +1299,14 @@ function openForm(id = null) {
   const form = document.getElementById("form");
   document.getElementById("form-title").textContent = id ? t("form_title_edit") : t("form_title_new");
   applyTranslations();
-
   const tranchFields = ["f-long-qty", "f-long-entry", "f-long-native", "f-short-qty", "f-short-entry", "f-short-native", "f-long-ticker", "f-short-ticker"];
   const setMulti = (multi) => {
-    tranchFields.forEach(fid => {
-      const el = document.getElementById(fid); if (!el) return;
-      const wrap = el.closest(".field") || el.parentElement;
-      if (wrap) wrap.style.opacity = multi ? "0.4" : "1";
-      el.disabled = !!multi;
-    });
+    tranchFields.forEach(fid => { const el = document.getElementById(fid); if (!el) return; const wrap = el.closest(".field") || el.parentElement; if (wrap) wrap.style.opacity = multi ? "0.4" : "1"; el.disabled = !!multi; });
     let note = document.getElementById("form-multitranche-note");
-    if (multi) {
-      if (!note) { note = document.createElement("div"); note.id = "form-multitranche-note"; note.className = "info-box"; const formEl = document.getElementById("form"); formEl.insertBefore(note, formEl.firstChild.nextSibling); }
-      note.textContent = t("form_multitranche_note"); note.style.display = "block";
-    } else if (note) note.style.display = "none";
+    if (multi) { if (!note) { note = document.createElement("div"); note.id = "form-multitranche-note"; note.className = "info-box"; const formEl = document.getElementById("form"); formEl.insertBefore(note, formEl.firstChild.nextSibling); } note.textContent = t("form_multitranche_note"); note.style.display = "block"; }
+    else if (note) note.style.display = "none";
   };
-
   const typeSection = document.getElementById("form-type-section");
-
   if (id) {
     const tr = trades.find(x => x.id === id); if (!tr) return;
     const trType = tradeType(tr);
@@ -1436,11 +1326,7 @@ function openForm(id = null) {
     document.getElementById("f-alert-pct").value = (tr.alertPctMin != null) ? formatForInput(tr.alertPctMin) : "";
     setMulti(isMulti);
     let alarmNote = document.getElementById("form-alarm-supertrade-note");
-    if (!alarmNote) {
-      alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box";
-      const alarmField = document.getElementById("f-alert-pct").closest(".field");
-      if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling);
-    }
+    if (!alarmNote) { alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box"; const alarmField = document.getElementById("f-alert-pct").closest(".field"); if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling); }
     alarmNote.textContent = t("alarm_supertrade_note"); alarmNote.style.display = "block";
   } else {
     const initialType = (currentPage === "total") ? "pair" : currentPage;
@@ -1472,9 +1358,7 @@ function saveForm() {
   const alertPctRaw = document.getElementById("f-alert-pct").value.trim();
   let alertPctMin = null;
   if (alertPctRaw) { const p = parseDecimal(alertPctRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = p; }
-
   const type = formType;
-
   if (editingId) {
     const existing = trades.find(x => x.id === editingId);
     if (!existing) { closeForm(); return; }
@@ -1482,21 +1366,14 @@ function saveForm() {
     existing.name = name; existing.alertPctMin = alertPctMin; existing.updated = Date.now();
     if (!isMulti) {
       const eType = tradeType(existing);
-      if (eType === "pair" || eType === "long") {
-        if (!longTicker) { alert(t("err_long_ticker_required")); return; }
-        if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
-      }
-      if (eType === "pair" || eType === "short") {
-        if (!shortTicker) { alert(t("err_short_ticker_required")); return; }
-        if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
-      }
+      if (eType === "pair" || eType === "long") { if (!longTicker) { alert(t("err_long_ticker_required")); return; } if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; } }
+      if (eType === "pair" || eType === "short") { if (!shortTicker) { alert(t("err_short_ticker_required")); return; } if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; } }
       const oldT = existing.tranches[0] || {};
       const longEntryCcy  = (eType === "pair" || eType === "long")  ? (longEntryNative  ? null : (oldT.longEntryCcy  || homeCurrency)) : null;
       const shortEntryCcy = (eType === "pair" || eType === "short") ? (shortEntryNative ? null : (oldT.shortEntryCcy || homeCurrency)) : null;
       if (eType === "pair" || eType === "long")  existing.longTicker  = longTicker;
       if (eType === "pair" || eType === "short") existing.shortTicker = shortTicker;
-      existing.tranches[0] = {
-        ...oldT,
+      existing.tranches[0] = { ...oldT,
         longQty:  (eType === "pair" || eType === "long")  ? longQty  : 0,
         longEntry:(eType === "pair" || eType === "long")  ? longEntry: 0,
         longEntryNative: (eType === "pair" || eType === "long")  ? longEntryNative  : false,
@@ -1509,16 +1386,8 @@ function saveForm() {
     }
     markLocalChange(); closeForm(); refreshAll(true); return;
   }
-
-  if (type === "pair" || type === "long") {
-    if (!longTicker) { alert(t("err_long_ticker_required")); return; }
-    if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; }
-  }
-  if (type === "pair" || type === "short") {
-    if (!shortTicker) { alert(t("err_short_ticker_required")); return; }
-    if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; }
-  }
-
+  if (type === "pair" || type === "long") { if (!longTicker) { alert(t("err_long_ticker_required")); return; } if (!isFinite(longQty) || longQty <= 0 || !isFinite(longEntry) || longEntry <= 0) { alert(t("err_long_invalid")); return; } }
+  if (type === "pair" || type === "short") { if (!shortTicker) { alert(t("err_short_ticker_required")); return; } if (!isFinite(shortQty) || shortQty <= 0 || !isFinite(shortEntry) || shortEntry <= 0) { alert(t("err_short_invalid")); return; } }
   const longEntryCcy  = (type === "pair" || type === "long")  ? (longEntryNative  ? null : homeCurrency) : null;
   const shortEntryCcy = (type === "pair" || type === "short") ? (shortEntryNative ? null : homeCurrency) : null;
   const newTranche = {
@@ -1533,12 +1402,10 @@ function saveForm() {
     shortEntryCcy,
     created: Date.now()
   };
-
   let matching = null;
   if (type === "pair")  matching = trades.find(x => tradeType(x) === "pair"  && x.longTicker === longTicker && x.shortTicker === shortTicker);
   if (type === "long")  matching = trades.find(x => tradeType(x) === "long"  && x.longTicker === longTicker);
   if (type === "short") matching = trades.find(x => tradeType(x) === "short" && x.shortTicker === shortTicker);
-
   if (matching) {
     matching.tranches = matching.tranches || [];
     matching.tranches.push(newTranche);
@@ -1548,27 +1415,13 @@ function saveForm() {
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 100);
     return;
   }
-
-  trades.push({
-    id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
-    type,
-    name,
-    longTicker:  (type === "pair" || type === "long")  ? longTicker  : null,
-    shortTicker: (type === "pair" || type === "short") ? shortTicker : null,
-    alertPctMin,
-    created: Date.now(), updated: Date.now(),
-    tranches: [newTranche]
-  });
+  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
   markLocalChange(); closeForm(); refreshAll(true);
 }
 
 function deleteTrade(id) {
   const tr = trades.find(x => x.id === id); if (!tr) return;
-  const dispName = tr.name || (
-    tradeType(tr) === "long"  ? tr.longTicker :
-    tradeType(tr) === "short" ? tr.shortTicker :
-    (tr.longTicker + " / " + tr.shortTicker)
-  );
+  const dispName = tr.name || (tradeType(tr) === "long" ? tr.longTicker : tradeType(tr) === "short" ? tr.shortTicker : (tr.longTicker + " / " + tr.shortTicker));
   if (!confirm(t("card_delete_confirm", { name: dispName }))) return;
   trades = trades.filter(x => x.id !== id);
   if (alertStates[id]) delete alertStates[id];
@@ -1589,6 +1442,7 @@ function closeMenu() { document.getElementById("menu-overlay").classList.remove(
 function openSettings() {
   document.getElementById("lang-select").value = loadLangPreference();
   document.getElementById("start-page-select").value = loadStartPage();
+  document.getElementById("theme-select").value = loadTheme();
   document.getElementById("home-ccy").value = homeCurrency;
   document.getElementById("worker-url").value = priceSettings.workerUrl || "";
   document.getElementById("sync-key").value = syncSettings.apiKey || "";
@@ -1639,21 +1493,15 @@ function importData() {
 }
 function clearAll() { closeMenu(); if (!confirm(t("io_clear_confirm"))) return; trades = []; alertStates = {}; markLocalChange(); render(); }
 
-// =========================== PAGE NAV ===========================
 function scrollToPage(pageKey, smooth = true) {
   const container = document.getElementById("pages-container");
-  const idx = PAGES.indexOf(pageKey);
-  if (idx < 0) return;
+  const idx = PAGES.indexOf(pageKey); if (idx < 0) return;
   const w = container.clientWidth;
   container.scrollTo({ left: idx * w, behavior: smooth ? "smooth" : "auto" });
   setActiveDot(pageKey);
   currentPage = pageKey;
 }
-function setActiveDot(pageKey) {
-  document.querySelectorAll(".page-dot").forEach(d => {
-    d.classList.toggle("active", d.getAttribute("data-dot") === pageKey);
-  });
-}
+function setActiveDot(pageKey) { document.querySelectorAll(".page-dot").forEach(d => { d.classList.toggle("active", d.getAttribute("data-dot") === pageKey); }); }
 function onPagesScroll() {
   if (pageScrollDebounce) clearTimeout(pageScrollDebounce);
   pageScrollDebounce = setTimeout(() => {
@@ -1661,14 +1509,10 @@ function onPagesScroll() {
     const w = container.clientWidth; if (w <= 0) return;
     const idx = Math.round(container.scrollLeft / w);
     const pageKey = PAGES[Math.max(0, Math.min(PAGES.length - 1, idx))];
-    if (pageKey !== currentPage) {
-      currentPage = pageKey;
-      setActiveDot(pageKey);
-    }
+    if (pageKey !== currentPage) { currentPage = pageKey; setActiveDot(pageKey); }
   }, 80);
 }
 
-// =========================== EVENT WIRING ===========================
 document.getElementById("btn-new").addEventListener("click", () => openForm(null));
 document.getElementById("btn-refresh").addEventListener("click", () => refreshAll(true));
 document.getElementById("f-cancel").addEventListener("click", closeForm);
@@ -1702,11 +1546,13 @@ document.getElementById("settings-save").addEventListener("click", async () => {
   const sb = document.getElementById("sync-bin").value.trim();
   const langChoice = document.getElementById("lang-select").value;
   const startPageChoice = document.getElementById("start-page-select").value;
+  const themeChoice = document.getElementById("theme-select").value;
   if (hc && /^[A-Z]{3}$/.test(hc)) { homeCurrency = hc; priceSettings.homeCurrency = hc; }
   priceSettings.workerUrl = wu; savePriceSettings();
   if (sk && sb) { syncSettings.apiKey = sk; syncSettings.binId = sb; syncSettings.enabled = true; saveSyncSettings(); setSyncStatus("ok", t("status_sync_active")); }
   saveLangPreference(langChoice);
   if (PAGES.includes(startPageChoice)) saveStartPage(startPageChoice);
+  if (THEMES.includes(themeChoice)) { saveTheme(themeChoice); applyTheme(themeChoice); }
   setLanguage(langChoice);
   closeSettings();
   FX_CACHE.clear(); PRICE_CACHE.clear(); PREVIOUS_PRICES.clear();
@@ -1721,19 +1567,36 @@ document.getElementById("sync-disable").addEventListener("click", () => {
   closeSettings(); setSyncStatus("off", t("status_sync_off"));
 });
 
-document.querySelectorAll(".type-radio").forEach(el => {
-  el.addEventListener("click", () => applyFormTypeUI(el.getAttribute("data-type")));
-});
-document.querySelectorAll(".page-dot").forEach(d => {
-  d.addEventListener("click", () => scrollToPage(d.getAttribute("data-dot"), true));
-});
+document.querySelectorAll(".type-radio").forEach(el => { el.addEventListener("click", () => applyFormTypeUI(el.getAttribute("data-type"))); });
+document.querySelectorAll(".page-dot").forEach(d => { d.addEventListener("click", () => scrollToPage(d.getAttribute("data-dot"), true)); });
 document.getElementById("pages-container").addEventListener("scroll", onPagesScroll, { passive: true });
 window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
-// Initial setup
+document.addEventListener("keydown", (e) => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  if (!e.shiftKey) return;
+  if (e.altKey) return;
+  if (!/^Digit[1-4]$/.test(e.code || "")) return;
+  const tag = (e.target?.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target?.isContentEditable)) return;
+  e.preventDefault(); e.stopPropagation();
+  const idx = parseInt(e.code.slice(-1), 10) - 1;
+  if (idx >= 0 && idx < PAGES.length) scrollToPage(PAGES[idx], true);
+}, { capture: true });
+
+// Apply theme as early as possible (before any visible render)
+applyTheme(loadTheme());
+
+// Live-update theme when "Auto" mode is active and system preference changes
+if (window.matchMedia) {
+  const mql = window.matchMedia("(prefers-color-scheme: dark)");
+  const onSysSchemeChange = () => { if (loadTheme() === "auto") applyTheme("auto"); };
+  if (mql.addEventListener) mql.addEventListener("change", onSysSchemeChange);
+  else if (mql.addListener) mql.addListener(onSysSchemeChange);
+}
+
 const initialLang = loadLangPreference();
 setLanguage(initialLang);
-
 loadStorage();
 render();
 if (syncSettings.enabled) setSyncStatus("ok", t("status_sync_active")); else setSyncStatus("off", t("status_sync_off"));
@@ -1741,7 +1604,6 @@ if (trades.length > 0 && priceSettings.workerUrl) refreshAll(false);
 if (syncSettings.enabled) syncFull();
 startAutoRefresh();
 setAutoStatus();
-
 currentPage = loadStartPage();
 requestAnimationFrame(() => scrollToPage(currentPage, false));
 
