@@ -152,6 +152,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .alarm-pill.squeeze-watching { background: rgba(255,184,77,0.20); color: var(--warn); }
 .alarm-pill.squeeze-triggered { background: rgba(255,140,0,0.28); color: var(--warn); animation: pulse 1.5s infinite; font-weight: 800; }
 .alarm-pill.squeeze-acked { background: rgba(255,184,77,0.12); color: var(--warn); }
+.squeeze-monitored { font-size: 12px; color: var(--warn); background: rgba(255,184,77,0.10); border: 1px solid rgba(255,184,77,0.3); padding: 8px 12px; border-radius: 7px; margin-bottom: 10px; font-weight: 600; line-height: 1.4; }
+.squeeze-monitored .ticker { font-family: ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 5px; background: rgba(255,184,77,0.18); border-radius: 3px; font-weight: 700; }
 .alarm-row.squeeze-watching { background: rgba(255,184,77,0.12); color: var(--warn); }
 .alarm-row.squeeze-triggered { background: rgba(255,140,0,0.20); color: var(--warn); font-weight: 700; animation: pulse 1.5s infinite; }
 .alarm-row.squeeze-acked { background: rgba(184,133,0,0.10); color: var(--warn); }
@@ -352,6 +354,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   </div>
   <div class="form-section alarm" id="form-squeeze-section">
     <h4 data-i18n="form_squeeze_title">⚡ Short-Squeeze-Alarm (optional)</h4>
+    <div class="squeeze-monitored" id="form-squeeze-monitored"></div>
     <div class="field">
       <label data-i18n="form_squeeze_label">Schwelle (% Short-Interest auf Float)</label>
       <input id="f-alert-squeeze" type="text" inputmode="decimal" autocomplete="off" placeholder="25">
@@ -601,9 +604,12 @@ const STRINGS = {
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
     card_delete_confirm: "„{name}\" löschen?",
-    form_squeeze_title: "⚡ Short-Squeeze-Alarm (optional)",
+    form_squeeze_title: "⚡ Short-Squeeze-Alarm (nur Short-Leg, optional)",
     form_squeeze_label: "Schwelle (% Short-Interest auf Float)",
-    form_squeeze_help: "Nur sinnvoll für US-Aktien — Yahoo liefert für nicht-US-Ticker meist keine Short-Interest-Daten. Eingabe als positive Zahl, z.B. <strong>25</strong> für „Alarm wenn ≥ 25 % der Float-Aktien leerverkauft sind”. Worker prüft einmal täglich, Telegram-Wiederholung 1× pro Tag bis quittiert.",
+    form_squeeze_monitored_short: "📍 Überwacht: <span class=\"ticker\">{ticker}</span>",
+    form_squeeze_monitored_pair: "📍 Überwacht: <span class=\"ticker\">{ticker}</span> (nur die Short-Seite des Pairs — der Long-Leg wird nicht auf Squeeze geprüft)",
+    form_squeeze_monitored_empty: "📍 Überwacht wird der Short-Ticker (bei Pair-Trades nur die Short-Seite). Trage erst oben den Short-Ticker ein.",
+    form_squeeze_help: "Greift nur für den Short-Ticker. Bei Pair-Trades wird der Long-Leg <strong>nicht</strong> auf Squeeze geprüft. Nur sinnvoll für US-Aktien — Yahoo liefert für nicht-US-Ticker meist keine Short-Interest-Daten. Eingabe als positive Zahl, z.B. <strong>25</strong> für „Alarm wenn ≥ 25 % der Float-Aktien leerverkauft sind”. Worker prüft einmal täglich, Telegram-Wiederholung 1× pro Tag bis quittiert.",
     form_squeeze_non_us_warn: "⚠ Der Short-Ticker hat einen Markt-Suffix — Yahoo liefert für nicht-US-Werte sehr wahrscheinlich keine Short-Interest-Daten. Schwelle wird gespeichert, Alarm wird aber realistisch nie auslösen.",
     alarm_squeeze_watching: "⚡ Squeeze-Alarm wachend — Schwelle ≥ {pct}",
     alarm_squeeze_triggered: "⚡ SQUEEZE-ALARM AUSGELÖST · Schwelle ≥ {pct} — auf Telegram quittieren",
@@ -728,9 +734,12 @@ const STRINGS = {
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
     card_delete_confirm: "Delete \"{name}\"?",
-    form_squeeze_title: "⚡ Short-squeeze alert (optional)",
+    form_squeeze_title: "⚡ Short-squeeze alert (short leg only, optional)",
     form_squeeze_label: "Threshold (% short interest on float)",
-    form_squeeze_help: "Only meaningful for US stocks — Yahoo usually has no short-interest data for non-US tickers. Enter a positive number, e.g. <strong>25</strong> for „alert when ≥ 25 % of the float is shorted”. Worker checks once daily, Telegram repeats 1× per day until acknowledged.",
+    form_squeeze_monitored_short: "📍 Monitored: <span class=\"ticker\">{ticker}</span>",
+    form_squeeze_monitored_pair: "📍 Monitored: <span class=\"ticker\">{ticker}</span> (only the short side of the pair — the long leg is not checked for squeeze)",
+    form_squeeze_monitored_empty: "📍 The short ticker will be monitored (for pair trades, only the short side). Enter the short ticker above first.",
+    form_squeeze_help: "Applies to the short ticker only. For pair trades, the long leg is <strong>not</strong> checked for squeeze. Only meaningful for US stocks — Yahoo usually has no short-interest data for non-US tickers. Enter a positive number, e.g. <strong>25</strong> for „alert when ≥ 25 % of the float is shorted”. Worker checks once daily, Telegram repeats 1× per day until acknowledged.",
     form_squeeze_non_us_warn: "⚠ The short ticker has an exchange suffix — Yahoo most likely won't have short-interest data for non-US securities. Threshold is saved, but the alert will probably never fire.",
     alarm_squeeze_watching: "⚡ Squeeze alert armed — threshold ≥ {pct}",
     alarm_squeeze_triggered: "⚡ SQUEEZE ALERT TRIGGERED · threshold ≥ {pct} — acknowledge on Telegram",
@@ -1945,13 +1954,29 @@ function looksLikeNonUsTicker(symbol) {
 
 // Zeigt die Non-US-Warnung in der Squeeze-Sektion, sobald der überwachte
 // Ticker (= shortTicker) einen Punkt-Suffix hat. Nur sichtbar wenn die
-// Squeeze-Sektion selbst aktiv ist (type=short oder pair).
+// Squeeze-Sektion selbst aktiv ist (type=short oder pair). Plus aktualisiert
+// die "Überwacht: ..."-Anzeige darunter.
 function updateSqueezeNonUsWarning() {
   const warn = document.getElementById("form-squeeze-non-us"); if (!warn) return;
+  const mon = document.getElementById("form-squeeze-monitored");
   const tp = formType;
-  if (tp !== "short" && tp !== "pair") { warn.style.display = "none"; return; }
+  if (tp !== "short" && tp !== "pair") {
+    warn.style.display = "none";
+    if (mon) mon.style.display = "none";
+    return;
+  }
   const tk = (document.getElementById("f-short-ticker")?.value || "").trim().toUpperCase();
   warn.style.display = (tk && looksLikeNonUsTicker(tk)) ? "block" : "none";
+  // Monitored-Indicator: dynamisch je nach Trade-Typ und Ticker-Eingabe
+  if (mon) {
+    mon.style.display = "block";
+    if (!tk) {
+      mon.innerHTML = t("form_squeeze_monitored_empty");
+    } else {
+      const key = (tp === "pair") ? "form_squeeze_monitored_pair" : "form_squeeze_monitored_short";
+      mon.innerHTML = t(key, { ticker: escapeHtml(tk) });
+    }
+  }
 }
 
 // Returns the API/quoted currency for the ticker currently typed into the form.
