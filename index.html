@@ -211,7 +211,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .menu-sheet button { justify-content: flex-start; text-align: left; width: 100%; }
 .io-textarea { width: 100%; min-height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; resize: vertical; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
-.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: stretch; justify-content: center; padding: 4vh 24px 10vh; overflow: hidden; transition: transform 0.45s cubic-bezier(0.55, 0.06, 0.68, 0.19), opacity 0.45s ease-out; }
+.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: stretch; justify-content: center; padding: 4vh 24px 10vh; overflow: hidden; transition: transform 0.75s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.75s ease-in-out; }
 .lock-screen.open { display: flex; }
 .lock-screen.unlocking { transform: translateX(-100%); opacity: 0; }
 .lock-spacer { flex: 1; min-height: 20px; }
@@ -254,8 +254,8 @@ body::before {
 .lock-dots.shake { animation: lockshake 0.4s; }
 .lock-error-strong { font-size: 17px; font-weight: 800; color: var(--neg); letter-spacing: 0.5px; padding: 5px 0 9px; text-transform: uppercase; }
 .lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 290px; margin-top: 4px; }
-.kp-btn { aspect-ratio: 1.32; min-height: 58px; font-size: 29px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 15px; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.15s ease-out, transform 0.12s ease-out, box-shadow 0.15s ease-out; font-variant-numeric: tabular-nums; padding: 0; position: relative; overflow: hidden; }
-.kp-btn:active, .kp-btn.pressed { background: rgba(127,127,127,0.42); transform: scale(0.90); box-shadow: 0 0 0 3px rgba(127,127,127,0.18) inset; }
+.kp-btn { aspect-ratio: 1; min-height: 58px; font-size: 29px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 50%; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.18s ease-out, transform 0.14s ease-out, box-shadow 0.18s ease-out; font-variant-numeric: tabular-nums; padding: 0; position: relative; overflow: hidden; }
+.kp-btn:active, .kp-btn.pressed { background: rgba(127,127,127,0.60); transform: scale(0.85); box-shadow: 0 0 0 5px rgba(127,127,127,0.30), 0 0 24px rgba(127,127,127,0.25); border-color: rgba(127,127,127,0.5); }
 .kp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .kp-btn.empty { background: transparent; border: none; pointer-events: none; }
 .kp-btn.back { font-size: 22px; font-weight: 600; }
@@ -302,8 +302,8 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 <body>
 <div class="lock-screen" id="lock-screen" aria-hidden="true">
   <div class="lock-box">
-    <div class="lock-app-title" data-i18n="app_title">Pair Trade Tracker</div>
-    <div class="lock-app-sub" id="lock-sub" data-i18n="lock_sub">Code eingeben</div>
+    <div class="lock-app-title" data-i18n="lock_welcome">Welcome</div>
+    <div class="lock-app-sub" id="lock-sub" data-i18n="lock_sub">Code eingeben um fortzufahren</div>
 
     <!-- Spacer schiebt alles darunter ans untere Ende der Lock-Box (TWINT-Layout) -->
     <div class="lock-spacer"></div>
@@ -694,7 +694,7 @@ const STRINGS = {
     alarm_max_acknowledged: "✓ Gewinn quittiert · neue Nachricht erst wenn unter {pct} und dann wieder darüber",
     menu_actions: "Aktionen", menu_data_mgmt: "Datenverwaltung", menu_sync_now: "Jetzt syncen",
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
-    lock_title: "App gesperrt", lock_sub: "Code eingeben", lock_unlock: "Entsperren",
+    lock_title: "App gesperrt", lock_welcome: "Welcome", lock_sub: "Code eingeben um fortzufahren", lock_unlock: "Entsperren",
     lock_wrong: "Zugriff verweigert",
     lock_freeze_msg: "Zu viele Falsch-Eingaben. Eingabe gesperrt — nur über Master-Key entsperrbar.",
     lock_forgot: "Passwort vergessen?",
@@ -824,7 +824,7 @@ const STRINGS = {
     alarm_max_acknowledged: "✓ Profit acknowledged · next message only when below {pct} and back above",
     menu_actions: "Actions", menu_data_mgmt: "Data management", menu_sync_now: "Sync now",
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
-    lock_title: "App locked", lock_sub: "Enter code", lock_unlock: "Unlock",
+    lock_title: "App locked", lock_welcome: "Welcome", lock_sub: "Enter code to continue", lock_unlock: "Unlock",
     lock_wrong: "Access denied",
     lock_freeze_msg: "Too many wrong attempts. Input frozen — only master key unlocks now.",
     lock_forgot: "Forgot password?",
@@ -1251,7 +1251,7 @@ function hideLockScreen() {
   setTimeout(() => {
     ls.classList.remove("open");
     ls.classList.remove("unlocking");
-  }, 460);
+  }, 760);
 }
 
 function fmtFreezeCountdown(ms) {
