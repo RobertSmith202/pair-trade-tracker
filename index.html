@@ -275,20 +275,28 @@ body::before {
 }
 .lock-loader-overlay.open { display: flex; }
 .lock-loader-overlay.fade-out { opacity: 0; }
-.lock-loader-svg { width: 130px; height: 130px; animation: pentagonSpin 1.7s linear infinite; }
-.loader-pentagon {
+.lock-loader-svg { width: 140px; height: 140px; }
+/* Hexagon bleibt statisch — die "Schlange" wandert via stroke-dasharray drumherum.
+   So bleibt die Hexagon-Form jederzeit klar erkennbar. */
+.hexagon-bg {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  opacity: 0.28;
+}
+.hexagon-snake {
   fill: none;
   stroke: var(--text);
-  stroke-width: 5;
+  stroke-width: 4.5;
   stroke-linejoin: round;
   stroke-linecap: round;
-  stroke-dasharray: 280;
-  stroke-dashoffset: 280;
-  animation: pentagonDraw 5s linear forwards;
+  stroke-dasharray: 80 200;
+  stroke-dashoffset: 0;
+  animation: hexSnake 1.9s linear infinite;
 }
 .lock-loader-text { font-size: 14px; color: var(--muted); letter-spacing: 0.6px; text-transform: uppercase; font-weight: 600; }
-@keyframes pentagonSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes pentagonDraw { from { stroke-dashoffset: 280; } to { stroke-dashoffset: 0; } }
+@keyframes hexSnake { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -280; } }
 .lock-box input { width: 100%; padding: 14px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; background: var(--bg); color: var(--text); text-align: center; letter-spacing: 2px; -webkit-appearance: none; appearance: none; }
 input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 .lock-match { font-size: 12px; padding: 8px 12px; border-radius: 7px; margin-top: 6px; font-weight: 500; }
@@ -374,10 +382,11 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   </div>
 </div>
 
-<!-- Pentagon-Loader nach erfolgreichem Code -->
+<!-- Hexagon-Loader nach erfolgreichem Code: feine Schlange wandert um statisches Hexagon -->
 <div class="lock-loader-overlay" id="lock-loader-overlay" aria-hidden="true">
   <svg class="lock-loader-svg" viewBox="0 0 100 100" aria-hidden="true">
-    <polygon class="loader-pentagon" points="50,8 95,42 78,92 22,92 5,42"/>
+    <polygon class="hexagon-bg"    points="50,4 90,27 90,73 50,96 10,73 10,27"/>
+    <polygon class="hexagon-snake" points="50,4 90,27 90,73 50,96 10,73 10,27"/>
   </svg>
   <div class="lock-loader-text" data-i18n="lock_loading">Authentifizierung</div>
 </div>
@@ -1294,8 +1303,8 @@ function unlockWithLoader() {
   const ls = document.getElementById("lock-screen");
   const loader = document.getElementById("lock-loader-overlay");
   if (!loader) { hideLockScreen(); return; }
-  // Pentagon-Animation neu anstoßen (falls schon mal gelaufen)
-  const poly = loader.querySelector(".loader-pentagon");
+  // Hexagon-Snake-Animation neu anstoßen (falls schon mal gelaufen)
+  const poly = loader.querySelector(".hexagon-snake");
   if (poly) { poly.style.animation = "none"; void poly.offsetWidth; poly.style.animation = ""; }
   // Lock-Screen wegmachen (instant, kein Slide), Loader öffnen
   if (ls) ls.classList.remove("open");
