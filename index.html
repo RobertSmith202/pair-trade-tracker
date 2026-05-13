@@ -322,31 +322,33 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <label for="f-short-native" id="f-short-native-label"></label>
     </div>
   </div>
-  <div class="form-section alarm">
-    <h4 data-i18n="form_alarm_title">🚨 Telegram-Alarm (optional)</h4>
-    <div class="field-row">
-      <div class="field">
-        <div class="thr-label-row">
-          <label id="f-alert-pct-label" data-i18n="form_alarm_min_label">Verlust-Schwelle (%)</label>
-          <div class="thr-toggle" data-thr-for="min" style="display:none">
-            <button type="button" class="tt-btn active" data-thr-mode="pct">%</button>
-            <button type="button" class="tt-btn" data-thr-mode="price" data-i18n="thr_mode_price">Preis</button>
-          </div>
+  <div class="form-section alarm" id="form-loss-section">
+    <h4 data-i18n="form_alarm_loss_title">🚨 Verlust-Alarm (optional)</h4>
+    <div class="field">
+      <div class="thr-label-row">
+        <label id="f-alert-pct-label" data-i18n="form_alarm_min_label">Verlust-Schwelle (%)</label>
+        <div class="thr-toggle" data-thr-for="min" style="display:none">
+          <button type="button" class="tt-btn active" data-thr-mode="pct">%</button>
+          <button type="button" class="tt-btn" data-thr-mode="price" data-i18n="thr_mode_price">Preis</button>
         </div>
-        <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="30">
       </div>
-      <div class="field">
-        <div class="thr-label-row">
-          <label id="f-alert-max-label" data-i18n="form_alarm_max_label">Gewinn-Schwelle (%)</label>
-          <div class="thr-toggle" data-thr-for="max" style="display:none">
-            <button type="button" class="tt-btn active" data-thr-mode="pct">%</button>
-            <button type="button" class="tt-btn" data-thr-mode="price" data-i18n="thr_mode_price">Preis</button>
-          </div>
-        </div>
-        <input id="f-alert-max" type="text" inputmode="decimal" autocomplete="off" placeholder="50">
-      </div>
+      <input id="f-alert-pct" type="text" inputmode="decimal" autocomplete="off" placeholder="30">
     </div>
-    <div class="help" data-i18n="form_alarm_pct_help"></div>
+    <div class="help" data-i18n="form_alarm_loss_help"></div>
+  </div>
+  <div class="form-section alarm" id="form-profit-section">
+    <h4 data-i18n="form_alarm_profit_title">🎯 Gewinn-Alarm (optional)</h4>
+    <div class="field">
+      <div class="thr-label-row">
+        <label id="f-alert-max-label" data-i18n="form_alarm_max_label">Gewinn-Schwelle (%)</label>
+        <div class="thr-toggle" data-thr-for="max" style="display:none">
+          <button type="button" class="tt-btn active" data-thr-mode="pct">%</button>
+          <button type="button" class="tt-btn" data-thr-mode="price" data-i18n="thr_mode_price">Preis</button>
+        </div>
+      </div>
+      <input id="f-alert-max" type="text" inputmode="decimal" autocomplete="off" placeholder="50">
+    </div>
+    <div class="help" data-i18n="form_alarm_profit_help"></div>
   </div>
   <div class="form-section alarm" id="form-squeeze-section">
     <h4 data-i18n="form_squeeze_title">⚡ Short-Squeeze-Alarm (optional)</h4>
@@ -582,7 +584,11 @@ const STRINGS = {
     form_long_position: "Long-Position", form_short_position: "Short-Position",
     form_ticker: "Ticker (Yahoo-Format)", form_qty: "Anzahl Aktien", form_entry: "Einstand",
     form_native_checkbox: "Einstand in Notierungswährung der Aktie (statt {ccy})",
-    form_alarm_title: "🚨 Telegram-Alarm (optional)",
+    form_alarm_title: "🚨 Verlust- und Gewinn-Alarm (optional)",
+    form_alarm_loss_title: "🚨 Verlust-Alarm (optional)",
+    form_alarm_profit_title: "🎯 Gewinn-Alarm (optional)",
+    form_alarm_loss_help: "Telegram-Alarm bei Performance ≤ −X% (Pct-Mode) bzw. Preis unter/über Schwelle (Preis-Mode bei Long/Short). Wiederholt alle 3 Min bis du quittierst.",
+    form_alarm_profit_help: "Telegram-Alarm bei Performance ≥ +X% (Pct-Mode) bzw. Preis über/unter Schwelle (Preis-Mode bei Long/Short). Wiederholt alle 30 Min bis du quittierst.",
     form_alarm_pct_label: "Alarm-Schwelle (Verlust in %)",
     form_alarm_min_label: "Verlust-Schwelle (%)",
     form_alarm_max_label: "Gewinn-Schwelle (%)",
@@ -705,7 +711,11 @@ const STRINGS = {
     form_long_position: "Long position", form_short_position: "Short position",
     form_ticker: "Ticker (Yahoo format)", form_qty: "Number of shares", form_entry: "Entry price",
     form_native_checkbox: "Entry price in stock's quoted currency (instead of {ccy})",
-    form_alarm_title: "🚨 Telegram alert (optional)",
+    form_alarm_title: "🚨 Loss & profit alert (optional)",
+    form_alarm_loss_title: "🚨 Loss alert (optional)",
+    form_alarm_profit_title: "🎯 Profit alert (optional)",
+    form_alarm_loss_help: "Telegram alert when performance ≤ −X% (pct mode) or price below/above threshold (price mode for long/short). Repeats every 3 min until acknowledged.",
+    form_alarm_profit_help: "Telegram alert when performance ≥ +X% (pct mode) or price above/below threshold (price mode for long/short). Repeats every 30 min until acknowledged.",
     form_alarm_pct_label: "Alert threshold (loss in %)",
     form_alarm_min_label: "Loss threshold (%)",
     form_alarm_max_label: "Profit threshold (%)",
@@ -817,7 +827,10 @@ function applyTranslations() {
   const formHelp = document.getElementById('form-help-currency'); if (formHelp) formHelp.innerHTML = t('form_help_currency', { ccy: homeCurrency });
   const longNativeLabel = document.getElementById('f-long-native-label'); if (longNativeLabel) longNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
   const shortNativeLabel = document.getElementById('f-short-native-label'); if (shortNativeLabel) shortNativeLabel.textContent = t('form_native_checkbox', { ccy: homeCurrency });
-  const alarmHelp = document.querySelector('.form-section.alarm .help'); if (alarmHelp) alarmHelp.innerHTML = t('form_alarm_pct_help');
+  // Help-Texte der einzelnen Alarm-Sektionen mit innerHTML setzen, damit <strong>/<em> rendern.
+  const lossHelp = document.querySelector('#form-loss-section .help'); if (lossHelp) lossHelp.innerHTML = t('form_alarm_loss_help');
+  const profitHelp = document.querySelector('#form-profit-section .help'); if (profitHelp) profitHelp.innerHTML = t('form_alarm_profit_help');
+  const sqzHelp = document.querySelector('#form-squeeze-section .help'); if (sqzHelp) sqzHelp.innerHTML = t('form_squeeze_help');
   if (typeof render === 'function') render();
   setAutoStatus();
 }
@@ -1626,25 +1639,25 @@ function alarmPillHtml(tr) {
   const states = alarmStateOf(tr);
   let html = "";
   if (hasMin) {
-    const s = states.min;
-    let icon = "🔔", cls = "watching";
-    if (s === "triggered")          { icon = "🚨"; cls = "triggered"; }
-    else if (s === "acknowledged")  { icon = "✓";  cls = "acked"; }
-    html += `<span class="alarm-pill ${cls}">${icon} ${fmtThresholdMin(tr)}</span>`;
+    // 🚨 = Verlust-Alarm. State entscheidet nur über Färbung/Animation, Icon ist immer 🚨.
+    let cls = "watching"; const s = states.min;
+    if (s === "triggered")          cls = "triggered";
+    else if (s === "acknowledged")  cls = "acked";
+    html += `<span class="alarm-pill ${cls}" title="${fmtThresholdMin(tr)}">🚨</span>`;
   }
   if (hasMax) {
-    const s = states.max;
-    let icon = "🎯", cls = "max-watching";
-    if (s === "notified")          { icon = "🎯"; cls = "max-notified"; }
-    else if (s === "acknowledged") { icon = "✓";  cls = "max-acked"; }
-    html += `<span class="alarm-pill ${cls}">${icon} ${fmtThresholdMax(tr)}</span>`;
+    // 🎯 = Gewinn-Alarm.
+    let cls = "max-watching"; const s = states.max;
+    if (s === "notified")          cls = "max-notified";
+    else if (s === "acknowledged") cls = "max-acked";
+    html += `<span class="alarm-pill ${cls}" title="${fmtThresholdMax(tr)}">🎯</span>`;
   }
   if (hasSqz) {
-    const s = states.squeeze;
-    let icon = "⚡", cls = "squeeze-watching";
-    if (s === "triggered")          { icon = "⚡"; cls = "squeeze-triggered"; }
-    else if (s === "acknowledged")  { icon = "✓";  cls = "squeeze-acked"; }
-    html += `<span class="alarm-pill ${cls}">${icon} ≥${fmtThresholdSqueeze(tr)}</span>`;
+    // ⚡ = Short-Squeeze-Alarm.
+    let cls = "squeeze-watching"; const s = states.squeeze;
+    if (s === "triggered")          cls = "squeeze-triggered";
+    else if (s === "acknowledged")  cls = "squeeze-acked";
+    html += `<span class="alarm-pill ${cls}" title="≥${fmtThresholdSqueeze(tr)}">⚡</span>`;
   }
   return html;
 }
