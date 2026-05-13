@@ -1298,28 +1298,38 @@ function hideLockScreen() {
   }, 760);
 }
 
-// Erfolgreicher Code → Pentagon-Loader für 5 Sekunden, dann App.
+// Erfolgreicher Code → Hexagon-Loader für 5 Sekunden, dann App.
+// In der Zeit läuft im Hintergrund: JSONBin-Pull + Live-Kurs-Refresh. Wenn die
+// Calls binnen 5s zurückkommen, ist die App beim Erscheinen schon current.
+// Brauchen sie länger, schließt der Loader trotzdem nach 5s und die Daten
+// rieseln im Hintergrund weiter rein — visuelle Reibungsfreiheit > Vollständigkeit.
 function unlockWithLoader() {
   const ls = document.getElementById("lock-screen");
   const loader = document.getElementById("lock-loader-overlay");
   if (!loader) { hideLockScreen(); return; }
-  // Hexagon-Snake-Animation neu anstoßen (falls schon mal gelaufen)
   const poly = loader.querySelector(".hexagon-snake");
   if (poly) { poly.style.animation = "none"; void poly.offsetWidth; poly.style.animation = ""; }
-  // Lock-Screen wegmachen (instant, kein Slide), Loader öffnen
   if (ls) ls.classList.remove("open");
   loader.classList.add("open");
-  // Nach 5s Loader-Animation: fade out, danach loader weg + App ist sichtbar
+  appUnlocked = true;
+
+  // Parallel zur Loader-Animation Daten synchronisieren
+  try {
+    if (syncSettings.enabled) {
+      Promise.resolve(syncFull()).catch(e => console.error("unlock sync error:", e));
+    }
+    if (priceSettings.workerUrl && trades.length > 0) {
+      Promise.resolve(refreshAll(true)).catch(e => console.error("unlock refresh error:", e));
+    }
+  } catch (e) { /* ignore — beste Mühe */ }
+
   setTimeout(() => {
     loader.classList.add("fade-out");
     setTimeout(() => {
       loader.classList.remove("open");
       loader.classList.remove("fade-out");
-      appUnlocked = true;
     }, 360);
   }, 5000);
-  // appUnlocked schon hier setzen, damit kein zweites visibilitychange triggert
-  appUnlocked = true;
 }
 
 function fmtFreezeCountdown(ms) {
