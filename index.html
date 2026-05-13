@@ -211,7 +211,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .menu-sheet button { justify-content: flex-start; text-align: left; width: 100%; }
 .io-textarea { width: 100%; min-height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; resize: vertical; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
-.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: stretch; justify-content: center; padding: 4vh 24px 10vh; overflow: hidden; transition: transform 0.75s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.75s ease-in-out; }
+.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: stretch; justify-content: center; padding: 4vh 24px 5vh; overflow: hidden; transition: transform 0.75s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.75s ease-in-out; }
 .lock-screen.open { display: flex; }
 .lock-screen.unlocking { transform: translateX(-100%); opacity: 0; }
 .lock-spacer { flex: 1; min-height: 20px; }
@@ -253,12 +253,12 @@ body::before {
 .lock-dot.filled { background: var(--text); border-color: var(--text); transform: scale(1.05); }
 .lock-dots.shake { animation: lockshake 0.4s; }
 .lock-error-strong { font-size: 17px; font-weight: 800; color: var(--neg); letter-spacing: 0.5px; padding: 5px 0 9px; text-transform: uppercase; }
-.lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 290px; margin-top: 4px; }
-.kp-btn { aspect-ratio: 1; min-height: 64px; font-size: 30px; font-weight: 400; background: var(--card); border: none; border-radius: 50%; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: filter 0.18s ease-out, transform 0.14s ease-out, box-shadow 0.18s ease-out; font-variant-numeric: tabular-nums; padding: 0; position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-.kp-btn:active, .kp-btn.pressed { filter: brightness(0.82); transform: scale(0.90); box-shadow: 0 0 0 7px rgba(127,127,127,0.22), 0 4px 14px rgba(0,0,0,0.18); }
+.lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 230px; margin-top: 4px; }
+.kp-btn { aspect-ratio: 1; min-height: 52px; font-size: 25px; font-weight: 400; background: var(--card); border: none; border-radius: 50%; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.06s linear, color 0.06s linear, transform 0.12s ease-out, box-shadow 0.18s ease-out; font-variant-numeric: tabular-nums; padding: 0; position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.kp-btn:active, .kp-btn.pressed { background-color: var(--text); color: var(--bg); transform: scale(0.94); box-shadow: 0 0 0 5px rgba(127,127,127,0.20); }
 .kp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.kp-btn.empty { background: transparent; border: none; pointer-events: none; }
-.kp-btn.back { font-size: 22px; font-weight: 600; }
+.kp-btn.empty { background: transparent; border: none; pointer-events: none; box-shadow: none; }
+.kp-btn.back { font-size: 19px; font-weight: 600; }
 @keyframes dotPop { 0% { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1.05); opacity: 1; } }
 .lock-dot.filled { animation: dotPop 0.18s ease-out; }
 /* Pentagon-Loader nach erfolgreichem Code */
@@ -2829,7 +2829,7 @@ document.querySelectorAll("#lock-keypad .kp-btn").forEach(btn => {
     const k = btn.getAttribute("data-kp");
     if (!k || k === "empty") return;
     btn.classList.remove("pressed"); void btn.offsetWidth; btn.classList.add("pressed");
-    setTimeout(() => btn.classList.remove("pressed"), 160);
+    setTimeout(() => btn.classList.remove("pressed"), 200);
     onKeypadPress(k);
   });
 });
