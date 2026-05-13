@@ -211,8 +211,19 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .menu-sheet button { justify-content: flex-start; text-align: left; width: 100%; }
 .io-textarea { width: 100%; min-height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; resize: vertical; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
-.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 24px; }
+.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 24px; overflow: hidden; }
 .lock-screen.open { display: flex; }
+.lock-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 280'><path d='M30 110 C30 40 80 20 120 20 C160 20 210 40 210 110 L210 220 C210 258 178 270 145 270 L95 270 C62 270 30 258 30 220 Z' stroke='white' stroke-width='3' fill='none'/><path d='M55 35 L62 6 L88 32 Z' fill='white'/><path d='M185 35 L178 6 L152 32 Z' fill='white'/><circle cx='80' cy='110' r='35' stroke='white' stroke-width='4' fill='none'/><circle cx='160' cy='110' r='35' stroke='white' stroke-width='4' fill='none'/><circle cx='80' cy='110' r='12' fill='white'/><circle cx='160' cy='110' r='12' fill='white'/><path d='M108 150 L120 170 L132 150 Z' fill='white'/><path d='M65 205 L120 240 L175 205' stroke='white' stroke-width='3' fill='none'/><path d='M40 170 Q60 210 50 245' stroke='white' stroke-width='2.5' fill='none'/><path d='M200 170 Q180 210 190 245' stroke='white' stroke-width='2.5' fill='none'/></svg>") center 42% / min(78vmin, 460px) auto no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 280'><path d='M30 110 C30 40 80 20 120 20 C160 20 210 40 210 110 L210 220 C210 258 178 270 145 270 L95 270 C62 270 30 258 30 220 Z' stroke='white' stroke-width='3' fill='none'/><path d='M55 35 L62 6 L88 32 Z' fill='white'/><path d='M185 35 L178 6 L152 32 Z' fill='white'/><circle cx='80' cy='110' r='35' stroke='white' stroke-width='4' fill='none'/><circle cx='160' cy='110' r='35' stroke='white' stroke-width='4' fill='none'/><circle cx='80' cy='110' r='12' fill='white'/><circle cx='160' cy='110' r='12' fill='white'/><path d='M108 150 L120 170 L132 150 Z' fill='white'/><path d='M65 205 L120 240 L175 205' stroke='white' stroke-width='3' fill='none'/><path d='M40 170 Q60 210 50 245' stroke='white' stroke-width='2.5' fill='none'/><path d='M200 170 Q180 210 190 245' stroke='white' stroke-width='2.5' fill='none'/></svg>") center 42% / min(78vmin, 460px) auto no-repeat;
+  background-color: var(--text);
+  opacity: 0.07;
+  pointer-events: none;
+}
+.lock-box { position: relative; z-index: 1; }
 .lock-box { width: 100%; max-width: 355px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 30px 20px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0; }
 .lock-app-title { font-size: 27px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 6px; }
 .lock-app-sub { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
@@ -221,12 +232,12 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .lock-dot.filled { background: var(--text); border-color: var(--text); transform: scale(1.05); }
 .lock-dots.shake { animation: lockshake 0.4s; }
 .lock-error-strong { font-size: 17px; font-weight: 800; color: var(--neg); letter-spacing: 0.5px; padding: 5px 0 9px; text-transform: uppercase; }
-.lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; width: 100%; max-width: 275px; margin-top: 4px; }
-.kp-btn { aspect-ratio: 1.38; min-height: 54px; font-size: 27px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 14px; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.08s, transform 0.05s; font-variant-numeric: tabular-nums; padding: 0; }
+.lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 290px; margin-top: 4px; }
+.kp-btn { aspect-ratio: 1.32; min-height: 58px; font-size: 29px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 15px; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.08s, transform 0.05s; font-variant-numeric: tabular-nums; padding: 0; }
 .kp-btn:active { background: rgba(127,127,127,0.28); transform: scale(0.94); }
 .kp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .kp-btn.empty { background: transparent; border: none; pointer-events: none; }
-.kp-btn.back { font-size: 21px; font-weight: 600; }
+.kp-btn.back { font-size: 22px; font-weight: 600; }
 .lock-box input { width: 100%; padding: 14px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; background: var(--bg); color: var(--text); text-align: center; letter-spacing: 2px; -webkit-appearance: none; appearance: none; }
 input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 .lock-match { font-size: 12px; padding: 8px 12px; border-radius: 7px; margin-top: 6px; font-weight: 500; }
