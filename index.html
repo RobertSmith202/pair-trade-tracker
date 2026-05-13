@@ -213,10 +213,20 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
 .lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 24px; }
 .lock-screen.open { display: flex; }
-.lock-box { width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 22px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
-.lock-icon { font-size: 42px; line-height: 1; margin-bottom: 4px; }
-.lock-title { font-size: 20px; font-weight: 700; color: var(--text); }
-.lock-sub { font-size: 13px; color: var(--muted); margin-top: -8px; }
+.lock-box { width: 100%; max-width: 360px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 32px 22px 26px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0; }
+.lock-app-title { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 6px; }
+.lock-app-sub { font-size: 14px; color: var(--muted); margin-bottom: 22px; }
+.lock-dots { display: flex; gap: 14px; justify-content: center; margin: 6px 0 22px; min-height: 18px; }
+.lock-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--muted); background: transparent; transition: background-color 0.12s, border-color 0.12s, transform 0.12s; }
+.lock-dot.filled { background: var(--text); border-color: var(--text); transform: scale(1.05); }
+.lock-dots.shake { animation: lockshake 0.4s; }
+.lock-error-strong { font-size: 17px; font-weight: 800; color: var(--neg); letter-spacing: 0.5px; padding: 6px 0 10px; text-transform: uppercase; }
+.lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 280px; margin-top: 4px; }
+.kp-btn { aspect-ratio: 1.35; min-height: 56px; font-size: 28px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 14px; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.08s, transform 0.05s; font-variant-numeric: tabular-nums; }
+.kp-btn:active { background: rgba(127,127,127,0.28); transform: scale(0.95); }
+.kp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.kp-btn.empty { background: transparent; border: none; pointer-events: none; }
+.kp-btn.back { font-size: 22px; font-weight: 600; }
 .lock-box input { width: 100%; padding: 14px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; background: var(--bg); color: var(--text); text-align: center; letter-spacing: 2px; -webkit-appearance: none; appearance: none; }
 input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 .lock-match { font-size: 12px; padding: 8px 12px; border-radius: 7px; margin-top: 6px; font-weight: 500; }
@@ -258,13 +268,37 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 <body>
 <div class="lock-screen" id="lock-screen" aria-hidden="true">
   <div class="lock-box">
-    <div class="lock-icon" aria-hidden="true">🔒</div>
-    <div class="lock-title" data-i18n="lock_title">App gesperrt</div>
-    <div class="lock-sub" id="lock-sub" data-i18n="lock_sub">Bitte Code eingeben</div>
-    <input id="lock-input" type="password" autocapitalize="off" autocorrect="off" autocomplete="current-password" aria-label="Code">
-    <div class="lock-error" id="lock-error" style="display:none"></div>
+    <div class="lock-app-title" data-i18n="app_title">Pair Trade Tracker</div>
+    <div class="lock-app-sub" id="lock-sub" data-i18n="lock_sub">Code eingeben</div>
+
+    <!-- PIN-Mode UI: Dot-Indicators -->
+    <div class="lock-dots" id="lock-dots" style="display:none"></div>
+
+    <!-- Password-Mode UI: Standard-Input (für iOS-Keyboard) -->
+    <input id="lock-input" type="password" autocapitalize="off" autocorrect="off" autocomplete="current-password" aria-label="Code" style="display:none">
+
+    <div class="lock-error-strong" id="lock-error" style="display:none"></div>
     <div class="lock-freeze" id="lock-freeze" style="display:none"></div>
-    <button id="lock-submit" class="primary" data-i18n="lock_unlock">Entsperren</button>
+
+    <!-- PIN-Mode UI: Custom 3×4 Keypad -->
+    <div class="lock-keypad" id="lock-keypad" style="display:none">
+      <button type="button" class="kp-btn" data-kp="1">1</button>
+      <button type="button" class="kp-btn" data-kp="2">2</button>
+      <button type="button" class="kp-btn" data-kp="3">3</button>
+      <button type="button" class="kp-btn" data-kp="4">4</button>
+      <button type="button" class="kp-btn" data-kp="5">5</button>
+      <button type="button" class="kp-btn" data-kp="6">6</button>
+      <button type="button" class="kp-btn" data-kp="7">7</button>
+      <button type="button" class="kp-btn" data-kp="8">8</button>
+      <button type="button" class="kp-btn" data-kp="9">9</button>
+      <button type="button" class="kp-btn empty" data-kp="empty" aria-hidden="true"></button>
+      <button type="button" class="kp-btn" data-kp="0">0</button>
+      <button type="button" class="kp-btn back" data-kp="back" aria-label="back">⌫</button>
+    </div>
+
+    <!-- Password-Mode UI: klassischer Submit-Button -->
+    <button id="lock-submit" class="primary" data-i18n="lock_unlock" style="display:none">Entsperren</button>
+
     <div id="lock-recovery-toggle" class="lock-recovery-toggle" data-i18n="lock_forgot">Passwort vergessen?</div>
     <div id="lock-recovery" class="lock-recovery" style="display:none">
       <div class="lock-recovery-info" data-i18n="lock_forgot_info">Gib deinen JSONBin Master-Key ein, um die Sperre zu entfernen.</div>
@@ -623,8 +657,8 @@ const STRINGS = {
     alarm_max_acknowledged: "✓ Gewinn quittiert · neue Nachricht erst wenn unter {pct} und dann wieder darüber",
     menu_actions: "Aktionen", menu_data_mgmt: "Datenverwaltung", menu_sync_now: "Jetzt syncen",
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
-    lock_title: "App gesperrt", lock_sub: "Bitte Code eingeben", lock_unlock: "Entsperren",
-    lock_wrong: "Falscher Code",
+    lock_title: "App gesperrt", lock_sub: "Code eingeben", lock_unlock: "Entsperren",
+    lock_wrong: "Zugriff verweigert",
     lock_freeze_msg: "Zu viele Falsch-Eingaben. Eingabe gesperrt — nur über Master-Key entsperrbar.",
     lock_forgot: "Passwort vergessen?",
     lock_forgot_info: "Gib deinen JSONBin Master-Key ein. Wenn er mit dem gespeicherten übereinstimmt, wird die Sperre entfernt und du bist drin.",
@@ -753,8 +787,8 @@ const STRINGS = {
     alarm_max_acknowledged: "✓ Profit acknowledged · next message only when below {pct} and back above",
     menu_actions: "Actions", menu_data_mgmt: "Data management", menu_sync_now: "Sync now",
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
-    lock_title: "App locked", lock_sub: "Please enter code", lock_unlock: "Unlock",
-    lock_wrong: "Wrong code",
+    lock_title: "App locked", lock_sub: "Enter code", lock_unlock: "Unlock",
+    lock_wrong: "Access denied",
     lock_freeze_msg: "Too many wrong attempts. Input frozen — only master key unlocks now.",
     lock_forgot: "Forgot password?",
     lock_forgot_info: "Enter your JSONBin master key. If it matches the stored one, the lock is removed and you're in.",
@@ -896,8 +930,13 @@ let lockHiddenAt = 0;          // when did the app go into background most recen
 function loadLockSettings() {
   try {
     const v = JSON.parse(localStorage.getItem(LOCK_KEY) || "{}");
-    return { enabled: !!v.enabled, type: v.type === "pin" ? "pin" : "password", hash: v.hash || null };
-  } catch { return { enabled: false, type: "password", hash: null }; }
+    return {
+      enabled: !!v.enabled,
+      type: v.type === "pin" ? "pin" : "password",
+      hash: v.hash || null,
+      pinLength: v.type === "pin" ? (Number(v.pinLength) || 0) : 0
+    };
+  } catch { return { enabled: false, type: "password", hash: null, pinLength: 0 }; }
 }
 function saveLockSettings(s) { try { localStorage.setItem(LOCK_KEY, JSON.stringify(s)); } catch {} }
 
@@ -953,12 +992,90 @@ function applyInputModeForCode(inp, mode) {
   }
 }
 
+// Aktiver Eingabe-State im PIN-Modus. Wird beim Tippen auf Keypad-Buttons
+// erweitert/gekürzt, beim Erfolg/Failed auf "" zurückgesetzt.
+let pinEntry = "";
+
+function renderLockDots() {
+  const wrap = document.getElementById("lock-dots"); if (!wrap) return;
+  // Anzahl Dots = max(pinLength aus Settings, aktuelle Eingabe-Länge, 4 als Mindestanzeige)
+  const stored = Number(lockSettings.pinLength) || 0;
+  const target = Math.max(stored, pinEntry.length, 4);
+  // Re-build the DOM nodes only if count changed; otherwise just toggle .filled
+  if (wrap.childElementCount !== target) {
+    wrap.innerHTML = "";
+    for (let i = 0; i < target; i++) {
+      const d = document.createElement("span");
+      d.className = "lock-dot";
+      wrap.appendChild(d);
+    }
+  }
+  Array.from(wrap.children).forEach((d, i) => d.classList.toggle("filled", i < pinEntry.length));
+}
+
+function clearPinEntry() {
+  pinEntry = "";
+  renderLockDots();
+}
+
 function configureLockInputType() {
+  const isPin = lockSettings.type === "pin";
   const inp = document.getElementById("lock-input");
-  applyInputModeForCode(inp, lockSettings.type === "pin" ? "pin" : "password");
-  if (inp) inp.value = "";
+  const submit = document.getElementById("lock-submit");
+  const keypad = document.getElementById("lock-keypad");
+  const dots = document.getElementById("lock-dots");
+  if (isPin) {
+    if (inp) { inp.style.display = "none"; inp.value = ""; }
+    if (submit) submit.style.display = "none";
+    if (keypad) keypad.style.display = "grid";
+    if (dots) dots.style.display = "flex";
+    clearPinEntry();
+  } else {
+    // Password-Mode: native Input + iOS-Keyboard
+    if (inp) {
+      inp.style.display = "block";
+      applyInputModeForCode(inp, "password");
+      inp.value = "";
+    }
+    if (submit) submit.style.display = "block";
+    if (keypad) keypad.style.display = "none";
+    if (dots) dots.style.display = "none";
+    pinEntry = "";
+  }
   const err = document.getElementById("lock-error");
   if (err) err.style.display = "none";
+}
+
+// Keypad-Tastendruck: Ziffer hängt sich an pinEntry an. Backspace löscht
+// letztes Zeichen. Auto-Submit, sobald pinLength erreicht ist (falls bekannt).
+async function onKeypadPress(key) {
+  // Defensive: wenn gerade Freeze aktiv ist, ignorieren (Buttons sind dann disabled,
+  // aber falls jemand sie über DOM-Manipulation auslöst, hier nochmal blocken)
+  const state = loadLockAttempts();
+  if (state.freezeUntil > Date.now()) return;
+  const err = document.getElementById("lock-error");
+  if (err && err.style.display !== "none") err.style.display = "none";
+  if (key === "back") {
+    if (pinEntry.length > 0) {
+      pinEntry = pinEntry.slice(0, -1);
+      renderLockDots();
+    }
+    return;
+  }
+  if (!/^[0-9]$/.test(key)) return;
+  pinEntry += key;
+  renderLockDots();
+  // Auto-Submit wenn Länge der gespeicherten PIN erreicht
+  const targetLen = Number(lockSettings.pinLength) || 0;
+  if (targetLen > 0 && pinEntry.length === targetLen) {
+    await attemptUnlock();
+    return;
+  }
+  // Falls Länge nicht bekannt (Legacy-Lock ohne pinLength): nach 6 Ziffern probieren,
+  // dann nach jedem weiteren Tipper. Reset wenn falsch.
+  if (targetLen === 0 && pinEntry.length >= 6) {
+    await attemptUnlock();
+  }
 }
 
 // Settings: re-applies the keyboard/mask mode to the new + confirm fields based
@@ -1049,7 +1166,12 @@ async function applyLockChange() {
   }
   if (state.action !== "set") return; // button shouldn't have been enabled
   const hash = await hashCode(state.code);
-  lockSettings = { enabled: true, type: state.type, hash };
+  lockSettings = {
+    enabled: true,
+    type: state.type,
+    hash,
+    pinLength: state.type === "pin" ? state.code.length : 0
+  };
   saveLockSettings(lockSettings);
   resetLockAttempts();
   // Clear the input fields so the bullets don't linger
@@ -1064,6 +1186,7 @@ async function applyLockChange() {
 function showLockScreen() {
   appUnlocked = false;
   configureLockInputType();
+  renderLockDots(); // PIN-Dots in den initialen Zustand (alle leer)
   // Always start with the recovery section collapsed so it isn't a one-click bypass
   const rec = document.getElementById("lock-recovery");
   if (rec) rec.style.display = "none";
@@ -1076,10 +1199,13 @@ function showLockScreen() {
   // Falls noch ein laufender Freeze besteht (z.B. Safari neu geöffnet während Freeze) —
   // sofort UI darauf abstimmen und Countdown anzeigen.
   updateLockFreezeUi();
-  setTimeout(() => {
-    const inp = document.getElementById("lock-input");
-    if (inp && !inp.disabled) inp.focus();
-  }, 120);
+  // Focus nur im Passwort-Mode (Custom-Keypad braucht keinen Focus auf einem Input).
+  if (lockSettings.type !== "pin") {
+    setTimeout(() => {
+      const inp = document.getElementById("lock-input");
+      if (inp && !inp.disabled) inp.focus();
+    }, 120);
+  }
 }
 function hideLockScreen() {
   const ls = document.getElementById("lock-screen");
@@ -1100,6 +1226,7 @@ function fmtFreezeCountdown(ms) {
 function updateLockFreezeUi() {
   const inp = document.getElementById("lock-input");
   const submit = document.getElementById("lock-submit");
+  const keypadBtns = document.querySelectorAll("#lock-keypad .kp-btn");
   const freezeBox = document.getElementById("lock-freeze");
   const err = document.getElementById("lock-error");
   const state = loadLockAttempts();
@@ -1107,6 +1234,8 @@ function updateLockFreezeUi() {
   if (remaining > 0) {
     if (inp) { inp.disabled = true; inp.value = ""; }
     if (submit) submit.disabled = true;
+    keypadBtns.forEach(b => { if (!b.classList.contains("empty")) b.disabled = true; });
+    pinEntry = ""; renderLockDots();
     if (err) err.style.display = "none";
     if (freezeBox) {
       freezeBox.style.display = "block";
@@ -1116,20 +1245,27 @@ function updateLockFreezeUi() {
       lockFreezeTimer = setInterval(updateLockFreezeUi, 1000);
     }
   } else {
-    // Freeze abgelaufen oder gar nicht aktiv
     if (lockFreezeTimer) { clearInterval(lockFreezeTimer); lockFreezeTimer = null; }
     if (inp) inp.disabled = false;
     if (submit) submit.disabled = false;
+    keypadBtns.forEach(b => { b.disabled = false; });
     if (freezeBox) freezeBox.style.display = "none";
   }
 }
 
 async function attemptUnlock() {
-  const inp = document.getElementById("lock-input"); if (!inp) return;
+  const isPin = lockSettings.type === "pin";
+  // Eingabe-Quelle hängt vom Modus ab
+  let v;
+  if (isPin) {
+    v = pinEntry;
+  } else {
+    const inp = document.getElementById("lock-input"); if (!inp) return;
+    v = inp.value;
+  }
   // Defensive: wenn die UI fehlerhaft trotz Freeze einen Submit zulässt, hier blocken
   const state = loadLockAttempts();
   if (state.freezeUntil > Date.now()) { updateLockFreezeUi(); return; }
-  const v = inp.value;
   if (!v) return;
   const h = await hashCode(v);
   if (h === lockSettings.hash) {
@@ -1146,8 +1282,19 @@ async function attemptUnlock() {
     saveLockAttempts(next);
     const err = document.getElementById("lock-error");
     if (err) { err.textContent = t("lock_wrong"); err.style.display = "block"; }
-    inp.value = "";
-    inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake");
+    if (isPin) {
+      // Dots shaken, PIN-Entry leeren
+      const dots = document.getElementById("lock-dots");
+      if (dots) { dots.classList.remove("shake"); void dots.offsetWidth; dots.classList.add("shake"); }
+      pinEntry = "";
+      renderLockDots();
+    } else {
+      const inp = document.getElementById("lock-input");
+      if (inp) {
+        inp.value = "";
+        inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake");
+      }
+    }
     updateLockFreezeUi();
   }
 }
@@ -2555,6 +2702,13 @@ document.addEventListener("visibilitychange", () => {
 // Lock-screen handlers
 document.getElementById("lock-submit").addEventListener("click", attemptUnlock);
 document.getElementById("lock-input").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); attemptUnlock(); } });
+// Custom-Keypad: click-Handler pro Button, dispatcht über data-kp-Attribut
+document.querySelectorAll("#lock-keypad .kp-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const k = btn.getAttribute("data-kp");
+    if (k && k !== "empty") onKeypadPress(k);
+  });
+});
 document.getElementById("lock-recovery-toggle").addEventListener("click", toggleLockRecovery);
 document.getElementById("lock-recovery-submit").addEventListener("click", attemptLockRecovery);
 document.getElementById("lock-recovery-input").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); attemptLockRecovery(); } });
