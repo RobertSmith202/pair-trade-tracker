@@ -1,32 +1,45 @@
-// Pair Trade Tracker — Cloudflare Worker (Type-aware: pair / long / short)
-// Two-threshold alarm with per-threshold mode (single-leg trades only):
-//   • Loss  threshold — alertPctMin (mode "pct") or alertPriceMin (mode "price"), repeats every 3 min until ack
-//   • Profit threshold — alertPctMax (mode "pct") or alertPriceMax (mode "price"), repeats every 30 min until ack
-// Pair trades only support pct mode (no single quoted price for a spread).
+// Pair Trade Tracker — Cloudflare Worker
+// Three Alarm-Typen:
+//   • Loss   — alertPctMin / alertPriceMin, alle 3 Min wiederholt bis ack (Cron: */3 * * * *)
+//   • Profit — alertPctMax / alertPriceMax, alle 30 Min wiederholt bis ack (Cron: */3 * * * *)
+//   • Short-Squeeze — alertShortPct, einmal täglich wiederholt bis ack (Cron: beliebige Tageszeit, z.B. "0 17 * * *" für 17:00 UTC)
+// Pair-Trades: nur pct-Mode für Loss/Profit (Spread hat keinen Quoted Price).
+// Short-Squeeze nur für type=short oder pair (überwacht in beiden Fällen shortTicker).
+// Cron-Dispatch: "*/3 ..."-Pattern → Loss/Profit-Check, alles andere → Squeeze-Check.
 const ALERT_REPEAT_MS = 3 * 60 * 1000;
 const PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000;
+// Robuste Cron-Dispatch: der schnelle Loss/Profit-Cron startet mit "*/3 " (3-Min-Intervall).
+// Alles andere (z.B. "0 17 * * *" für täglich 17:00 UTC) wird als Squeeze-Cron behandelt.
+// Damit kannst du die Squeeze-Cron-Zeit im Cloudflare-Dashboard frei ändern ohne Code-Update.
+const FAST_CRON_PREFIX = "*/3";
 const TRADING_START_HOUR = 9;
 const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 
 const WORKER_STRINGS = {
   de: {
-    alarm_title:"🚨 ALARM", profit_title:"🎯 GEWINN-SCHWELLE ERREICHT",
+    alarm_title:"🚨 VERLUST-SCHWELLE ÜBERSCHRITTEN", profit_title:"🎯 GEWINN-SCHWELLE ERREICHT",
+    squeeze_title:"⚡ SHORT-SQUEEZE-ALARM",
     pair:"Paar", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen",
     current_price:"Aktueller Kurs",
+    short_interest:"Short-Interest", days_to_cover:"Days to Cover", data_as_of:"Datenstand",
     ack_prompt:"→ Antworte mit beliebigem Text, um den Alarm zu bestätigen",
     profit_ack_prompt:"→ Antworte mit beliebigem Text, um den Gewinn-Alarm zu bestätigen (Wiederholung alle 30 Min)",
+    squeeze_ack_prompt:"→ Antworte mit beliebigem Text, um den Squeeze-Alarm zu quittieren (Wiederholung 1× pro Tag)",
     ack_received:"✅ Alarm bestätigt",
     test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen."
   },
   en: {
-    alarm_title:"🚨 ALERT", profit_title:"🎯 PROFIT THRESHOLD REACHED",
+    alarm_title:"🚨 LOSS THRESHOLD BREACHED", profit_title:"🎯 PROFIT THRESHOLD REACHED",
+    squeeze_title:"⚡ SHORT-SQUEEZE ALERT",
     pair:"Pair", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches",
     current_price:"Current price",
+    short_interest:"Short interest", days_to_cover:"Days to cover", data_as_of:"Data as of",
     ack_prompt:"→ Reply with any text to acknowledge the alert",
     profit_ack_prompt:"→ Reply with any text to acknowledge the profit alert (repeats every 30 min)",
+    squeeze_ack_prompt:"→ Reply with any text to acknowledge the squeeze alert (repeats 1× per day)",
     ack_received:"✅ Alert acknowledged",
     test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge."
   }
@@ -189,21 +202,132 @@ function buildAlarmMessage(lang, trade, kind, mode, perfPct, pnl, notionalNow, t
   return lines.join("\n");
 }
 
-// Migrate legacy alertState format to {min, max} structure
+// Migrate legacy alertState format to {min, max, squeeze} structure
 function ensureStateShape(st) {
-  if (!st || typeof st !== "object") return { min: { state: "idle", lastAlertAt: 0 }, max: { state: "idle", lastAlertAt: 0 } };
-  // New structure already
-  if (st.min || st.max) {
+  const empty = { state: "idle", lastAlertAt: 0 };
+  if (!st || typeof st !== "object") return { min: { ...empty }, max: { ...empty }, squeeze: { ...empty } };
+  if (st.min || st.max || st.squeeze) {
     return {
-      min: st.min || { state: "idle", lastAlertAt: 0 },
-      max: st.max || { state: "idle", lastAlertAt: 0 }
+      min: st.min || { ...empty },
+      max: st.max || { ...empty },
+      squeeze: st.squeeze || { ...empty }
     };
   }
-  // Legacy flat: {state, lastAlertAt} → migrate into min, max defaults
+  // Legacy flat: {state, lastAlertAt} → migrate into min slot only
   return {
     min: { state: st.state || "idle", lastAlertAt: st.lastAlertAt || 0 },
-    max: { state: "idle", lastAlertAt: 0 }
+    max: { ...empty },
+    squeeze: { ...empty }
   };
+}
+
+// Holt Short-Interest-Statistiken via Yahoo quoteSummary defaultKeyStatistics.
+// Liefert nur dann sinnvolle Werte, wenn Yahoo für den Ticker entsprechende
+// Pflichtmeldungen verfügbar hat — primär US-Listings.
+async function fetchShortInterest(symbol) {
+  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=defaultKeyStatistics`;
+  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 PairTradeTracker" } });
+  if (!r.ok) throw new Error("yahoo http " + r.status);
+  const data = await r.json();
+  const stats = data?.quoteSummary?.result?.[0]?.defaultKeyStatistics;
+  if (!stats) return null;
+  // Yahoo liefert die Felder als {raw: <num>, fmt: "<string>"}. Wir wollen die rohen Zahlen.
+  const raw = (x) => (x && typeof x === "object" && "raw" in x) ? x.raw : x;
+  const shortPctFloat = raw(stats.shortPercentOfFloat);
+  if (shortPctFloat == null || !isFinite(shortPctFloat)) return null;
+  return {
+    shortPercentOfFloat: shortPctFloat * 100,  // Yahoo gibt als Dezimalbruch (0.285) → wir wollen %
+    sharesShort: raw(stats.sharesShort),
+    sharesShortPriorMonth: raw(stats.sharesShortPriorMonth),
+    shortRatio: raw(stats.shortRatio),  // Days to Cover
+    dateShortInterest: raw(stats.dateShortInterest)  // Unix-Timestamp
+  };
+}
+
+function buildSqueezeMessage(lang, trade, shortPct, threshold, shortInfo) {
+  const type = tradeType(trade);
+  const typeLabel = (type === "short") ? workerT(lang, "short_only") : workerT(lang, "pair");
+  const displayName = trade.name || (type === "short" ? trade.shortTicker : (trade.longTicker + " / " + trade.shortTicker));
+  const lines = [
+    workerT(lang, "squeeze_title"), "",
+    typeLabel + ": " + displayName,
+    workerT(lang, "short_interest") + ": " + shortPct.toFixed(2) + "% (Float)",
+    workerT(lang, "threshold") + ": ≥ " + threshold.toFixed(2) + "%"
+  ];
+  if (shortInfo.shortRatio != null && isFinite(shortInfo.shortRatio)) {
+    lines.push(workerT(lang, "days_to_cover") + ": " + shortInfo.shortRatio.toFixed(2));
+  }
+  if (shortInfo.dateShortInterest) {
+    const d = new Date(shortInfo.dateShortInterest * 1000);
+    const dateStr = d.toISOString().slice(0, 10); // YYYY-MM-DD
+    lines.push(workerT(lang, "data_as_of") + ": " + dateStr);
+  }
+  lines.push("");
+  lines.push(workerT(lang, "squeeze_ack_prompt"));
+  return lines.join("\n");
+}
+
+// Daily check: für jeden Trade vom Typ short oder pair mit gesetztem alertShortPct
+// → Short-Interest von Yahoo holen und gegen Schwelle prüfen. Identische
+// State-Maschine wie Loss/Profit (idle → triggered → acknowledged → idle).
+async function runShortSqueezeCheck(env) {
+  const record = await jsonbinRead(env);
+  const trades = record.trades || [];
+  const lang = record.lang || "de";
+  const states = record.alertStates || {};
+  let stateChanged = false;
+  const results = [];
+  const now = Date.now();
+
+  for (const trade of trades) {
+    const id = trade.id;
+    const type = tradeType(trade);
+    // Nur short-only und pair (für pair: shortTicker, gleiche Logik wie short-only).
+    // Long-only bewusst ausgeschlossen — Robert wollte das explizit so.
+    if (type !== "short" && type !== "pair") continue;
+    const thrRaw = trade.alertShortPct;
+    if (thrRaw == null || thrRaw === "") continue;
+    const threshold = Math.abs(Number(thrRaw));
+    if (!isFinite(threshold) || threshold <= 0) continue;
+    const symbol = trade.shortTicker;
+    if (!symbol) continue;
+
+    let info;
+    try { info = await fetchShortInterest(symbol); } catch (e) { results.push({ id, error: e.message }); continue; }
+    if (!info) {
+      // Yahoo hat keine Short-Interest-Daten für diesen Ticker (typisch für nicht-US-Werte).
+      // State unverändert lassen — nicht reset auf idle, weil das Daten-Lücke und nicht Erholung ist.
+      results.push({ id, kind: "squeeze", action: "no_data" });
+      continue;
+    }
+
+    const breached = info.shortPercentOfFloat >= threshold;
+    const st = ensureStateShape(states[id]);
+    const cur = st.squeeze.state;
+    let stChanged = false;
+
+    if (breached && cur === "idle") {
+      await sendTelegram(env, buildSqueezeMessage(lang, trade, info.shortPercentOfFloat, threshold, info));
+      st.squeeze = { state: "triggered", lastAlertAt: now };
+      stChanged = true;
+      results.push({ id, kind: "squeeze", action: "triggered" });
+    } else if (breached && cur === "triggered") {
+      // Cron ist 1× pro Tag → jeder erneute breached-Treffer = täglicher Repeat
+      await sendTelegram(env, buildSqueezeMessage(lang, trade, info.shortPercentOfFloat, threshold, info));
+      st.squeeze = { state: "triggered", lastAlertAt: now };
+      stChanged = true;
+      results.push({ id, kind: "squeeze", action: "repeated" });
+    } else if (!breached && cur !== "idle") {
+      st.squeeze = { state: "idle", lastAlertAt: 0 };
+      stChanged = true;
+      results.push({ id, kind: "squeeze", action: "reset" });
+    }
+
+    if (stChanged) { states[id] = st; stateChanged = true; }
+  }
+
+  if (stateChanged) await jsonbinWrite(env, { ...record, alertStates: states });
+  return { ok: true, results };
 }
 
 async function runAlarmCheck(env) {
@@ -329,6 +453,10 @@ async function handleTelegramWebhook(req, env) {
       st.max = { state: "acknowledged", lastAlertAt: ackTs };
       touched = true;
     }
+    if (st.squeeze?.state === "triggered") {
+      st.squeeze = { state: "acknowledged", lastAlertAt: ackTs };
+      touched = true;
+    }
     if (touched) { states[id] = st; changed = true; }
   }
   if (changed) { try { await jsonbinWrite(env, { ...record, alertStates: states }); } catch {} }
@@ -350,13 +478,25 @@ export default {
     if (url.pathname === "/" || url.pathname === "") {
       const s = url.searchParams.get("symbol");
       if (s) return yahooProxy(s);
-      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /check, /test-alert, /setup-webhook, /telegram-webhook");
+      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook");
     }
     if (url.pathname === "/check") { try { return jsonResponse(await runAlarmCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
+    if (url.pathname === "/check-squeeze") { try { return jsonResponse(await runShortSqueezeCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/test-alert") return textResponse(await sendTestAlert(env));
     if (url.pathname === "/setup-webhook") return setupWebhook(req, env);
     if (url.pathname === "/telegram-webhook" && req.method === "POST") return handleTelegramWebhook(req, env);
     return textResponse("not found", 404);
   },
-  async scheduled(event, env, ctx) { ctx.waitUntil(runAlarmCheck(env).catch(e => console.error("cron error:", e))); }
+  // Mehrere Cron-Trigger im Cloudflare-Dashboard: "*/3 * * * *" für Loss/Profit,
+  // beliebige Tages-Cron (z.B. "0 17 * * *") für Short-Squeeze. Wir matchen den
+  // Fast-Cron explizit über das "*/3"-Präfix und behandeln alles andere als Squeeze.
+  // Vorteil: die Squeeze-Cron-Zeit kann im Dashboard frei geändert werden.
+  async scheduled(event, env, ctx) {
+    const cronStr = (event && event.cron) ? String(event.cron) : "";
+    if (cronStr.startsWith(FAST_CRON_PREFIX)) {
+      ctx.waitUntil(runAlarmCheck(env).catch(e => console.error("cron error:", e)));
+    } else {
+      ctx.waitUntil(runShortSqueezeCheck(env).catch(e => console.error("squeeze cron error:", e)));
+    }
+  }
 };

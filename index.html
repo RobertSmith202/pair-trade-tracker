@@ -149,6 +149,12 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .alarm-pill.max-acked { background: rgba(46,125,50,0.12); color: var(--pos); }
 .alarm-pill.triggered { background: var(--neg-bg); color: var(--neg); animation: pulse 1.5s infinite; }
 .alarm-pill.acked { background: rgba(120,120,120,0.18); color: var(--muted); }
+.alarm-pill.squeeze-watching { background: rgba(255,184,77,0.20); color: var(--warn); }
+.alarm-pill.squeeze-triggered { background: rgba(255,140,0,0.28); color: var(--warn); animation: pulse 1.5s infinite; font-weight: 800; }
+.alarm-pill.squeeze-acked { background: rgba(255,184,77,0.12); color: var(--warn); }
+.alarm-row.squeeze-watching { background: rgba(255,184,77,0.12); color: var(--warn); }
+.alarm-row.squeeze-triggered { background: rgba(255,140,0,0.20); color: var(--warn); font-weight: 700; animation: pulse 1.5s infinite; }
+.alarm-row.squeeze-acked { background: rgba(184,133,0,0.10); color: var(--warn); }
 .trade-head.tappable { cursor: pointer; user-select: none; }
 .trade-head.tappable:hover .trade-name { opacity: 0.85; }
 .tranche-panel { margin-top: 10px; padding: 10px 10px 6px; background: rgba(120,120,120,0.05); border-radius: 8px; border: 1px solid var(--border); display: none; }
@@ -341,6 +347,15 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       </div>
     </div>
     <div class="help" data-i18n="form_alarm_pct_help"></div>
+  </div>
+  <div class="form-section alarm" id="form-squeeze-section">
+    <h4 data-i18n="form_squeeze_title">⚡ Short-Squeeze-Alarm (optional)</h4>
+    <div class="field">
+      <label data-i18n="form_squeeze_label">Schwelle (% Short-Interest auf Float)</label>
+      <input id="f-alert-squeeze" type="text" inputmode="decimal" autocomplete="off" placeholder="25">
+    </div>
+    <div class="help" data-i18n="form_squeeze_help"></div>
+    <div class="info-box" id="form-squeeze-non-us" style="display:none;" data-i18n="form_squeeze_non_us_warn"></div>
   </div>
   <div class="form-actions"><button id="f-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="f-save" data-i18n="btn_save">Speichern</button></div>
 </div>
@@ -580,6 +595,14 @@ const STRINGS = {
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
     card_delete_confirm: "„{name}\" löschen?",
+    form_squeeze_title: "⚡ Short-Squeeze-Alarm (optional)",
+    form_squeeze_label: "Schwelle (% Short-Interest auf Float)",
+    form_squeeze_help: "Nur sinnvoll für US-Aktien — Yahoo liefert für nicht-US-Ticker meist keine Short-Interest-Daten. Eingabe als positive Zahl, z.B. <strong>25</strong> für „Alarm wenn ≥ 25 % der Float-Aktien leerverkauft sind”. Worker prüft einmal täglich, Telegram-Wiederholung 1× pro Tag bis quittiert.",
+    form_squeeze_non_us_warn: "⚠ Der Short-Ticker hat einen Markt-Suffix — Yahoo liefert für nicht-US-Werte sehr wahrscheinlich keine Short-Interest-Daten. Schwelle wird gespeichert, Alarm wird aber realistisch nie auslösen.",
+    alarm_squeeze_watching: "⚡ Squeeze-Alarm wachend — Schwelle ≥ {pct}",
+    alarm_squeeze_triggered: "⚡ SQUEEZE-ALARM AUSGELÖST · Schwelle ≥ {pct} — auf Telegram quittieren",
+    alarm_squeeze_acked: "✓ Squeeze quittiert · neue Nachricht erst wenn unter {pct} und dann wieder darüber",
+    err_squeeze_invalid: "Squeeze-Schwelle: ungültige Zahl. Beispiel: 25",
     alarm_watching: "🔔 Verlust-Alarm wachend — Schwelle {pct}",
     alarm_triggered: "🚨 VERLUST-ALARM AUSGELÖST · Schwelle {pct} — auf Telegram quittieren",
     alarm_acknowledged: "✓ Quittiert · wird neu scharf bei Erholung über {pct}",
@@ -695,6 +718,14 @@ const STRINGS = {
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
     card_delete_confirm: "Delete \"{name}\"?",
+    form_squeeze_title: "⚡ Short-squeeze alert (optional)",
+    form_squeeze_label: "Threshold (% short interest on float)",
+    form_squeeze_help: "Only meaningful for US stocks — Yahoo usually has no short-interest data for non-US tickers. Enter a positive number, e.g. <strong>25</strong> for „alert when ≥ 25 % of the float is shorted”. Worker checks once daily, Telegram repeats 1× per day until acknowledged.",
+    form_squeeze_non_us_warn: "⚠ The short ticker has an exchange suffix — Yahoo most likely won't have short-interest data for non-US securities. Threshold is saved, but the alert will probably never fire.",
+    alarm_squeeze_watching: "⚡ Squeeze alert armed — threshold ≥ {pct}",
+    alarm_squeeze_triggered: "⚡ SQUEEZE ALERT TRIGGERED · threshold ≥ {pct} — acknowledge on Telegram",
+    alarm_squeeze_acked: "✓ Squeeze acknowledged · next message only when below {pct} and back above",
+    err_squeeze_invalid: "Squeeze threshold: invalid number. Example: 25",
     alarm_watching: "🔔 Loss alarm armed — threshold {pct}",
     alarm_triggered: "🚨 LOSS ALARM TRIGGERED · threshold {pct} — acknowledge on Telegram",
     alarm_acknowledged: "✓ Acknowledged · re-arms when recovers above {pct}",
@@ -1480,16 +1511,17 @@ function computeTrade(tr, lp, sp) {
 // and the new {min: {...}, max: {...}} side-by-side.
 function alarmStateOf(tr) {
   const st = alertStates[tr.id];
-  if (!st) return { min: "idle", max: "idle" };
-  if (st.min || st.max) {
+  if (!st) return { min: "idle", max: "idle", squeeze: "idle" };
+  if (st.min || st.max || st.squeeze) {
     return {
       min: st.min?.state || "idle",
-      max: st.max?.state || "idle"
+      max: st.max?.state || "idle",
+      squeeze: st.squeeze?.state || "idle"
     };
   }
   // Legacy flat structure: it referred to the loss-threshold alarm only.
   const oldState = st.current || st.state || "idle";
-  return { min: oldState, max: "idle" };
+  return { min: oldState, max: "idle", squeeze: "idle" };
 }
 
 // Returns the API/quoted currency for a single-leg trade ("long"/"short").
@@ -1516,6 +1548,16 @@ function hasMaxThreshold(tr) {
   if (tr.alertMaxMode === "price") return tr.alertPriceMax != null && tr.alertPriceMax !== "";
   return tr.alertPctMax != null && tr.alertPctMax !== "";
 }
+// Squeeze-Schwelle existiert nur für short-only und pair (wird auf den
+// shortTicker angewandt). Für long-only wird sie nicht ausgewertet.
+function hasSqueezeThreshold(tr) {
+  const tp = tradeType(tr);
+  if (tp !== "short" && tp !== "pair") return false;
+  return tr.alertShortPct != null && tr.alertShortPct !== "" && Number(tr.alertShortPct) > 0;
+}
+function fmtThresholdSqueeze(tr) {
+  return fmtPct(Math.abs(Number(tr.alertShortPct)));
+}
 
 // Returns a formatted string for a threshold of a given trade (loss or profit), respecting mode.
 function fmtThresholdMin(tr) {
@@ -1530,7 +1572,8 @@ function fmtThresholdMax(tr) {
 function alarmStatusHtml(tr) {
   const hasMin = hasMinThreshold(tr);
   const hasMax = hasMaxThreshold(tr);
-  if (!hasMin && !hasMax) return "";
+  const hasSqz = hasSqueezeThreshold(tr);
+  if (!hasMin && !hasMax && !hasSqz) return "";
   const states = alarmStateOf(tr);
   let html = "";
   if (hasMin) {
@@ -1546,6 +1589,13 @@ function alarmStatusHtml(tr) {
     if (s === "idle")              html += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
     else if (s === "notified")     html += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
     else if (s === "acknowledged") html += `<div class="alarm-row max-acked">${t("alarm_max_acknowledged", { pct: thr })}</div>`;
+  }
+  if (hasSqz) {
+    const thr = fmtThresholdSqueeze(tr);
+    const s = states.squeeze;
+    if (s === "idle")              html += `<div class="alarm-row squeeze-watching">${t("alarm_squeeze_watching", { pct: thr })}</div>`;
+    else if (s === "triggered")    html += `<div class="alarm-row squeeze-triggered">${t("alarm_squeeze_triggered", { pct: thr })}</div>`;
+    else if (s === "acknowledged") html += `<div class="alarm-row squeeze-acked">${t("alarm_squeeze_acked", { pct: thr })}</div>`;
   }
   return html;
 }
@@ -1571,7 +1621,8 @@ function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
 function alarmPillHtml(tr) {
   const hasMin = hasMinThreshold(tr);
   const hasMax = hasMaxThreshold(tr);
-  if (!hasMin && !hasMax) return "";
+  const hasSqz = hasSqueezeThreshold(tr);
+  if (!hasMin && !hasMax && !hasSqz) return "";
   const states = alarmStateOf(tr);
   let html = "";
   if (hasMin) {
@@ -1587,6 +1638,13 @@ function alarmPillHtml(tr) {
     if (s === "notified")          { icon = "🎯"; cls = "max-notified"; }
     else if (s === "acknowledged") { icon = "✓";  cls = "max-acked"; }
     html += `<span class="alarm-pill ${cls}">${icon} ${fmtThresholdMax(tr)}</span>`;
+  }
+  if (hasSqz) {
+    const s = states.squeeze;
+    let icon = "⚡", cls = "squeeze-watching";
+    if (s === "triggered")          { icon = "⚡"; cls = "squeeze-triggered"; }
+    else if (s === "acknowledged")  { icon = "✓";  cls = "squeeze-acked"; }
+    html += `<span class="alarm-pill ${cls}">${icon} ≥${fmtThresholdSqueeze(tr)}</span>`;
   }
   return html;
 }
@@ -1844,6 +1902,14 @@ function applyFormTypeUI(type) {
   const shortSec = document.getElementById("form-short-section");
   longSec.style.display = (type === "pair" || type === "long") ? "block" : "none";
   shortSec.style.display = (type === "pair" || type === "short") ? "block" : "none";
+  // Squeeze-Sektion nur bei type=short oder pair — Long-only-Trades haben keinen Squeeze-Alarm
+  const squeezeSec = document.getElementById("form-squeeze-section");
+  if (squeezeSec) squeezeSec.style.display = (type === "short" || type === "pair") ? "block" : "none";
+  if (type !== "short" && type !== "pair") {
+    const sqzInput = document.getElementById("f-alert-squeeze");
+    if (sqzInput) sqzInput.value = "";
+  }
+  updateSqueezeNonUsWarning();
   // Threshold mode toggles: only show for single-leg (long/short), never for pair
   const showToggle = (type === "long" || type === "short");
   document.querySelectorAll('.thr-toggle').forEach(el => { el.style.display = showToggle ? "inline-flex" : "none"; });
@@ -1853,6 +1919,26 @@ function applyFormTypeUI(type) {
   }
   applyThresholdModeUI("min", formAlertMinMode);
   applyThresholdModeUI("max", formAlertMaxMode);
+}
+
+// Heuristik für „ist das ein US-Ticker?". Yahoo verwendet für nicht-US-Listings
+// einen Punkt-Suffix (SAP.DE, AIR.PA, RYA.IR etc.). US-Tickers haben in der
+// Regel keinen Punkt. Tickers wie BRK.B sind mit Punkt aber US — false positive
+// akzeptiert, weil dann nur die Warnung erscheint, nichts wird blockiert.
+function looksLikeNonUsTicker(symbol) {
+  if (!symbol) return false;
+  return /\./.test(symbol);
+}
+
+// Zeigt die Non-US-Warnung in der Squeeze-Sektion, sobald der überwachte
+// Ticker (= shortTicker) einen Punkt-Suffix hat. Nur sichtbar wenn die
+// Squeeze-Sektion selbst aktiv ist (type=short oder pair).
+function updateSqueezeNonUsWarning() {
+  const warn = document.getElementById("form-squeeze-non-us"); if (!warn) return;
+  const tp = formType;
+  if (tp !== "short" && tp !== "pair") { warn.style.display = "none"; return; }
+  const tk = (document.getElementById("f-short-ticker")?.value || "").trim().toUpperCase();
+  warn.style.display = (tk && looksLikeNonUsTicker(tk)) ? "block" : "none";
 }
 
 // Returns the API/quoted currency for the ticker currently typed into the form.
@@ -1950,6 +2036,9 @@ function openForm(id = null) {
     }
     applyThresholdModeUI("min", formAlertMinMode);
     applyThresholdModeUI("max", formAlertMaxMode);
+    // Squeeze-Schwelle laden (positive Prozentzahl)
+    document.getElementById("f-alert-squeeze").value = (tr.alertShortPct != null && tr.alertShortPct !== "") ? formatForInput(Math.abs(tr.alertShortPct)) : "";
+    updateSqueezeNonUsWarning();
     setMulti(isMulti);
     let alarmNote = document.getElementById("form-alarm-supertrade-note");
     if (!alarmNote) { alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box"; const alarmField = document.getElementById("f-alert-pct").closest(".field"); if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling); }
@@ -1960,7 +2049,7 @@ function openForm(id = null) {
     formAlertMaxMode = "pct";
     applyFormTypeUI(initialType);
     typeSection.style.display = (currentPage === "total") ? "block" : "none";
-    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max"].forEach(i => document.getElementById(i).value = "");
+    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max","f-alert-squeeze"].forEach(i => document.getElementById(i).value = "");
     document.getElementById("f-long-native").checked = false;
     document.getElementById("f-short-native").checked = false;
     setMulti(false);
@@ -2042,12 +2131,14 @@ function saveForm() {
   const shortEntryNative = document.getElementById("f-short-native").checked;
   const alertPctRaw = document.getElementById("f-alert-pct").value.trim();
   const alertMaxRaw = document.getElementById("f-alert-max").value.trim();
+  const alertSqzRaw = document.getElementById("f-alert-squeeze").value.trim();
   const type = formType;
   // For pair-trades, force pct mode (price thresholds make no sense on a spread).
   const minMode = (type === "long" || type === "short") ? formAlertMinMode : "pct";
   const maxMode = (type === "long" || type === "short") ? formAlertMaxMode : "pct";
   let alertPctMin = null, alertPctMax = null;
   let alertPriceMin = null, alertPriceMax = null;
+  let alertShortPct = null;
   if (alertPctRaw) {
     const p = parseDecimal(alertPctRaw);
     if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; }
@@ -2059,6 +2150,13 @@ function saveForm() {
     if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; }
     if (maxMode === "price") { alertPriceMax = Math.abs(p); }
     else                     { alertPctMax   = Math.abs(p); }
+  }
+  // Squeeze nur für short oder pair — Long-only-Trades haben kein Feld und
+  // selbst wenn Roh-Wert dabei wäre, würde er hier verworfen.
+  if (alertSqzRaw && (type === "short" || type === "pair")) {
+    const p = parseDecimal(alertSqzRaw);
+    if (!isFinite(p)) { alert(t("err_squeeze_invalid")); return; }
+    alertShortPct = Math.abs(p);
   }
   if (editingId) {
     const existing = trades.find(x => x.id === editingId);
@@ -2089,6 +2187,8 @@ function saveForm() {
     existing.alertPctMin = alertPctMin; existing.alertPctMax = alertPctMax;
     existing.alertPriceMin = alertPriceMin; existing.alertPriceMax = alertPriceMax;
     existing.alertMinMode = minMode; existing.alertMaxMode = maxMode;
+    // Squeeze nur für short/pair speichern, sonst null (kein Alarm für Long-only)
+    existing.alertShortPct = (eType === "short" || eType === "pair") ? alertShortPct : null;
     existing.updated = Date.now();
     if (!isMulti) {
       const oldT = existing.tranches[0] || {};
@@ -2150,12 +2250,19 @@ function saveForm() {
       matching.alertPriceMax = alertPriceMax;
       matching.alertMaxMode = maxMode;
     }
+    // Squeeze: nur übernehmen wenn bestehender Trade noch keinen Squeeze hat
+    // UND der bestehende Trade-Typ überhaupt Squeeze unterstützt (short/pair).
+    const matchingType = tradeType(matching);
+    if ((matchingType === "short" || matchingType === "pair") && (matching.alertShortPct == null || matching.alertShortPct === "") && alertShortPct != null) {
+      matching.alertShortPct = alertShortPct;
+    }
     matching.updated = Date.now();
     markLocalChange(); closeForm(); refreshAll(true);
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 100);
     return;
   }
-  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
+  const newAlertShortPct = (type === "short" || type === "pair") ? alertShortPct : null;
+  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, alertShortPct: newAlertShortPct, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
   markLocalChange(); closeForm(); refreshAll(true);
 }
 
@@ -2349,11 +2456,13 @@ document.querySelectorAll(".thr-toggle .tt-btn").forEach(btn => {
   });
 });
 // Keep the price-mode currency label fresh when the user types a new ticker.
+// Plus: refresh the squeeze non-US warning when the short ticker changes.
 ["f-long-ticker", "f-short-ticker"].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("input", () => {
     if (formAlertMinMode === "price") applyThresholdModeUI("min", "price");
     if (formAlertMaxMode === "price") applyThresholdModeUI("max", "price");
+    if (id === "f-short-ticker") updateSqueezeNonUsWarning();
   });
 });
 document.querySelectorAll(".page-dot").forEach(d => { d.addEventListener("click", () => scrollToPage(d.getAttribute("data-dot"), true)); });
