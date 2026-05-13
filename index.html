@@ -210,11 +210,25 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .lock-title { font-size: 20px; font-weight: 700; color: var(--text); }
 .lock-sub { font-size: 13px; color: var(--muted); margin-top: -8px; }
 .lock-box input { width: 100%; padding: 14px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; background: var(--bg); color: var(--text); text-align: center; letter-spacing: 2px; -webkit-appearance: none; appearance: none; }
+input.pin-mask { -webkit-text-security: disc; text-security: disc; }
+.lock-match { font-size: 12px; padding: 8px 12px; border-radius: 7px; margin-top: 6px; font-weight: 500; }
+.lock-match.neutral { color: var(--muted); background: transparent; border: 1px dashed var(--border); }
+.lock-match.ok { color: var(--pos); background: var(--pos-bg); }
+.lock-match.bad { color: var(--neg); background: var(--neg-bg); }
+.lock-apply-row { display: flex; gap: 8px; margin-top: 10px; }
+.lock-apply-row button { flex: 1; }
+.lock-apply-row button:disabled { opacity: 0.4; cursor: not-allowed; }
 .lock-box input:focus { outline: none; border-color: var(--info); }
 .lock-box input.shake { animation: lockshake 0.4s; }
 @keyframes lockshake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
 .lock-error { font-size: 13px; color: var(--neg); font-weight: 600; }
 .lock-box button.primary { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; }
+.lock-recovery-toggle { font-size: 13px; color: var(--info); margin-top: 4px; cursor: pointer; text-decoration: underline; padding: 8px 4px; -webkit-tap-highlight-color: transparent; }
+.lock-recovery-toggle:active { opacity: 0.7; }
+.lock-recovery { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 10px; }
+.lock-recovery-info { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.lock-recovery input { letter-spacing: 0; font-size: 13px; text-align: left; }
+.lock-recovery button { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; }
 .modal-overlay.open { display: flex; }
 .modal { background: var(--card); width: 100%; max-width: 520px; padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; overflow-y: auto; }
 .modal h1 { font-size: 22px; font-weight: 700; margin-bottom: 0; }
@@ -238,6 +252,13 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
     <input id="lock-input" type="password" autocapitalize="off" autocorrect="off" autocomplete="current-password" aria-label="Code">
     <div class="lock-error" id="lock-error" style="display:none"></div>
     <button id="lock-submit" class="primary" data-i18n="lock_unlock">Entsperren</button>
+    <div id="lock-recovery-toggle" class="lock-recovery-toggle" data-i18n="lock_forgot">Passwort vergessen?</div>
+    <div id="lock-recovery" class="lock-recovery" style="display:none">
+      <div class="lock-recovery-info" data-i18n="lock_forgot_info">Gib deinen JSONBin Master-Key ein, um die Sperre zu entfernen.</div>
+      <input id="lock-recovery-input" type="password" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="$2a$10$..." aria-label="Master-Key">
+      <div class="lock-error" id="lock-recovery-error" style="display:none"></div>
+      <button id="lock-recovery-submit" data-i18n="lock_forgot_submit">Sperre entfernen</button>
+    </div>
   </div>
 </div>
 
@@ -473,8 +494,11 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
       </div>
       <div class="field"><label data-i18n="settings_lock_new_label">Neuer Code</label><input id="lock-new" type="password" autocapitalize="off" autocorrect="off" autocomplete="new-password"></div>
       <div class="field"><label data-i18n="settings_lock_confirm_label">Bestätigen</label><input id="lock-confirm" type="password" autocapitalize="off" autocorrect="off" autocomplete="new-password"></div>
+      <div id="lock-match-feedback" class="lock-match neutral"></div>
       <div class="info-box" id="lock-keep-hint" style="display:none;" data-i18n="settings_lock_keep_hint"></div>
     </div>
+    <div class="lock-apply-row"><button id="lock-apply-btn" class="primary" disabled data-i18n="lock_apply_set">Sperre bestätigen</button></div>
+    <div id="lock-apply-result" class="lock-match ok" style="display:none;"></div>
 
     <h4 class="section-h" data-i18n="settings_start_page">Standard-Page</h4>
     <div class="info-box" data-i18n="settings_start_page_info"></div>
@@ -561,7 +585,12 @@ const STRINGS = {
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     lock_title: "App gesperrt", lock_sub: "Bitte Code eingeben", lock_unlock: "Entsperren",
     lock_wrong: "Falscher Code",
-    settings_lock_title: "App-Sperre", settings_lock_info: "Optionaler Zusatzschutz, falls dir jemand das entsperrte Handy abnimmt, während die App offen ist. Greift nur nach 30 Sek. im Hintergrund. Wenn du die App / Safari schließt, sind Sync-Credentials und Trades sowieso weg (Auto-Wipe) — eine neue Session startet leer, dafür ist keine Sperre nötig. Hinweis: die Sperre ist ein UI-Schutz, keine echte Verschlüsselung — wer Safari-Devtools öffnet, kommt während der Session trotzdem an die Trades.",
+    lock_forgot: "Passwort vergessen?",
+    lock_forgot_info: "Gib deinen JSONBin Master-Key ein. Wenn er mit dem gespeicherten übereinstimmt, wird die Sperre entfernt und du bist drin.",
+    lock_forgot_submit: "Sperre entfernen",
+    lock_forgot_no_key: "Kein Master-Key gespeichert — die Recovery funktioniert nur wenn vorher schon synct war.",
+    lock_forgot_wrong: "Master-Key stimmt nicht.",
+    settings_lock_title: "App-Sperre", settings_lock_info: "Sperrbildschirm bei jedem App-Öffnen und nach 30 Sek. im Hintergrund. Schützt davor, dass jemand mit Zugang zum entsperrten Handy deine Trades sieht. Recovery via JSONBin Master-Key auf dem Sperrbildschirm. Hinweis: die Sperre ist ein UI-Schutz, keine echte Datenverschlüsselung — wer Safari-Devtools öffnet, kann die Daten direkt lesen.",
     settings_lock_status_label: "Sperre", settings_lock_off: "Aus", settings_lock_on: "Aktiv",
     settings_lock_type_label: "Art", settings_lock_type_pin: "PIN (Zahlen)", settings_lock_type_password: "Passwort",
     settings_lock_new_label: "Neuer Code", settings_lock_confirm_label: "Bestätigen",
@@ -570,6 +599,15 @@ const STRINGS = {
     settings_lock_err_mismatch: "Code und Bestätigung stimmen nicht überein.",
     settings_lock_err_pin_nonnumeric: "PIN darf nur Ziffern enthalten.",
     settings_lock_err_too_short: "Mindestens 4 Zeichen.",
+    lock_apply_set: "Sperre bestätigen", lock_apply_remove: "Sperre entfernen",
+    lock_match_empty: "Beide Felder ausfüllen",
+    lock_match_ok: "✓ Codes stimmen überein",
+    lock_match_bad: "✗ Codes stimmen nicht überein",
+    lock_match_pin_too_short: "PIN mindestens 4 Ziffern",
+    lock_match_pin_nonnumeric: "PIN darf nur Ziffern enthalten",
+    lock_apply_set_ok: "✓ Sperre aktiviert — gilt ab jetzt für diese Session",
+    lock_apply_removed_ok: "✓ Sperre entfernt",
+    lock_apply_no_existing: "Keine aktive Sperre vorhanden",
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
     settings_language_info: "Pro Gerät gespeichert (nicht synced).",
     settings_theme: "Erscheinungsbild",
@@ -661,7 +699,12 @@ const STRINGS = {
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     lock_title: "App locked", lock_sub: "Please enter code", lock_unlock: "Unlock",
     lock_wrong: "Wrong code",
-    settings_lock_title: "App lock", settings_lock_info: "Optional extra layer for the case where someone grabs your unlocked phone while the app is open. Kicks in after 30 sec in the background. Closing the app / Safari wipes sync credentials and trades automatically (Auto-Wipe) — a fresh session starts empty, so no lock is needed there. Note: this is a UI gate, not real data encryption — anyone with Safari Developer Tools can still read the trades during a session.",
+    lock_forgot: "Forgot password?",
+    lock_forgot_info: "Enter your JSONBin master key. If it matches the stored one, the lock is removed and you're in.",
+    lock_forgot_submit: "Remove lock",
+    lock_forgot_no_key: "No master key saved — recovery only works after you've configured sync at least once.",
+    lock_forgot_wrong: "Master key doesn't match.",
+    settings_lock_title: "App lock", settings_lock_info: "Lock screen on every app open and after 30 sec in the background. Protects against anyone with access to the unlocked phone seeing your trades. Recovery via JSONBin master key on the lock screen. Note: this is a UI gate, not real data encryption — anyone with Safari Developer Tools can read the data directly.",
     settings_lock_status_label: "Lock", settings_lock_off: "Off", settings_lock_on: "Active",
     settings_lock_type_label: "Type", settings_lock_type_pin: "PIN (digits)", settings_lock_type_password: "Password",
     settings_lock_new_label: "New code", settings_lock_confirm_label: "Confirm",
@@ -670,6 +713,15 @@ const STRINGS = {
     settings_lock_err_mismatch: "Code and confirmation don't match.",
     settings_lock_err_pin_nonnumeric: "PIN must contain only digits.",
     settings_lock_err_too_short: "At least 4 characters.",
+    lock_apply_set: "Confirm lock", lock_apply_remove: "Remove lock",
+    lock_match_empty: "Fill both fields",
+    lock_match_ok: "✓ Codes match",
+    lock_match_bad: "✗ Codes don't match",
+    lock_match_pin_too_short: "PIN must be at least 4 digits",
+    lock_match_pin_nonnumeric: "PIN must contain only digits",
+    lock_apply_set_ok: "✓ Lock active — effective from now on this session",
+    lock_apply_removed_ok: "✓ Lock removed",
+    lock_apply_no_existing: "No active lock to remove",
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
     settings_language_info: "Stored per device (not synced).",
     settings_theme: "Appearance",
@@ -794,26 +846,141 @@ async function hashCode(plain) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function configureLockInputType() {
-  const inp = document.getElementById("lock-input");
+// Configures any input element to either PIN-style (numeric keypad on iOS,
+// masked with CSS bullets) or password-style (standard masked text input).
+function applyInputModeForCode(inp, mode) {
   if (!inp) return;
-  if (lockSettings.type === "pin") {
-    inp.setAttribute("type", "tel");
+  if (mode === "pin") {
+    inp.setAttribute("type", "text");
     inp.setAttribute("inputmode", "numeric");
     inp.setAttribute("pattern", "[0-9]*");
+    inp.setAttribute("autocomplete", "one-time-code"); // keeps Safari from suggesting saved passwords
+    inp.classList.add("pin-mask");
   } else {
     inp.setAttribute("type", "password");
     inp.removeAttribute("pattern");
     inp.removeAttribute("inputmode");
+    inp.setAttribute("autocomplete", "new-password");
+    inp.classList.remove("pin-mask");
   }
-  inp.value = "";
+}
+
+function configureLockInputType() {
+  const inp = document.getElementById("lock-input");
+  applyInputModeForCode(inp, lockSettings.type === "pin" ? "pin" : "password");
+  if (inp) inp.value = "";
   const err = document.getElementById("lock-error");
   if (err) err.style.display = "none";
+}
+
+// Settings: re-applies the keyboard/mask mode to the new + confirm fields based
+// on the currently selected lock type in the settings dropdown.
+function configureSettingsLockInputs() {
+  const sel = document.getElementById("lock-type-select");
+  const mode = (sel && sel.value === "pin") ? "pin" : "password";
+  applyInputModeForCode(document.getElementById("lock-new"), mode);
+  applyInputModeForCode(document.getElementById("lock-confirm"), mode);
+}
+
+// --- Live match feedback + apply-button state machine ---
+// Validates the current state of the lock form and returns the case the user
+// is in. The apply button + feedback box are driven entirely from this.
+function evaluateLockForm() {
+  const enabled = document.getElementById("lock-enabled-select").value === "on";
+  const type = document.getElementById("lock-type-select").value === "pin" ? "pin" : "password";
+  const a = document.getElementById("lock-new").value;
+  const b = document.getElementById("lock-confirm").value;
+  if (!enabled) {
+    // User wants to remove the lock
+    return { action: "remove", enabled: false, hasExisting: lockSettings.enabled && !!lockSettings.hash };
+  }
+  // User wants to set/replace the lock
+  if (!a && !b) return { action: "blocked", reason: "empty", enabled: true, type };
+  if (!a || !b) return { action: "blocked", reason: "empty", enabled: true, type };
+  // PIN-specific rules: numeric only AND mindestens 4 Ziffern
+  if (type === "pin") {
+    if (!/^[0-9]+$/.test(a) || !/^[0-9]+$/.test(b)) return { action: "blocked", reason: "pin_nonnumeric", enabled: true, type };
+    if (a.length < 4 || b.length < 4) return { action: "blocked", reason: "pin_too_short", enabled: true, type };
+  }
+  // Password mode: any keyboard character allowed, kein Längen-Minimum
+  if (a !== b) return { action: "blocked", reason: "mismatch", enabled: true, type };
+  return { action: "set", enabled: true, type, code: a };
+}
+
+function updateLockUiState() {
+  const fb = document.getElementById("lock-match-feedback");
+  const btn = document.getElementById("lock-apply-btn");
+  const result = document.getElementById("lock-apply-result");
+  if (!fb || !btn) return;
+  // Hide the "successfully applied" toast as soon as the user starts editing again
+  if (result) result.style.display = "none";
+  const state = evaluateLockForm();
+  if (state.action === "remove") {
+    fb.style.display = "none";
+    btn.textContent = t("lock_apply_remove");
+    btn.disabled = !state.hasExisting;
+  } else if (state.action === "blocked") {
+    fb.style.display = "block";
+    let key = "lock_match_empty";
+    let cls = "neutral";
+    if (state.reason === "empty") { key = "lock_match_empty"; cls = "neutral"; }
+    else if (state.reason === "pin_too_short") { key = "lock_match_pin_too_short"; cls = "bad"; }
+    else if (state.reason === "pin_nonnumeric") { key = "lock_match_pin_nonnumeric"; cls = "bad"; }
+    else if (state.reason === "mismatch") { key = "lock_match_bad"; cls = "bad"; }
+    fb.className = "lock-match " + cls;
+    fb.textContent = t(key);
+    btn.textContent = t("lock_apply_set");
+    btn.disabled = true;
+  } else if (state.action === "set") {
+    fb.style.display = "block";
+    fb.className = "lock-match ok";
+    fb.textContent = t("lock_match_ok");
+    btn.textContent = t("lock_apply_set");
+    btn.disabled = false;
+  }
+}
+
+async function applyLockChange() {
+  const state = evaluateLockForm();
+  const result = document.getElementById("lock-apply-result");
+  if (state.action === "remove") {
+    if (!state.hasExisting) {
+      result.className = "lock-match neutral";
+      result.textContent = t("lock_apply_no_existing");
+      result.style.display = "block";
+      return;
+    }
+    lockSettings = { enabled: false, type: lockSettings.type, hash: null };
+    saveLockSettings(lockSettings);
+    result.className = "lock-match ok";
+    result.textContent = t("lock_apply_removed_ok");
+    result.style.display = "block";
+    updateLockUiState();
+    return;
+  }
+  if (state.action !== "set") return; // button shouldn't have been enabled
+  const hash = await hashCode(state.code);
+  lockSettings = { enabled: true, type: state.type, hash };
+  saveLockSettings(lockSettings);
+  // Clear the input fields so the bullets don't linger
+  document.getElementById("lock-new").value = "";
+  document.getElementById("lock-confirm").value = "";
+  result.className = "lock-match ok";
+  result.textContent = t("lock_apply_set_ok");
+  result.style.display = "block";
+  updateLockUiState();
 }
 
 function showLockScreen() {
   appUnlocked = false;
   configureLockInputType();
+  // Always start with the recovery section collapsed so it isn't a one-click bypass
+  const rec = document.getElementById("lock-recovery");
+  if (rec) rec.style.display = "none";
+  const recInp = document.getElementById("lock-recovery-input");
+  if (recInp) recInp.value = "";
+  const recErr = document.getElementById("lock-recovery-error");
+  if (recErr) recErr.style.display = "none";
   const ls = document.getElementById("lock-screen");
   if (ls) ls.classList.add("open");
   setTimeout(() => { const inp = document.getElementById("lock-input"); if (inp) inp.focus(); }, 120);
@@ -837,6 +1004,47 @@ async function attemptUnlock() {
     inp.value = "";
     inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake");
   }
+}
+
+function toggleLockRecovery() {
+  const sec = document.getElementById("lock-recovery"); if (!sec) return;
+  const visible = sec.style.display !== "none";
+  if (visible) {
+    sec.style.display = "none";
+  } else {
+    sec.style.display = "flex";
+    const recoveryInput = document.getElementById("lock-recovery-input");
+    if (recoveryInput) { recoveryInput.value = ""; setTimeout(() => recoveryInput.focus(), 80); }
+    const recoveryError = document.getElementById("lock-recovery-error");
+    if (recoveryError) recoveryError.style.display = "none";
+  }
+}
+
+// Verify the user-entered master key against the stored one and, on match,
+// disable the lock and let the user in.
+function attemptLockRecovery() {
+  const inp = document.getElementById("lock-recovery-input"); if (!inp) return;
+  const err = document.getElementById("lock-recovery-error");
+  const v = inp.value.trim();
+  const storedKey = (syncSettings && syncSettings.apiKey) ? syncSettings.apiKey.trim() : "";
+  if (!storedKey) {
+    if (err) { err.textContent = t("lock_forgot_no_key"); err.style.display = "block"; }
+    return;
+  }
+  if (!v || v !== storedKey) {
+    if (err) { err.textContent = t("lock_forgot_wrong"); err.style.display = "block"; }
+    inp.value = "";
+    inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake");
+    return;
+  }
+  // Match — wipe the lock and let the user through.
+  lockSettings = { enabled: false, type: lockSettings.type || "password", hash: null };
+  saveLockSettings(lockSettings);
+  // Reset the recovery UI so it doesn't reappear next time
+  document.getElementById("lock-recovery").style.display = "none";
+  document.getElementById("lock-recovery-input").value = "";
+  if (err) err.style.display = "none";
+  hideLockScreen();
 }
 
 function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); return (v && STRINGS[v]) ? v : "de"; } catch { return "de"; } }
@@ -893,16 +1101,8 @@ function setActiveThemeCard(theme) {
   });
 }
 
-// Sync credentials live in sessionStorage ONLY — auto-wipe on Safari close.
-// Anyone opening a fresh session sees an empty form, not your trade history.
-function loadSyncSettings() { try { const raw = sessionStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
-function saveSyncSettings() { try { sessionStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); } catch {} }
-// One-time migration: if old localStorage still holds sync credentials from a
-// previous build, scrub them so they don't persist across closes anymore.
-try { if (localStorage.getItem(SYNC_KEY)) localStorage.removeItem(SYNC_KEY); } catch {}
-
-// Worker URL + home currency are not secrets — keep them in localStorage so the
-// user doesn't have to retype them every session.
+function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
+function saveSyncSettings() { localStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); }
 function loadPriceSettings() { try { const raw = localStorage.getItem(PRICE_KEY); if (!raw) return { workerUrl: "", homeCurrency: "EUR" }; return Object.assign({ workerUrl: "", homeCurrency: "EUR" }, JSON.parse(raw)); } catch { return { workerUrl: "", homeCurrency: "EUR" }; } }
 function savePriceSettings() { localStorage.setItem(PRICE_KEY, JSON.stringify(priceSettings)); }
 
@@ -924,17 +1124,12 @@ function migrateTrades() {
   return changed;
 }
 
-// Trade cache + alert states live in sessionStorage so they're wiped on Safari close.
-// On the first fresh launch the app shows an empty state; the user must enter
-// JSONBin credentials in Settings to pull their data back.
 function loadStorage() {
-  try { const raw = sessionStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
+  try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
   trades = []; alertStates = {}; localLastModified = 0;
 }
-function persistLocal() { try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, alertStates, lastModified: localLastModified })); } catch {} }
-// One-time migration: scrub any old localStorage trade cache from previous builds.
-try { if (localStorage.getItem(STORAGE_KEY)) localStorage.removeItem(STORAGE_KEY); } catch {}
-try { if (localStorage.getItem(STORAGE_KEY_OLD)) localStorage.removeItem(STORAGE_KEY_OLD); } catch {}
+function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, alertStates, lastModified: localLastModified })); }
 function markLocalChange() { localLastModified = Date.now(); persistLocal(); scheduleSyncPush(); }
 
 function fmtMoney(n, c) { if (n == null || !isFinite(n)) return "—"; try { return new Intl.NumberFormat("de-DE", { style: "currency", currency: c || homeCurrency, maximumFractionDigits: 2 }).format(n); } catch { return n.toFixed(2) + " " + (c || homeCurrency); } }
@@ -1904,7 +2099,11 @@ function openSettings() {
   document.getElementById("lock-type-select").value = lockSettings.type === "pin" ? "pin" : "password";
   document.getElementById("lock-new").value = "";
   document.getElementById("lock-confirm").value = "";
+  configureSettingsLockInputs();
   updateLockConfigVisibility();
+  updateLockUiState();
+  const result = document.getElementById("lock-apply-result");
+  if (result) result.style.display = "none";
   document.getElementById("settings-modal").classList.add("open");
   closeMenu();
 }
@@ -2005,36 +2204,10 @@ document.getElementById("settings-test").addEventListener("click", async () => {
   else { sEl.className = "test-result err"; sEl.textContent = t("test_sync_no_creds"); }
 });
 document.getElementById("settings-save").addEventListener("click", async () => {
-  // Lock-settings handling — done first so that any validation error blocks the
-  // rest of the save and the user stays in the modal to fix it.
-  const lockEnabledChoice = document.getElementById("lock-enabled-select").value;
-  const lockTypeChoice = document.getElementById("lock-type-select").value === "pin" ? "pin" : "password";
-  const newCode = document.getElementById("lock-new").value;
-  const confirmCode = document.getElementById("lock-confirm").value;
-  if (lockEnabledChoice === "off") {
-    lockSettings = { enabled: false, type: lockTypeChoice, hash: null };
-    saveLockSettings(lockSettings);
-  } else {
-    // Enabled — figure out which path
-    const wantsChangeCode = newCode.length > 0 || confirmCode.length > 0;
-    const hasExistingCode = lockSettings.enabled && lockSettings.hash;
-    const typeChanged = (lockTypeChoice !== lockSettings.type) && hasExistingCode;
-    if (!hasExistingCode || wantsChangeCode || typeChanged) {
-      // Must set a new code
-      if (newCode.length === 0) { alert(t("settings_lock_err_empty")); return; }
-      if (newCode !== confirmCode) { alert(t("settings_lock_err_mismatch")); return; }
-      if (lockTypeChoice === "pin" && !/^[0-9]+$/.test(newCode)) { alert(t("settings_lock_err_pin_nonnumeric")); return; }
-      if (newCode.length < 4) { alert(t("settings_lock_err_too_short")); return; }
-      const hash = await hashCode(newCode);
-      lockSettings = { enabled: true, type: lockTypeChoice, hash };
-      saveLockSettings(lockSettings);
-    } else {
-      // Keep existing hash, only adjust type/enabled if needed
-      lockSettings = { enabled: true, type: lockTypeChoice, hash: lockSettings.hash };
-      saveLockSettings(lockSettings);
-    }
-  }
-
+  // Lock-Settings werden NICHT mehr hier behandelt — der dedizierte
+  // "Sperre bestätigen / entfernen"-Button macht das atomar, sobald geklickt.
+  // Damit ist ausgeschlossen, dass eine nicht-übereinstimmende Code-Eingabe
+  // versehentlich gespeichert wird.
   const hc = document.getElementById("home-ccy").value.trim().toUpperCase().slice(0,3);
   const wu = document.getElementById("worker-url").value.trim();
   const sk = document.getElementById("sync-key").value.trim();
@@ -2103,12 +2276,11 @@ for (const k of PAGES) applyViewModeUI(k);
 
 const initialLang = loadLangPreference();
 setLanguage(initialLang);
-// Lock-Settings nur LADEN — der Lock-Screen wird aber NICHT beim Boot gezeigt.
-// Grund: Sync-Credentials + Trades sind in sessionStorage und beim Boot leer →
-// es gibt nichts zu schützen. Lock greift erst, wenn die App im Hintergrund war
-// (>30s) UND in der laufenden Session schon Daten geladen wurden (Szenario A).
+// Boot-time lock check — show the lock screen BEFORE loadStorage/render so any
+// cached trades aren't visible behind the lock.
 lockSettings = loadLockSettings();
-appUnlocked = true;
+if (lockSettings.enabled && lockSettings.hash) showLockScreen();
+else appUnlocked = true;
 loadStorage();
 render();
 if (syncSettings.enabled) setSyncStatus("ok", t("status_sync_active")); else setSyncStatus("off", t("status_sync_off"));
@@ -2119,18 +2291,11 @@ setAutoStatus();
 currentPage = loadStartPage();
 requestAnimationFrame(() => scrollToPage(currentPage, false));
 
-// Re-lock-Logik nur scharf, wenn die laufende Session Daten geladen hat.
-// Sonst gibt's nichts zu schützen — Lock-Screen wäre nur Reibung.
-function sessionHasData() {
-  return (trades.length > 0) || !!syncSettings.apiKey || !!syncSettings.binId;
-}
-
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    if (lockSettings.enabled && lockSettings.hash && sessionHasData()) lockHiddenAt = Date.now();
+    if (lockSettings.enabled && lockSettings.hash) lockHiddenAt = Date.now();
   } else {
-    // Coming back to foreground — re-lock if hidden long enough AND session has data
-    if (lockSettings.enabled && lockSettings.hash && lockHiddenAt && sessionHasData()) {
+    if (lockSettings.enabled && lockSettings.hash && lockHiddenAt) {
       const elapsed = Date.now() - lockHiddenAt;
       if (elapsed > LOCK_RELOCK_MS && appUnlocked) showLockScreen();
     }
@@ -2147,13 +2312,22 @@ document.addEventListener("visibilitychange", () => {
 // Lock-screen handlers
 document.getElementById("lock-submit").addEventListener("click", attemptUnlock);
 document.getElementById("lock-input").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); attemptUnlock(); } });
+document.getElementById("lock-recovery-toggle").addEventListener("click", toggleLockRecovery);
+document.getElementById("lock-recovery-submit").addEventListener("click", attemptLockRecovery);
+document.getElementById("lock-recovery-input").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); attemptLockRecovery(); } });
 // Settings UI for lock
 document.getElementById("lock-enabled-select").addEventListener("change", updateLockConfigVisibility);
 document.getElementById("lock-type-select").addEventListener("change", () => {
   // If the user changes type, clear the new/confirm fields since the rules differ.
   document.getElementById("lock-new").value = "";
   document.getElementById("lock-confirm").value = "";
+  configureSettingsLockInputs(); // swap keyboard mode (PIN ↔ password)
+  updateLockUiState();
 });
+document.getElementById("lock-enabled-select").addEventListener("change", updateLockUiState);
+document.getElementById("lock-new").addEventListener("input", updateLockUiState);
+document.getElementById("lock-confirm").addEventListener("input", updateLockUiState);
+document.getElementById("lock-apply-btn").addEventListener("click", applyLockChange);
 setInterval(setAutoStatus, 60000);
 </script>
 </body>

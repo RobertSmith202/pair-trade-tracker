@@ -20,8 +20,8 @@ Kern-Features:
 - **Zwei-Schwellen-Alarm** pro Trade: Verlust (3-Min-Repeat bis Quittung) + Gewinn (30-Min-Repeat bis Quittung), via Telegram-Bot
 - Bei Single-Leg-Trades (Long / Short) zusätzlich: Schwelle wahlweise als Prozentwert oder als absoluter Preis in der Notierungswährung des Tickers
 - **Soft-Warnung beim Speichern** wenn eine eingegebene Schwelle bereits durch den aktuellen Kurs verletzt wäre
-- **Auto-Wipe**: Sync-Credentials und Trade-Cache leben in `sessionStorage` und sind beim Safari-Close weg
-- **Optionale App-Sperre** (PIN oder Passwort) für „App offen + Handy aus der Hand geben"-Szenario
+- **Optionale App-Sperre** (PIN oder Passwort) — Lock-Screen bei jedem App-Öffnen und nach 30 Sek. im Hintergrund
+- **Master-Key-Recovery** auf dem Lock-Screen: bei vergessenem Code per JSONBin Master-Key entsperren
 - Zwei Sprachen (DE, EN) — geräteabhängig
 - Drei Themes (Mitternacht / Hell / Dunkel) — geräteabhängig
 - Standard-Page in Settings konfigurierbar — pro Gerät
@@ -47,89 +47,111 @@ Deployment: GitHub → Netlify (auto-deploy für HTML), Cloudflare-Dashboard (ma
 
 ---
 
-## Storage-Architektur (Auto-Wipe)
+## Storage-Architektur
 
-Die App nutzt zwei verschiedene Browser-Speicher mit **unterschiedlichen Persistenz-Garantien**:
-
-### sessionStorage (überlebt Safari-Schließen NICHT)
+Alle App-Daten leben in `localStorage` und überleben Safari-Schließen / App-Switcher-Wischen.
 
 | Key | Inhalt |
 |---|---|
-| `pair_trade_tracker_v2` | Trades + AlertStates + lastModified — der gesamte Trade-Cache |
+| `pair_trade_tracker_v2` | Trades + AlertStates + lastModified |
 | `pair_trade_sync_v1` | JSONBin Master-Key, Bin-ID, enabled-Flag |
-
-Diese Daten werden beim Schließen von Safari (oder beim Wischen der PWA aus dem App-Switcher auf iOS) **automatisch gelöscht**. Eine neue Session startet leer.
-
-### localStorage (überlebt Safari-Schließen)
-
-| Key | Inhalt |
-|---|---|
-| `pair_trade_price_v1` | Worker-URL + Home-Currency (keine Geheimnisse) |
+| `pair_trade_price_v1` | Worker-URL + Home-Currency |
 | `pair_trade_lang_v1` | gewählte Sprache (DE/EN) |
 | `pair_trade_theme_v1` | gewähltes Theme (midnight/light/dark) |
 | `pair_trade_view_v1` | Grid/Liste-Modus pro Page |
 | `pair_trade_start_page_v1` | Standard-Page beim App-Start |
 | `pair_trade_lock_v1` | App-Sperre-Settings: `{enabled, type, hash}` |
 
-### Warum diese Aufteilung?
+**Historische Notiz:** Eine frühere Version dieser App verschob `tracker_v2` und `sync_v1` nach `sessionStorage` (Auto-Wipe beim Safari-Close). Wurde rückgängig gemacht, weil der User-Komfort darunter litt (jede Session = JSONBin-Master-Key und Bin-ID neu eintippen). Der Schutz vor neugierigen Blicken übernimmt jetzt komplett der Lock-Screen mit Master-Key-Recovery (siehe unten).
 
-**Threat Model**: Schutz davor, dass jemand das geklaute / geliehene Handy nimmt und die Trade-Historie sieht.
-
-- **Geheime Daten** (Trades, JSONBin-Creds) sollen beim Safari-Close verschwinden. Wer die URL danach öffnet, sieht eine leere Form, die wie ein nicht eingerichtetes Tool aussieht — kein Hinweis darauf, dass es etwas zu schützen gäbe.
-- **Nicht-geheime Settings** (Theme, Sprache, Worker-URL etc.) bleiben, damit die UX bei jeder Session nicht von Null beginnt.
-
-Beim ersten Start einer neuen Session muss der User in Settings den JSONBin Master-Key und die Bin-ID neu eingeben. Sync pullt dann die Trades zurück. **Heißt operativ:** User muss sich Master-Key + Bin-ID irgendwo sicher speichern (Passwort-Manager + iCloud Keychain + Auto-Fill mit Face ID ist der reibungsärmste Weg).
-
-### Was bedeutet das für Migration alter Builds?
-
-Frühere Versionen speicherten alle Daten in `localStorage`. Beim ersten Start der neuen Version werden `pair_trade_tracker_v2`, `pair_trade_tracker_v1` und `pair_trade_sync_v1` aus dem localStorage **proaktiv gelöscht** (siehe einmaligen Cleanup-Aufruf direkt nach den Storage-Funktionen). Damit landen alte Caches nicht mehr persistent — der User muss sich danach einmalig neu einloggen, ist dann aber im neuen Modell.
+**Threat-Modell:** Schutz davor, dass jemand das geklaute / geliehene Handy nimmt und die Trade-Historie sieht. Erste Verteidigungslinie ist iOS Auto-Lock (Face ID / PIN). Zweite ist der Lock-Screen der PWA. Beide sind UI-Schichten — keine Verschlüsselung der lokalen Daten. Wer Safari-Devtools öffnet, kann `localStorage` direkt lesen.
 
 ---
 
 ## App-Sperre (Lock-Screen)
 
-Optionaler Zusatzschutz für ein spezifisches Szenario, das vom Auto-Wipe NICHT abgedeckt wird.
+Hauptschutz vor neugierigen Blicken. Da `localStorage` Trades und Sync-Credentials persistent hält, ist der Lock-Screen das einzige UI-Hindernis zwischen einem entsperrten Gerät und der Trade-Anzeige.
 
 ### Threat-Matrix
 
-| Szenario | Auto-Wipe | App-Sperre | iOS Auto-Lock |
-|---|---|---|---|
-| Handy weg, App geschlossen, Dieb öffnet URL | ✅ schützt (leere Form) | irrelevant | — |
-| Handy weg, App offen | ❌ wirkt nicht | ✅ schützt (nach 30s Hintergrund) | ✅ schützt (sofort bei Sperre) |
-| Handy entsperrt in fremder Hand <30s | ❌ | ❌ | ⚠️ je nach Auto-Lock-Konfig |
-
-Die App-Sperre **deckt nur den zweiten Fall ab**: App ist offen, Handy wird kurz aus der Hand gegeben, User vergisst sie zu schließen. Nach 30 Sek. im Hintergrund kommt beim Zurückkehren der Lock-Screen.
+| Szenario | App-Sperre | iOS Auto-Lock |
+|---|---|---|
+| Handy verloren, durch iOS-PIN/FaceID gesperrt | irrelevant (iOS schützt) | ✅ |
+| Entsperrtes Handy, App geschlossen, jemand öffnet URL | ✅ Lock-Screen beim Boot | — |
+| Entsperrtes Handy, App offen, User legt es weg | ✅ Re-Lock nach 30 Sek. Hintergrund | ✅ wenn iOS-Auto-Lock kürzer |
+| Entsperrtes Handy <30 Sek. in fremder Hand bei offener App | ❌ | ⚠️ je nach Auto-Lock-Konfig |
+| Forensiker mit Mac-Kabel + Safari Devtools | ❌ (Lock ist UI-Schutz) | ❌ |
 
 ### Wann der Lock-Screen feuert
 
-- `lockSettings.enabled === true` UND `lockSettings.hash` gesetzt
-- UND `sessionHasData()` ist true (Trades geladen ODER Sync-Credentials in sessionStorage)
-- UND App war zuvor `document.hidden` für mehr als `LOCK_RELOCK_MS` (30 Sek.)
+- **Beim App-Boot:** wenn `lockSettings.enabled === true` UND `lockSettings.hash` gesetzt. Lock erscheint sofort, **bevor** `loadStorage()` und `render()` aufgerufen werden — keine Flash der gecachten Trade-Daten hinter dem Lock.
+- **Beim Zurückkommen aus dem Hintergrund:** wenn die App `document.hidden` für mehr als `LOCK_RELOCK_MS` (30 Sek.) war.
 
-**Nicht beim Boot.** Eine frische Session hat noch keine Daten in `sessionStorage`, der Lock-Screen wäre redundant (es gibt nichts zu schützen). Der User landet sofort auf der leeren App und gibt seine Credentials ein. Erst nach erfolgreichem Sync ist „session has data" wahr, und ab dann ist die Sperre für diese Session „scharf".
+Schnelles Wechseln zur Telegram-App (z. B. zum Alarm-Acknowledge) und zurück bleibt unter 30 Sek. → kein Re-Lock.
+
+### Master-Key-Recovery
+
+Auf dem Lock-Screen gibt es unter dem „Entsperren"-Button einen Link „Passwort vergessen?". Klick öffnet ein zweites Eingabefeld für den JSONBin Master-Key.
+
+Logik (in `attemptLockRecovery()`):
+1. Eingegebener Master-Key wird mit `syncSettings.apiKey` aus `localStorage` verglichen (`===` String-Match nach trim).
+2. Bei Match: `lockSettings = { enabled: false, hash: null }`, Persistierung, Lock-Screen wird ausgeblendet.
+3. Bei Mismatch: rote Fehlermeldung + Shake-Animation.
+4. Wenn kein `apiKey` gespeichert ist (Sync nie konfiguriert): „Kein Master-Key gespeichert" als Hinweis.
+
+**Wichtige Eigenschaften der Recovery:**
+- Der Master-Key liegt im gleichen `localStorage` wie der Lock-Hash. Ein Angreifer mit Devtools-Zugriff kann beide direkt lesen — die Recovery erhöht die Angriffsfläche nicht, weil sie nur einen UX-Komfort-Weg auf das bietet, was der Angreifer ohnehin schon hätte.
+- Die Recovery feuert **niemals** automatisch — der User muss den Link explizit antippen UND den Master-Key tippen/pasten. Damit kein Risiko durch versehentliches Auslösen.
+- Nach erfolgreicher Recovery ist die Sperre aus. Der User muss sie in Settings neu einrichten, falls er sie wieder will. So vermeidet man Verwirrung darüber, ob der vergessene Code „repariert" wurde oder nicht.
+- Worker und Bot werden nicht involviert. Recovery ist rein clientseitig.
 
 ### Code-Speicherung
 
 Nur ein SHA-256-Hash via Web Crypto wird in `pair_trade_lock_v1` gespeichert. Der Klartext-Code landet nirgendwo. Settings-Wahl zwischen `type: "pin"` (numerisches iOS-Keyboard) und `type: "password"` (beliebige Zeichen).
 
-Validierung beim Anlegen:
-- Mindestlänge 4 Zeichen
-- PIN darf nur Ziffern enthalten
-- Code + Bestätigung müssen identisch sein (zweites Eingabefeld als Schutz vor Vertippern)
+### Validierungs-Regeln pro Modus
 
-Beim Editieren bestehender Sperre: Code-Felder leer = bestehender Code bleibt. Nur Typ ändern oder Sperre ausschalten ist auch ohne Re-Entry möglich.
+**Passwort-Modus:**
+- Jedes Keyboard-Zeichen erlaubt (Buchstaben, Ziffern, Sonderzeichen, Emojis, beliebige Unicode-Zeichen)
+- **Keine Mindestlänge** — auch ein einzelnes Zeichen ist gültig. Robert hat das explizit so gewollt.
+- Einzige Bedingungen: beide Felder nicht leer + beide identisch.
+
+**PIN-Modus:**
+- Nur Ziffern 0-9 erlaubt
+- **Mindestens 4 Stellen** Pflicht
+- Beide Felder identisch.
+
+Code + Bestätigung müssen in beiden Modi identisch sein (zweites Eingabefeld als Schutz vor Vertippern).
+
+### UI-Flow zum Anlegen / Ändern / Entfernen
+
+Die Lock-Konfiguration ist **nicht** an den Haupt-Save-Button des Settings-Modals gekoppelt. Stattdessen gibt es einen dedizierten „Sperre bestätigen" / „Sperre entfernen"-Button direkt unter den Code-Feldern. Begründung: ein versehentliches „Speichern" mit nicht-übereinstimmenden Codes wäre eine sinnlose UX. Der dedizierte Button validiert und schreibt atomar.
+
+Live-Feedback während des Tippens (über `evaluateLockForm()` + `updateLockUiState()`):
+- Beide Felder leer → graues neutrales „Beide Felder ausfüllen", Button deaktiviert
+- PIN-Mode mit weniger als 4 Ziffern → rot „PIN mindestens 4 Ziffern", Button deaktiviert
+- PIN-Mode mit Nicht-Ziffer → rot „PIN darf nur Ziffern enthalten", Button deaktiviert
+- Codes unterschiedlich → rot „✗ Codes stimmen nicht überein", Button deaktiviert
+- Codes valide + identisch → grün „✓ Codes stimmen überein", Button **aktiviert**
+
+Klick auf den Button:
+- Bei Status=Aktiv mit validem Code → schreibt Hash in localStorage, leert die Felder, zeigt „✓ Sperre aktiviert"
+- Bei Status=Aus → entfernt die Sperre (oder zeigt „Keine aktive Sperre vorhanden" falls bereits aus)
+- Bei Status=Aktiv ohne validen Code → Button bleibt deaktiviert, kein Klick möglich
+
+Beim Editieren einer bestehenden Sperre: Code-Felder leer lassen → bestehender Code bleibt. Nur Typ-Änderung allein ohne neuen Code wird nicht unterstützt (Button bleibt deaktiviert) — Robert müsste in diesem Fall einen neuen Code eintippen.
 
 ### Bekannte Grenzen / explizit dokumentierte Schwächen
 
 Da das Repo privat ist, hier transparent die Schwachstellen:
 
-1. **Pure UI-Sperre, keine Datenverschlüsselung.** Während die Session läuft, liegen die Trades unverschlüsselt in `sessionStorage`. Wer Safari-Developer-Tools öffnet (Mac angeschlossen + Web-Inspector), kommt direkt an die Daten ran, ohne den Lock-Screen passieren zu müssen.
+1. **Pure UI-Sperre, keine Datenverschlüsselung.** Trades liegen unverschlüsselt in `localStorage`. Wer Safari-Developer-Tools öffnet (Mac angeschlossen + Web-Inspector), kommt direkt an die Daten ran, ohne den Lock-Screen passieren zu müssen.
 
-2. **Lock kann durch Storage-Manipulation umgangen werden.** Wer den `lockSettings.hash` Eintrag in localStorage löscht (Safari Devtools → Application → Local Storage), kommt beim nächsten visibilitychange-Event ohne Code rein. Aber: der Angreifer braucht dafür eine offene Session — sobald die zu Ende ist, gibt's keine Daten mehr zu schützen.
+2. **Lock kann durch Storage-Manipulation umgangen werden.** Wer den `lockSettings.hash` Eintrag in `localStorage` löscht (Safari Devtools → Application → Local Storage), kommt beim nächsten Boot ohne Code rein.
 
 3. **Brute-Force gegen 4-stelligen PIN ist trivial offline.** Wer den Hash hat (siehe Punkt 2), kann 10.000 PINs in unter einer Sekunde durchprobieren. Da hilft kein PBKDF2, weil der Lock selbst nicht zur Datenverschlüsselung genutzt wird — der Angreifer braucht den Hash gar nicht zu knacken, er löscht ihn einfach.
 
-4. **Kein Recovery-Pfad.** Wenn der User den Code vergisst und gerade eine aktive Session läuft → keine Möglichkeit, ihn zurückzusetzen, außer Safari-Daten zu löschen. Damit gehen aber alle localStorage-Settings UND der gerade aktive sessionStorage (Trades, Sync-Creds) verloren. Sync pullt nach Re-Login die Trades zurück, andere Settings müssen einmal neu konfiguriert werden.
+4. **Recovery-Pfad ist nur ein UX-Komfort, keine zweite Schutzschicht.** Der Master-Key liegt im gleichen `localStorage` wie der Lock-Hash. Wer eines lesen kann, kann beides lesen. Der Recovery-Button ist nur dazu da, dass der User selbst (mit Passwort-Manager + Face ID Auto-Fill) bei vergessenem Code wieder reinkommt. Er erhöht NICHT die Sicherheit gegenüber einem technisch versierten Angreifer.
 
 5. **Worker und Telegram-Bot wissen nichts vom Lock.** Die App-Sperre ist rein clientseitig. Damit hat sie keinen Einfluss auf:
    - Alarm-Cron alle 3 Min läuft weiter
@@ -141,9 +163,13 @@ Da das Repo privat ist, hier transparent die Schwachstellen:
 ### Bewusste Design-Entscheidungen
 
 - Lock-Settings werden nicht in JSONBin synct. Pro Gerät einstellbar.
-- Sperre nur sichtbar wenn `sessionHasData()` — vermeidet redundante UX bei leerer Session.
-- 30-Sek-Hintergrund-Schwelle, nicht sofort. Schnelles Wechseln zur Telegram-App und zurück soll nicht jedes Mal sperren.
-- Eingabe-Feld iOS-spezifisch: `type="tel" inputmode="numeric"` für PIN (zeigt Ziffern-Keypad), `type="password"` für Passwort.
+- Lock-Screen feuert beim Boot **bevor** `loadStorage()`/`render()` aufgerufen werden — keine Flash der gecachten Trade-Daten hinter dem Lock.
+- 30-Sek-Hintergrund-Schwelle (`LOCK_RELOCK_MS`), nicht sofort. Schnelles Wechseln zur Telegram-App und zurück soll nicht jedes Mal sperren.
+- Eingabe-Felder iOS-spezifisch (über `applyInputModeForCode()`):
+  - PIN: `type="text" inputmode="numeric" pattern="[0-9]*"` zeigt den sauberen Ziffern-Keypad (nicht den Telefon-Dial-Pad mit `*` und `#`). Visuelles Maskieren über CSS-Klasse `pin-mask` (`-webkit-text-security: disc`). Autocomplete `one-time-code` damit Safari keine gespeicherten Passwörter vorschlägt.
+  - Passwort: `type="password"` mit nativer iOS-Maskierung und vollem Alpha-Keyboard.
+- Lock-Commit ist atomar (dedizierter Button), Haupt-Save berührt die Lock-Settings nicht.
+- Recovery-Sektion ist beim Öffnen des Lock-Screens immer kollabiert. Der User muss aktiv auf den „Passwort vergessen?"-Link tippen, damit das Master-Key-Feld auftaucht.
 
 ---
 
@@ -338,11 +364,13 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 
 10. **Preis-Schwellen sind nicht FX-konvertiert:** Eine Preis-Schwelle für AAPL ist in USD, eine für SAP.DE in EUR. Worker vergleicht direkt gegen `regularMarketPrice` in der Notierungswährung.
 
-11. **Auto-Wipe braucht User-Disziplin bei Credentials:** JSONBin Master-Key + Bin-ID müssen außerhalb der App gespeichert sein (Passwort-Manager). Ohne diese zwei Strings kein Datenzugriff mehr. Die App selbst hat absichtlich keinen Recovery-Pfad — der würde Worker oder Bot involvieren, was die saubere Trennung „Datenschutz lebt nur auf dem Device" zerstören würde.
+11. **Master-Key + Bin-ID extern sichern:** liegen zwar in `localStorage` und müssen nicht jedes Mal eingetippt werden, aber wer den Lock-Code vergessen hat UND keinen Backup des Master-Keys hat (z. B. Passwort-Manager), kommt über den Recovery-Pfad nicht rein. Die einzige Fallback-Option ist dann das vollständige Löschen der Safari-Site-Daten — was ALLE Settings wegnimmt, der Sync zieht die Trades zwar wieder zurück, aber Heimat-Währung, Theme, etc. müssen neu konfiguriert werden.
 
-12. **App-Sperre ist UI-Schutz, keine Verschlüsselung:** Während eine Session läuft, sind Trades unverschlüsselt in sessionStorage. Wer Safari Devtools öffnet oder den `lockSettings.hash` aus localStorage löscht, umgeht die Sperre vollständig. Schutz nur gegen Casual-Snooping (jemand schaut kurz aufs offene Handy).
+12. **App-Sperre ist UI-Schutz, keine Verschlüsselung:** Trades liegen unverschlüsselt in `localStorage`. Wer Safari Devtools öffnet oder den `lockSettings.hash` aus localStorage löscht, umgeht die Sperre vollständig. Schutz nur gegen Casual-Snooping (jemand schaut kurz aufs offene Handy).
 
-13. **Worker und Bot kennen weder Auto-Wipe noch App-Sperre:** Telegram-Alarme laufen unabhängig von der App-Session. Wenn der Cron einen Alarm feuert, kriegt der User die Telegram-Nachricht, egal ob die PWA gerade offen ist oder nicht, egal ob die App gesperrt ist oder nicht. Der Bot ist nur an JSONBin angedockt.
+13. **Worker und Bot kennen die App-Sperre nicht:** Telegram-Alarme laufen unabhängig von der App-Session. Wenn der Cron einen Alarm feuert, kriegt der User die Telegram-Nachricht, egal ob die PWA gerade offen ist oder nicht, egal ob die App gesperrt ist oder nicht. Der Bot ist nur an JSONBin angedockt.
+
+14. **Master-Key-Recovery setzt vorhandene Sync-Config voraus:** Wenn der User die Sperre aktiviert hat OHNE jemals Sync zu konfigurieren (also `syncSettings.apiKey` ist leer), bringt der „Passwort vergessen"-Pfad nichts — es gibt keinen Master-Key zum Verifizieren. Der Lock-Screen zeigt dann „Kein Master-Key gespeichert". In diesem Edge-Case muss der User Safari-Site-Daten löschen.
 
 ---
 
@@ -373,7 +401,7 @@ Beim Hinzufügen neuer UI-Strings: in DE und EN einpflegen. DE als Fallback wenn
 Du bist jetzt informiert genug um Änderungen vorzunehmen. Empfohlenes Vorgehen:
 
 1. Den aktuellen Stand des Codes via WebFetch oder Upload anschauen
-2. Bei Architektur-Änderungen: prüfe ob bestehende Konventionen (State-Machine, Pfadunabhängigkeit, Tranche-Modell, Trade-Typ-Isolation, Pct/Preis-Mode, sessionStorage vs. localStorage Trennung) tangiert werden
+2. Bei Architektur-Änderungen: prüfe ob bestehende Konventionen (State-Machine, Pfadunabhängigkeit, Tranche-Modell, Trade-Typ-Isolation, Pct/Preis-Mode, Lock-Boot-Reihenfolge) tangiert werden
 3. Bei API-Contract-Änderungen zwischen App und Worker: beide Seiten gleichzeitig anpassen, Worker zuerst deployen
-4. Bei neuen sensiblen Daten (z.B. weitere Credentials): **immer überlegen, ob sie in sessionStorage oder localStorage gehören.** Faustregel: was dem Angreifer beim Lesen schaden würde → sessionStorage. Was nur Komfort ist → localStorage.
+4. Bei neuen sensiblen Daten (z.B. weitere Credentials): überlege, ob sie an Worker/Bot exponiert sein dürfen. Lock-Settings und alles Lock-bezogene bleibt rein clientseitig.
 5. Diese Datei bei substanziellen Änderungen aktualisieren — sie ist Teil des Projekts, nicht Beiwerk.
