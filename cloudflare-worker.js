@@ -221,27 +221,73 @@ function ensureStateShape(st) {
   };
 }
 
+// Yahoo verlangt für quoteSummary seit 2023 ein CSRF-Token ("crumb") plus
+// passendes Session-Cookie. Hier ist der Auth-Dance: einmal fc.yahoo.com
+// pingen, Cookie einsammeln, mit dem Cookie den Crumb-Endpoint aufrufen.
+// Cache hält sich im Module-Scope solange das Worker-Isolate lebt.
+let _yahooAuth = null; // { cookie, crumb, ts }
+const YAHOO_AUTH_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+
+function extractSetCookies(headers) {
+  if (typeof headers.getSetCookie === "function") {
+    try { return headers.getSetCookie(); } catch {}
+  }
+  const single = headers.get("set-cookie") || "";
+  // Aufsplitten an Kommas, denen ein Cookie-Name+Equal folgt — vermeidet,
+  // dass `expires=Wed, 13 May...` als zwei Cookies missverstanden wird.
+  return single.split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/).map(s => s.trim()).filter(Boolean);
+}
+
+async function getYahooAuth(force = false) {
+  if (!force && _yahooAuth && (Date.now() - _yahooAuth.ts) < YAHOO_AUTH_TTL_MS) return _yahooAuth;
+  const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Version/16.0 Safari/605.1.15";
+  // Schritt 1: Cookie holen
+  const r1 = await fetch("https://fc.yahoo.com", { redirect: "manual", headers: { "User-Agent": ua } });
+  const cookieParts = extractSetCookies(r1.headers).map(c => c.split(";")[0].trim()).filter(Boolean);
+  if (cookieParts.length === 0) throw new Error("yahoo: no cookie from fc.yahoo.com");
+  const cookie = cookieParts.join("; ");
+  // Schritt 2: Crumb mit Cookie holen
+  const r2 = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
+    headers: { "Cookie": cookie, "User-Agent": ua }
+  });
+  if (!r2.ok) throw new Error("yahoo crumb http " + r2.status);
+  const crumb = (await r2.text()).trim();
+  if (!crumb || crumb.length < 4 || /<html/i.test(crumb)) throw new Error("yahoo: empty/invalid crumb");
+  _yahooAuth = { cookie, crumb, ts: Date.now() };
+  return _yahooAuth;
+}
+
 // Holt Short-Interest-Statistiken via Yahoo quoteSummary defaultKeyStatistics.
 // Liefert nur dann sinnvolle Werte, wenn Yahoo für den Ticker entsprechende
 // Pflichtmeldungen verfügbar hat — primär US-Listings.
 async function fetchShortInterest(symbol) {
-  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=defaultKeyStatistics`;
-  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 PairTradeTracker" } });
-  if (!r.ok) throw new Error("yahoo http " + r.status);
-  const data = await r.json();
-  const stats = data?.quoteSummary?.result?.[0]?.defaultKeyStatistics;
-  if (!stats) return null;
-  // Yahoo liefert die Felder als {raw: <num>, fmt: "<string>"}. Wir wollen die rohen Zahlen.
-  const raw = (x) => (x && typeof x === "object" && "raw" in x) ? x.raw : x;
-  const shortPctFloat = raw(stats.shortPercentOfFloat);
-  if (shortPctFloat == null || !isFinite(shortPctFloat)) return null;
-  return {
-    shortPercentOfFloat: shortPctFloat * 100,  // Yahoo gibt als Dezimalbruch (0.285) → wir wollen %
-    sharesShort: raw(stats.sharesShort),
-    sharesShortPriorMonth: raw(stats.sharesShortPriorMonth),
-    shortRatio: raw(stats.shortRatio),  // Days to Cover
-    dateShortInterest: raw(stats.dateShortInterest)  // Unix-Timestamp
-  };
+  const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Version/16.0 Safari/605.1.15";
+  let auth = await getYahooAuth();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=defaultKeyStatistics&crumb=${encodeURIComponent(auth.crumb)}`;
+    const r = await fetch(url, { headers: { "Cookie": auth.cookie, "User-Agent": ua } });
+    if (r.status === 401 && attempt === 0) {
+      // Auth stale → einmal frisch holen und retry
+      _yahooAuth = null;
+      auth = await getYahooAuth(true);
+      continue;
+    }
+    if (!r.ok) throw new Error("yahoo http " + r.status);
+    const data = await r.json();
+    const stats = data?.quoteSummary?.result?.[0]?.defaultKeyStatistics;
+    if (!stats) return null;
+    const raw = (x) => (x && typeof x === "object" && "raw" in x) ? x.raw : x;
+    const shortPctFloat = raw(stats.shortPercentOfFloat);
+    if (shortPctFloat == null || !isFinite(shortPctFloat)) return null;
+    return {
+      shortPercentOfFloat: shortPctFloat * 100,
+      sharesShort: raw(stats.sharesShort),
+      sharesShortPriorMonth: raw(stats.sharesShortPriorMonth),
+      shortRatio: raw(stats.shortRatio),
+      dateShortInterest: raw(stats.dateShortInterest)
+    };
+  }
+  throw new Error("yahoo http 401 (auth retry failed)");
 }
 
 function buildSqueezeMessage(lang, trade, shortPct, threshold, shortInfo) {
