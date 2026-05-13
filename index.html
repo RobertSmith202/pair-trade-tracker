@@ -998,23 +998,16 @@ let pinEntry = "";
 
 function renderLockDots() {
   const wrap = document.getElementById("lock-dots"); if (!wrap) return;
-  // Vor Eingabe (pinEntry leer) keine Dots zeigen — verrät nicht die PIN-Länge.
-  // Erst sobald der User tippt, erscheinen Dots (gefüllte + leere als Längen-Hint).
-  if (pinEntry.length === 0) {
+  // Es werden NUR so viele Dots gezeigt, wie der User bislang getippt hat —
+  // alle gefüllt. Keine leeren Längen-Hints, kein Verrat der PIN-Länge.
+  if (wrap.childElementCount !== pinEntry.length) {
     wrap.innerHTML = "";
-    return;
-  }
-  const stored = Number(lockSettings.pinLength) || 0;
-  const target = Math.max(stored, pinEntry.length, 4);
-  if (wrap.childElementCount !== target) {
-    wrap.innerHTML = "";
-    for (let i = 0; i < target; i++) {
+    for (let i = 0; i < pinEntry.length; i++) {
       const d = document.createElement("span");
-      d.className = "lock-dot";
+      d.className = "lock-dot filled";
       wrap.appendChild(d);
     }
   }
-  Array.from(wrap.children).forEach((d, i) => d.classList.toggle("filled", i < pinEntry.length));
 }
 
 function clearPinEntry() {
