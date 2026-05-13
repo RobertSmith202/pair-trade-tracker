@@ -211,8 +211,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .menu-sheet button { justify-content: flex-start; text-align: left; width: 100%; }
 .io-textarea { width: 100%; min-height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; resize: vertical; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
-.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: flex-start; justify-content: center; padding: 4vh 24px 24px; overflow: hidden; }
+.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: stretch; justify-content: center; padding: 4vh 24px 4vh; overflow: hidden; }
 .lock-screen.open { display: flex; }
+.lock-spacer { flex: 1; min-height: 20px; }
 .lock-screen::before {
   content: "";
   position: absolute;
@@ -281,6 +282,9 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   <div class="lock-box">
     <div class="lock-app-title" data-i18n="app_title">Pair Trade Tracker</div>
     <div class="lock-app-sub" id="lock-sub" data-i18n="lock_sub">Code eingeben</div>
+
+    <!-- Spacer schiebt alles darunter ans untere Ende der Lock-Box (TWINT-Layout) -->
+    <div class="lock-spacer"></div>
 
     <!-- PIN-Mode UI: Dot-Indicators -->
     <div class="lock-dots" id="lock-dots" style="display:none"></div>
