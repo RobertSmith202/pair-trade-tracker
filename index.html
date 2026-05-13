@@ -203,6 +203,18 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .menu-sheet button { justify-content: flex-start; text-align: left; width: 100%; }
 .io-textarea { width: 100%; min-height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; resize: vertical; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
+.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 24px; }
+.lock-screen.open { display: flex; }
+.lock-box { width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 22px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
+.lock-icon { font-size: 42px; line-height: 1; margin-bottom: 4px; }
+.lock-title { font-size: 20px; font-weight: 700; color: var(--text); }
+.lock-sub { font-size: 13px; color: var(--muted); margin-top: -8px; }
+.lock-box input { width: 100%; padding: 14px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; background: var(--bg); color: var(--text); text-align: center; letter-spacing: 2px; -webkit-appearance: none; appearance: none; }
+.lock-box input:focus { outline: none; border-color: var(--info); }
+.lock-box input.shake { animation: lockshake 0.4s; }
+@keyframes lockshake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+.lock-error { font-size: 13px; color: var(--neg); font-weight: 600; }
+.lock-box button.primary { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; }
 .modal-overlay.open { display: flex; }
 .modal { background: var(--card); width: 100%; max-width: 520px; padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; overflow-y: auto; }
 .modal h1 { font-size: 22px; font-weight: 700; margin-bottom: 0; }
@@ -218,6 +230,16 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 </style>
 </head>
 <body>
+<div class="lock-screen" id="lock-screen" aria-hidden="true">
+  <div class="lock-box">
+    <div class="lock-icon" aria-hidden="true">🔒</div>
+    <div class="lock-title" data-i18n="lock_title">App gesperrt</div>
+    <div class="lock-sub" id="lock-sub" data-i18n="lock_sub">Bitte Code eingeben</div>
+    <input id="lock-input" type="password" autocapitalize="off" autocorrect="off" autocomplete="current-password" aria-label="Code">
+    <div class="lock-error" id="lock-error" style="display:none"></div>
+    <button id="lock-submit" class="primary" data-i18n="lock_unlock">Entsperren</button>
+  </div>
+</div>
 
 <div class="toolbar-wrap">
   <div class="toolbar">
@@ -432,6 +454,28 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
       </select>
     </div>
 
+    <h4 class="section-h" data-i18n="settings_lock_title">App-Sperre</h4>
+    <div class="info-box" data-i18n="settings_lock_info"></div>
+    <div class="field">
+      <label data-i18n="settings_lock_status_label">Sperre</label>
+      <select id="lock-enabled-select">
+        <option value="off" data-i18n="settings_lock_off">Aus</option>
+        <option value="on" data-i18n="settings_lock_on">Aktiv</option>
+      </select>
+    </div>
+    <div id="lock-config-area">
+      <div class="field">
+        <label data-i18n="settings_lock_type_label">Art</label>
+        <select id="lock-type-select">
+          <option value="pin" data-i18n="settings_lock_type_pin">PIN (Zahlen)</option>
+          <option value="password" data-i18n="settings_lock_type_password">Passwort</option>
+        </select>
+      </div>
+      <div class="field"><label data-i18n="settings_lock_new_label">Neuer Code</label><input id="lock-new" type="password" autocapitalize="off" autocorrect="off" autocomplete="new-password"></div>
+      <div class="field"><label data-i18n="settings_lock_confirm_label">Bestätigen</label><input id="lock-confirm" type="password" autocapitalize="off" autocorrect="off" autocomplete="new-password"></div>
+      <div class="info-box" id="lock-keep-hint" style="display:none;" data-i18n="settings_lock_keep_hint"></div>
+    </div>
+
     <h4 class="section-h" data-i18n="settings_start_page">Standard-Page</h4>
     <div class="info-box" data-i18n="settings_start_page_info"></div>
     <div class="field">
@@ -515,6 +559,17 @@ const STRINGS = {
     alarm_max_acknowledged: "✓ Gewinn quittiert · neue Nachricht erst wenn unter {pct} und dann wieder darüber",
     menu_actions: "Aktionen", menu_data_mgmt: "Datenverwaltung", menu_sync_now: "Jetzt syncen",
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
+    lock_title: "App gesperrt", lock_sub: "Bitte Code eingeben", lock_unlock: "Entsperren",
+    lock_wrong: "Falscher Code",
+    settings_lock_title: "App-Sperre", settings_lock_info: "Optionaler Zusatzschutz, falls dir jemand das entsperrte Handy abnimmt, während die App offen ist. Greift nur nach 30 Sek. im Hintergrund. Wenn du die App / Safari schließt, sind Sync-Credentials und Trades sowieso weg (Auto-Wipe) — eine neue Session startet leer, dafür ist keine Sperre nötig. Hinweis: die Sperre ist ein UI-Schutz, keine echte Verschlüsselung — wer Safari-Devtools öffnet, kommt während der Session trotzdem an die Trades.",
+    settings_lock_status_label: "Sperre", settings_lock_off: "Aus", settings_lock_on: "Aktiv",
+    settings_lock_type_label: "Art", settings_lock_type_pin: "PIN (Zahlen)", settings_lock_type_password: "Passwort",
+    settings_lock_new_label: "Neuer Code", settings_lock_confirm_label: "Bestätigen",
+    settings_lock_keep_hint: "Code-Felder leer lassen, um den bestehenden Code zu behalten.",
+    settings_lock_err_empty: "Bitte einen Code eingeben.",
+    settings_lock_err_mismatch: "Code und Bestätigung stimmen nicht überein.",
+    settings_lock_err_pin_nonnumeric: "PIN darf nur Ziffern enthalten.",
+    settings_lock_err_too_short: "Mindestens 4 Zeichen.",
     settings_title: "Einstellungen", settings_language: "Sprache", settings_language_label: "Sprache",
     settings_language_info: "Pro Gerät gespeichert (nicht synced).",
     settings_theme: "Erscheinungsbild",
@@ -604,6 +659,17 @@ const STRINGS = {
     alarm_max_acknowledged: "✓ Profit acknowledged · next message only when below {pct} and back above",
     menu_actions: "Actions", menu_data_mgmt: "Data management", menu_sync_now: "Sync now",
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
+    lock_title: "App locked", lock_sub: "Please enter code", lock_unlock: "Unlock",
+    lock_wrong: "Wrong code",
+    settings_lock_title: "App lock", settings_lock_info: "Optional extra layer for the case where someone grabs your unlocked phone while the app is open. Kicks in after 30 sec in the background. Closing the app / Safari wipes sync credentials and trades automatically (Auto-Wipe) — a fresh session starts empty, so no lock is needed there. Note: this is a UI gate, not real data encryption — anyone with Safari Developer Tools can still read the trades during a session.",
+    settings_lock_status_label: "Lock", settings_lock_off: "Off", settings_lock_on: "Active",
+    settings_lock_type_label: "Type", settings_lock_type_pin: "PIN (digits)", settings_lock_type_password: "Password",
+    settings_lock_new_label: "New code", settings_lock_confirm_label: "Confirm",
+    settings_lock_keep_hint: "Leave code fields empty to keep the existing code.",
+    settings_lock_err_empty: "Please enter a code.",
+    settings_lock_err_mismatch: "Code and confirmation don't match.",
+    settings_lock_err_pin_nonnumeric: "PIN must contain only digits.",
+    settings_lock_err_too_short: "At least 4 characters.",
     settings_title: "Settings", settings_language: "Language", settings_language_label: "Language",
     settings_language_info: "Stored per device (not synced).",
     settings_theme: "Appearance",
@@ -673,6 +739,8 @@ const PRICE_KEY = "pair_trade_price_v1";
 const LANG_KEY = "pair_trade_lang_v1";
 const START_PAGE_KEY = "pair_trade_start_page_v1";
 const THEME_KEY = "pair_trade_theme_v1";
+const LOCK_KEY = "pair_trade_lock_v1";
+const LOCK_RELOCK_MS = 30 * 1000;
 const VIEW_MODE_KEY = "pair_trade_view_v1";
 const VIEW_MODES = ["grid", "list"];
 const PRICE_CACHE = new Map();
@@ -706,6 +774,70 @@ let formAlertMinMode = "pct"; // "pct" | "price"  (per current form session)
 let formAlertMaxMode = "pct";
 let pageScrollDebounce = null;
 let viewModes = { pair: "grid", long: "grid", short: "grid", total: "grid" };
+
+// --- App-Lock state ---
+let lockSettings = { enabled: false, type: "password", hash: null };
+let appUnlocked = true;       // true after successful unlock OR if lock disabled
+let lockHiddenAt = 0;          // when did the app go into background most recently
+
+function loadLockSettings() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LOCK_KEY) || "{}");
+    return { enabled: !!v.enabled, type: v.type === "pin" ? "pin" : "password", hash: v.hash || null };
+  } catch { return { enabled: false, type: "password", hash: null }; }
+}
+function saveLockSettings(s) { try { localStorage.setItem(LOCK_KEY, JSON.stringify(s)); } catch {} }
+
+async function hashCode(plain) {
+  const data = new TextEncoder().encode(String(plain));
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function configureLockInputType() {
+  const inp = document.getElementById("lock-input");
+  if (!inp) return;
+  if (lockSettings.type === "pin") {
+    inp.setAttribute("type", "tel");
+    inp.setAttribute("inputmode", "numeric");
+    inp.setAttribute("pattern", "[0-9]*");
+  } else {
+    inp.setAttribute("type", "password");
+    inp.removeAttribute("pattern");
+    inp.removeAttribute("inputmode");
+  }
+  inp.value = "";
+  const err = document.getElementById("lock-error");
+  if (err) err.style.display = "none";
+}
+
+function showLockScreen() {
+  appUnlocked = false;
+  configureLockInputType();
+  const ls = document.getElementById("lock-screen");
+  if (ls) ls.classList.add("open");
+  setTimeout(() => { const inp = document.getElementById("lock-input"); if (inp) inp.focus(); }, 120);
+}
+function hideLockScreen() {
+  const ls = document.getElementById("lock-screen");
+  if (ls) ls.classList.remove("open");
+  appUnlocked = true;
+}
+
+async function attemptUnlock() {
+  const inp = document.getElementById("lock-input"); if (!inp) return;
+  const v = inp.value;
+  if (!v) return;
+  const h = await hashCode(v);
+  if (h === lockSettings.hash) {
+    hideLockScreen();
+  } else {
+    const err = document.getElementById("lock-error");
+    if (err) { err.textContent = t("lock_wrong"); err.style.display = "block"; }
+    inp.value = "";
+    inp.classList.remove("shake"); void inp.offsetWidth; inp.classList.add("shake");
+  }
+}
 
 function loadLangPreference() { try { const v = localStorage.getItem(LANG_KEY); return (v && STRINGS[v]) ? v : "de"; } catch { return "de"; } }
 function saveLangPreference(lang) { try { localStorage.setItem(LANG_KEY, lang); } catch {} }
@@ -761,8 +893,16 @@ function setActiveThemeCard(theme) {
   });
 }
 
-function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
-function saveSyncSettings() { localStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); }
+// Sync credentials live in sessionStorage ONLY — auto-wipe on Safari close.
+// Anyone opening a fresh session sees an empty form, not your trade history.
+function loadSyncSettings() { try { const raw = sessionStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
+function saveSyncSettings() { try { sessionStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); } catch {} }
+// One-time migration: if old localStorage still holds sync credentials from a
+// previous build, scrub them so they don't persist across closes anymore.
+try { if (localStorage.getItem(SYNC_KEY)) localStorage.removeItem(SYNC_KEY); } catch {}
+
+// Worker URL + home currency are not secrets — keep them in localStorage so the
+// user doesn't have to retype them every session.
 function loadPriceSettings() { try { const raw = localStorage.getItem(PRICE_KEY); if (!raw) return { workerUrl: "", homeCurrency: "EUR" }; return Object.assign({ workerUrl: "", homeCurrency: "EUR" }, JSON.parse(raw)); } catch { return { workerUrl: "", homeCurrency: "EUR" }; } }
 function savePriceSettings() { localStorage.setItem(PRICE_KEY, JSON.stringify(priceSettings)); }
 
@@ -784,12 +924,17 @@ function migrateTrades() {
   return changed;
 }
 
+// Trade cache + alert states live in sessionStorage so they're wiped on Safari close.
+// On the first fresh launch the app shows an empty state; the user must enter
+// JSONBin credentials in Settings to pull their data back.
 function loadStorage() {
-  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
-  try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
+  try { const raw = sessionStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
   trades = []; alertStates = {}; localLastModified = 0;
 }
-function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, alertStates, lastModified: localLastModified })); }
+function persistLocal() { try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, alertStates, lastModified: localLastModified })); } catch {} }
+// One-time migration: scrub any old localStorage trade cache from previous builds.
+try { if (localStorage.getItem(STORAGE_KEY)) localStorage.removeItem(STORAGE_KEY); } catch {}
+try { if (localStorage.getItem(STORAGE_KEY_OLD)) localStorage.removeItem(STORAGE_KEY_OLD); } catch {}
 function markLocalChange() { localLastModified = Date.now(); persistLocal(); scheduleSyncPush(); }
 
 function fmtMoney(n, c) { if (n == null || !isFinite(n)) return "—"; try { return new Intl.NumberFormat("de-DE", { style: "currency", currency: c || homeCurrency, maximumFractionDigits: 2 }).format(n); } catch { return n.toFixed(2) + " " + (c || homeCurrency); } }
@@ -1754,8 +1899,24 @@ function openSettings() {
   document.getElementById("price-test-result").style.display = "none";
   document.getElementById("sync-test-result").style.display = "none";
   document.getElementById("sync-disable").style.display = syncSettings.enabled ? "block" : "none";
+  // Lock settings: read current state and populate UI
+  document.getElementById("lock-enabled-select").value = lockSettings.enabled ? "on" : "off";
+  document.getElementById("lock-type-select").value = lockSettings.type === "pin" ? "pin" : "password";
+  document.getElementById("lock-new").value = "";
+  document.getElementById("lock-confirm").value = "";
+  updateLockConfigVisibility();
   document.getElementById("settings-modal").classList.add("open");
   closeMenu();
+}
+
+// Show/hide the lock-config area based on the enabled select; also show
+// the "leave empty to keep current code" hint only when a code already exists.
+function updateLockConfigVisibility() {
+  const enabledChoice = document.getElementById("lock-enabled-select").value;
+  const area = document.getElementById("lock-config-area");
+  area.style.display = (enabledChoice === "on") ? "block" : "none";
+  const hint = document.getElementById("lock-keep-hint");
+  if (hint) hint.style.display = (enabledChoice === "on" && lockSettings.enabled && lockSettings.hash) ? "block" : "none";
 }
 function closeSettings() { document.getElementById("settings-modal").classList.remove("open"); }
 
@@ -1844,6 +2005,36 @@ document.getElementById("settings-test").addEventListener("click", async () => {
   else { sEl.className = "test-result err"; sEl.textContent = t("test_sync_no_creds"); }
 });
 document.getElementById("settings-save").addEventListener("click", async () => {
+  // Lock-settings handling — done first so that any validation error blocks the
+  // rest of the save and the user stays in the modal to fix it.
+  const lockEnabledChoice = document.getElementById("lock-enabled-select").value;
+  const lockTypeChoice = document.getElementById("lock-type-select").value === "pin" ? "pin" : "password";
+  const newCode = document.getElementById("lock-new").value;
+  const confirmCode = document.getElementById("lock-confirm").value;
+  if (lockEnabledChoice === "off") {
+    lockSettings = { enabled: false, type: lockTypeChoice, hash: null };
+    saveLockSettings(lockSettings);
+  } else {
+    // Enabled — figure out which path
+    const wantsChangeCode = newCode.length > 0 || confirmCode.length > 0;
+    const hasExistingCode = lockSettings.enabled && lockSettings.hash;
+    const typeChanged = (lockTypeChoice !== lockSettings.type) && hasExistingCode;
+    if (!hasExistingCode || wantsChangeCode || typeChanged) {
+      // Must set a new code
+      if (newCode.length === 0) { alert(t("settings_lock_err_empty")); return; }
+      if (newCode !== confirmCode) { alert(t("settings_lock_err_mismatch")); return; }
+      if (lockTypeChoice === "pin" && !/^[0-9]+$/.test(newCode)) { alert(t("settings_lock_err_pin_nonnumeric")); return; }
+      if (newCode.length < 4) { alert(t("settings_lock_err_too_short")); return; }
+      const hash = await hashCode(newCode);
+      lockSettings = { enabled: true, type: lockTypeChoice, hash };
+      saveLockSettings(lockSettings);
+    } else {
+      // Keep existing hash, only adjust type/enabled if needed
+      lockSettings = { enabled: true, type: lockTypeChoice, hash: lockSettings.hash };
+      saveLockSettings(lockSettings);
+    }
+  }
+
   const hc = document.getElementById("home-ccy").value.trim().toUpperCase().slice(0,3);
   const wu = document.getElementById("worker-url").value.trim();
   const sk = document.getElementById("sync-key").value.trim();
@@ -1912,6 +2103,12 @@ for (const k of PAGES) applyViewModeUI(k);
 
 const initialLang = loadLangPreference();
 setLanguage(initialLang);
+// Lock-Settings nur LADEN — der Lock-Screen wird aber NICHT beim Boot gezeigt.
+// Grund: Sync-Credentials + Trades sind in sessionStorage und beim Boot leer →
+// es gibt nichts zu schützen. Lock greift erst, wenn die App im Hintergrund war
+// (>30s) UND in der laufenden Session schon Daten geladen wurden (Szenario A).
+lockSettings = loadLockSettings();
+appUnlocked = true;
 loadStorage();
 render();
 if (syncSettings.enabled) setSyncStatus("ok", t("status_sync_active")); else setSyncStatus("off", t("status_sync_off"));
@@ -1922,8 +2119,22 @@ setAutoStatus();
 currentPage = loadStartPage();
 requestAnimationFrame(() => scrollToPage(currentPage, false));
 
+// Re-lock-Logik nur scharf, wenn die laufende Session Daten geladen hat.
+// Sonst gibt's nichts zu schützen — Lock-Screen wäre nur Reibung.
+function sessionHasData() {
+  return (trades.length > 0) || !!syncSettings.apiKey || !!syncSettings.binId;
+}
+
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
+  if (document.hidden) {
+    if (lockSettings.enabled && lockSettings.hash && sessionHasData()) lockHiddenAt = Date.now();
+  } else {
+    // Coming back to foreground — re-lock if hidden long enough AND session has data
+    if (lockSettings.enabled && lockSettings.hash && lockHiddenAt && sessionHasData()) {
+      const elapsed = Date.now() - lockHiddenAt;
+      if (elapsed > LOCK_RELOCK_MS && appUnlocked) showLockScreen();
+    }
+    lockHiddenAt = 0;
     if (syncSettings.enabled) syncFull();
     if (trades.length > 0 && priceSettings.workerUrl) {
       const lastTs = Math.max(...[...PRICE_CACHE.values()].map(v => v.ts || 0), 0);
@@ -1931,6 +2142,17 @@ document.addEventListener("visibilitychange", () => {
     }
     setAutoStatus();
   }
+});
+
+// Lock-screen handlers
+document.getElementById("lock-submit").addEventListener("click", attemptUnlock);
+document.getElementById("lock-input").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); attemptUnlock(); } });
+// Settings UI for lock
+document.getElementById("lock-enabled-select").addEventListener("change", updateLockConfigVisibility);
+document.getElementById("lock-type-select").addEventListener("change", () => {
+  // If the user changes type, clear the new/confirm fields since the rules differ.
+  document.getElementById("lock-new").value = "";
+  document.getElementById("lock-confirm").value = "";
 });
 setInterval(setAutoStatus, 60000);
 </script>
