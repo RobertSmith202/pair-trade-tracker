@@ -20,7 +20,8 @@ Kern-Features:
 - **Zwei-Schwellen-Alarm** pro Trade: Verlust (3-Min-Repeat bis Quittung) + Gewinn (30-Min-Repeat bis Quittung), via Telegram-Bot
 - Bei Single-Leg-Trades (Long / Short) zusätzlich: Schwelle wahlweise als Prozentwert oder als absoluter Preis in der Notierungswährung des Tickers
 - **Soft-Warnung beim Speichern** wenn eine eingegebene Schwelle bereits durch den aktuellen Kurs verletzt wäre
-- **Optionale App-Sperre** (PIN oder Passwort) — Lock-Screen bei jedem App-Öffnen und nach 30 Sek. im Hintergrund
+- **Optionale App-Sperre** (PIN oder Passwort) — Lock-Screen bei jedem App-Öffnen und nach 30 Sek. im Hintergrund. Pro Gerät einstellbar, nicht synced.
+- **Brute-Force-Schutz**: Eskalierende Eingabe-Freezes nach je 3 falschen Versuchen (1/3/5 Min, dann Verdopplung). Während Freeze nur Master-Key-Recovery möglich.
 - **Master-Key-Recovery** auf dem Lock-Screen: bei vergessenem Code per JSONBin Master-Key entsperren
 - Zwei Sprachen (DE, EN) — geräteabhängig
 - Drei Themes (Mitternacht / Hell / Dunkel) — geräteabhängig
@@ -61,6 +62,7 @@ Alle App-Daten leben in `localStorage` und überleben Safari-Schließen / App-Sw
 | `pair_trade_view_v1` | Grid/Liste-Modus pro Page |
 | `pair_trade_start_page_v1` | Standard-Page beim App-Start |
 | `pair_trade_lock_v1` | App-Sperre-Settings: `{enabled, type, hash}` |
+| `pair_trade_lock_attempts_v1` | Brute-Force-Zähler: `{wrongAttempts, freezeUntil}` |
 
 **Historische Notiz:** Eine frühere Version dieser App verschob `tracker_v2` und `sync_v1` nach `sessionStorage` (Auto-Wipe beim Safari-Close). Wurde rückgängig gemacht, weil der User-Komfort darunter litt (jede Session = JSONBin-Master-Key und Bin-ID neu eintippen). Der Schutz vor neugierigen Blicken übernimmt jetzt komplett der Lock-Screen mit Master-Key-Recovery (siehe unten).
 
@@ -141,6 +143,32 @@ Klick auf den Button:
 
 Beim Editieren einer bestehenden Sperre: Code-Felder leer lassen → bestehender Code bleibt. Nur Typ-Änderung allein ohne neuen Code wird nicht unterstützt (Button bleibt deaktiviert) — Robert müsste in diesem Fall einen neuen Code eintippen.
 
+### Brute-Force-Schutz (Eingabe-Freeze)
+
+Nach jeweils 3 falschen Eingaben wird die Eingabe für einen wachsenden Zeitraum komplett gesperrt — Input-Feld + Entsperren-Button disabled, Countdown läuft. Während des Freezes ist die **einzige** Möglichkeit reinzukommen die Master-Key-Recovery.
+
+Eskalation (per 3er-Block):
+
+| Block | Falsch-Eingaben | Freeze-Dauer |
+|---|---|---|
+| 1 | 3 | 1 Min |
+| 2 | 6 | 3 Min |
+| 3 | 9 | 5 Min |
+| 4 | 12 | 10 Min |
+| 5 | 15 | 20 Min |
+| 6 | 18 | 40 Min |
+| 7 | 21 | 80 Min |
+| n ≥ 4 | 3·n | 5 · 2^(n−3) Min |
+
+Implementiert in `freezeDurationMs(totalWrongAttempts)`. Zähler `wrongAttempts` ist kumulativ über die ganze Lebenszeit der Sperre — kein Reset zwischen Freezes, sondern erst bei erfolgreicher Entsperrung (richtiger Code ODER Master-Key-Recovery) ODER beim Ändern/Entfernen der Sperre in Settings.
+
+**Persistenz:** `wrongAttempts` und `freezeUntil` liegen in `localStorage`, überleben Safari-Close und PWA-Neustart. Ein Angreifer kann den Freeze nicht durch App-Neustart umgehen.
+
+**UI-Verhalten während Freeze:**
+- Beim Anzeigen des Lock-Screens (`showLockScreen()`) wird der aktuelle Freeze-Status sofort geprüft und die UI entsprechend gesetzt.
+- Ein `setInterval` aktualisiert den Countdown sekündlich; läuft ab und gibt die Eingabe wieder frei.
+- Master-Key-Eingabefeld (`#lock-recovery-input`) bleibt vom Freeze unberührt — Robert wollte das explizit so.
+
 ### Bekannte Grenzen / explizit dokumentierte Schwächen
 
 Da das Repo privat ist, hier transparent die Schwachstellen:
@@ -149,7 +177,9 @@ Da das Repo privat ist, hier transparent die Schwachstellen:
 
 2. **Lock kann durch Storage-Manipulation umgangen werden.** Wer den `lockSettings.hash` Eintrag in `localStorage` löscht (Safari Devtools → Application → Local Storage), kommt beim nächsten Boot ohne Code rein.
 
-3. **Brute-Force gegen 4-stelligen PIN ist trivial offline.** Wer den Hash hat (siehe Punkt 2), kann 10.000 PINs in unter einer Sekunde durchprobieren. Da hilft kein PBKDF2, weil der Lock selbst nicht zur Datenverschlüsselung genutzt wird — der Angreifer braucht den Hash gar nicht zu knacken, er löscht ihn einfach.
+3. **Brute-Force gegen 4-stelligen PIN ist trivial offline.** Wer den Hash hat (siehe Punkt 2), kann 10.000 PINs in unter einer Sekunde durchprobieren. Da hilft kein PBKDF2, weil der Lock selbst nicht zur Datenverschlüsselung genutzt wird — der Angreifer braucht den Hash gar nicht zu knacken, er löscht ihn einfach. **Aber:** UI-Brute-Force durch wiederholtes Tippen am Lock-Screen wird durch die Freeze-Eskalation (siehe Brute-Force-Schutz-Abschnitt oben) so weit verlangsamt, dass selbst der einfachste 4-stellige PIN unzumutbar lange dauert. Der Schutz greift nur gegen casual snoopers, nicht gegen Devtools-Angreifer.
+
+   Devtools-Angreifer kann auch den Brute-Force-Zähler in `pair_trade_lock_attempts_v1` löschen, um den Freeze zu umgehen. Konsistent mit dem Rest des Threat-Models.
 
 4. **Recovery-Pfad ist nur ein UX-Komfort, keine zweite Schutzschicht.** Der Master-Key liegt im gleichen `localStorage` wie der Lock-Hash. Wer eines lesen kann, kann beides lesen. Der Recovery-Button ist nur dazu da, dass der User selbst (mit Passwort-Manager + Face ID Auto-Fill) bei vergessenem Code wieder reinkommt. Er erhöht NICHT die Sicherheit gegenüber einem technisch versierten Angreifer.
 
@@ -162,7 +192,7 @@ Da das Repo privat ist, hier transparent die Schwachstellen:
 
 ### Bewusste Design-Entscheidungen
 
-- Lock-Settings werden nicht in JSONBin synct. Pro Gerät einstellbar.
+- **Lock-Settings + Brute-Force-Zähler werden nie in JSONBin synct.** Beide Storage-Keys (`pair_trade_lock_v1` und `pair_trade_lock_attempts_v1`) sind strikt pro Gerät. Begründung: das iPhone wird realistisch eher geklaut als das MacBook — also soll der User pro Gerät entscheiden können, ob er eine Sperre braucht. Beispielsweise: iPhone aktiv mit PIN, MacBook ohne Sperre. Auch ein laufender Freeze am iPhone wirkt nicht aufs MacBook.
 - Lock-Screen feuert beim Boot **bevor** `loadStorage()`/`render()` aufgerufen werden — keine Flash der gecachten Trade-Daten hinter dem Lock.
 - 30-Sek-Hintergrund-Schwelle (`LOCK_RELOCK_MS`), nicht sofort. Schnelles Wechseln zur Telegram-App und zurück soll nicht jedes Mal sperren.
 - Eingabe-Felder iOS-spezifisch (über `applyInputModeForCode()`):
