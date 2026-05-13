@@ -211,8 +211,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .menu-sheet button { justify-content: flex-start; text-align: left; width: 100%; }
 .io-textarea { width: 100%; min-height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; resize: vertical; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 200; align-items: center; justify-content: center; padding: 14px; }
-.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: stretch; justify-content: center; padding: 4vh 24px 10vh; overflow: hidden; }
+.lock-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: none; align-items: stretch; justify-content: center; padding: 4vh 24px 10vh; overflow: hidden; transition: transform 0.45s cubic-bezier(0.55, 0.06, 0.68, 0.19), opacity 0.45s ease-out; }
 .lock-screen.open { display: flex; }
+.lock-screen.unlocking { transform: translateX(-100%); opacity: 0; }
 .lock-spacer { flex: 1; min-height: 20px; }
 /* Eulen-Wasserzeichen für Lock-Screen UND alle App-Seiten gemeinsam.
    Identische Größe + Position, damit beim Entsperren visuell kein Sprung passiert. */
@@ -253,11 +254,13 @@ body::before {
 .lock-dots.shake { animation: lockshake 0.4s; }
 .lock-error-strong { font-size: 17px; font-weight: 800; color: var(--neg); letter-spacing: 0.5px; padding: 5px 0 9px; text-transform: uppercase; }
 .lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 290px; margin-top: 4px; }
-.kp-btn { aspect-ratio: 1.32; min-height: 58px; font-size: 29px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 15px; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.08s, transform 0.05s; font-variant-numeric: tabular-nums; padding: 0; }
-.kp-btn:active { background: rgba(127,127,127,0.28); transform: scale(0.94); }
+.kp-btn { aspect-ratio: 1.32; min-height: 58px; font-size: 29px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 15px; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.15s ease-out, transform 0.12s ease-out, box-shadow 0.15s ease-out; font-variant-numeric: tabular-nums; padding: 0; position: relative; overflow: hidden; }
+.kp-btn:active, .kp-btn.pressed { background: rgba(127,127,127,0.42); transform: scale(0.90); box-shadow: 0 0 0 3px rgba(127,127,127,0.18) inset; }
 .kp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .kp-btn.empty { background: transparent; border: none; pointer-events: none; }
 .kp-btn.back { font-size: 22px; font-weight: 600; }
+@keyframes dotPop { 0% { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1.05); opacity: 1; } }
+.lock-dot.filled { animation: dotPop 0.18s ease-out; }
 .lock-box input { width: 100%; padding: 14px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; background: var(--bg); color: var(--text); text-align: center; letter-spacing: 2px; -webkit-appearance: none; appearance: none; }
 input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 .lock-match { font-size: 12px; padding: 8px 12px; border-radius: 7px; margin-top: 6px; font-weight: 500; }
@@ -1240,8 +1243,15 @@ function showLockScreen() {
 }
 function hideLockScreen() {
   const ls = document.getElementById("lock-screen");
-  if (ls) ls.classList.remove("open");
+  if (!ls) { appUnlocked = true; return; }
   appUnlocked = true;
+  // Slide-Out-Animation: Lock-Screen schiebt nach links + faded.
+  // Nach 450ms (= transition duration) wird display:none aktiviert via .open-Entfernung.
+  ls.classList.add("unlocking");
+  setTimeout(() => {
+    ls.classList.remove("open");
+    ls.classList.remove("unlocking");
+  }, 460);
 }
 
 function fmtFreezeCountdown(ms) {
@@ -2733,11 +2743,16 @@ document.addEventListener("visibilitychange", () => {
 // Lock-screen handlers
 document.getElementById("lock-submit").addEventListener("click", attemptUnlock);
 document.getElementById("lock-input").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); attemptUnlock(); } });
-// Custom-Keypad: click-Handler pro Button, dispatcht über data-kp-Attribut
+// Custom-Keypad: click-Handler pro Button, dispatcht über data-kp-Attribut.
+// Zusätzlich kurzes .pressed-Highlight via JS, damit das Feedback auch sichtbar
+// ist wenn iOS-Safari die :active-Pseudoklasse zu früh wegnimmt.
 document.querySelectorAll("#lock-keypad .kp-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const k = btn.getAttribute("data-kp");
-    if (k && k !== "empty") onKeypadPress(k);
+    if (!k || k === "empty") return;
+    btn.classList.remove("pressed"); void btn.offsetWidth; btn.classList.add("pressed");
+    setTimeout(() => btn.classList.remove("pressed"), 160);
+    onKeypadPress(k);
   });
 });
 document.getElementById("lock-recovery-toggle").addEventListener("click", toggleLockRecovery);
