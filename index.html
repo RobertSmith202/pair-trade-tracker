@@ -254,13 +254,41 @@ body::before {
 .lock-dots.shake { animation: lockshake 0.4s; }
 .lock-error-strong { font-size: 17px; font-weight: 800; color: var(--neg); letter-spacing: 0.5px; padding: 5px 0 9px; text-transform: uppercase; }
 .lock-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 290px; margin-top: 4px; }
-.kp-btn { aspect-ratio: 1; min-height: 58px; font-size: 29px; font-weight: 500; background: rgba(127,127,127,0.10); border: 1px solid var(--border); border-radius: 50%; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.18s ease-out, transform 0.14s ease-out, box-shadow 0.18s ease-out; font-variant-numeric: tabular-nums; padding: 0; position: relative; overflow: hidden; }
-.kp-btn:active, .kp-btn.pressed { background: rgba(127,127,127,0.60); transform: scale(0.85); box-shadow: 0 0 0 5px rgba(127,127,127,0.30), 0 0 24px rgba(127,127,127,0.25); border-color: rgba(127,127,127,0.5); }
+.kp-btn { aspect-ratio: 1; min-height: 64px; font-size: 30px; font-weight: 400; background: var(--card); border: none; border-radius: 50%; color: var(--text); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: filter 0.18s ease-out, transform 0.14s ease-out, box-shadow 0.18s ease-out; font-variant-numeric: tabular-nums; padding: 0; position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.kp-btn:active, .kp-btn.pressed { filter: brightness(0.82); transform: scale(0.90); box-shadow: 0 0 0 7px rgba(127,127,127,0.22), 0 4px 14px rgba(0,0,0,0.18); }
 .kp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .kp-btn.empty { background: transparent; border: none; pointer-events: none; }
 .kp-btn.back { font-size: 22px; font-weight: 600; }
 @keyframes dotPop { 0% { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1.05); opacity: 1; } }
 .lock-dot.filled { animation: dotPop 0.18s ease-out; }
+/* Pentagon-Loader nach erfolgreichem Code */
+.lock-loader-overlay {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  z-index: 1200;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  transition: opacity 0.35s ease-out;
+}
+.lock-loader-overlay.open { display: flex; }
+.lock-loader-overlay.fade-out { opacity: 0; }
+.lock-loader-svg { width: 130px; height: 130px; animation: pentagonSpin 1.7s linear infinite; }
+.loader-pentagon {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 280;
+  stroke-dashoffset: 280;
+  animation: pentagonDraw 5s linear forwards;
+}
+.lock-loader-text { font-size: 14px; color: var(--muted); letter-spacing: 0.6px; text-transform: uppercase; font-weight: 600; }
+@keyframes pentagonSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes pentagonDraw { from { stroke-dashoffset: 280; } to { stroke-dashoffset: 0; } }
 .lock-box input { width: 100%; padding: 14px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 18px; background: var(--bg); color: var(--text); text-align: center; letter-spacing: 2px; -webkit-appearance: none; appearance: none; }
 input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 .lock-match { font-size: 12px; padding: 8px 12px; border-radius: 7px; margin-top: 6px; font-weight: 500; }
@@ -344,6 +372,14 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <button id="lock-recovery-submit" data-i18n="lock_forgot_submit">Sperre entfernen</button>
     </div>
   </div>
+</div>
+
+<!-- Pentagon-Loader nach erfolgreichem Code -->
+<div class="lock-loader-overlay" id="lock-loader-overlay" aria-hidden="true">
+  <svg class="lock-loader-svg" viewBox="0 0 100 100" aria-hidden="true">
+    <polygon class="loader-pentagon" points="50,8 95,42 78,92 22,92 5,42"/>
+  </svg>
+  <div class="lock-loader-text" data-i18n="lock_loading">Authentifizierung</div>
 </div>
 
 <div class="toolbar-wrap">
@@ -695,7 +731,7 @@ const STRINGS = {
     menu_actions: "Aktionen", menu_data_mgmt: "Datenverwaltung", menu_sync_now: "Jetzt syncen",
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     lock_title: "App gesperrt", lock_welcome: "Welcome", lock_sub: "Code eingeben um fortzufahren", lock_unlock: "Entsperren",
-    lock_wrong: "Zugriff verweigert",
+    lock_wrong: "Zugriff verweigert", lock_loading: "Authentifizierung",
     lock_freeze_msg: "Zu viele Falsch-Eingaben. Eingabe gesperrt — nur über Master-Key entsperrbar.",
     lock_forgot: "Passwort vergessen?",
     lock_forgot_info: "Gib deinen JSONBin Master-Key ein. Wenn er mit dem gespeicherten übereinstimmt, wird die Sperre entfernt und du bist drin.",
@@ -825,7 +861,7 @@ const STRINGS = {
     menu_actions: "Actions", menu_data_mgmt: "Data management", menu_sync_now: "Sync now",
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     lock_title: "App locked", lock_welcome: "Welcome", lock_sub: "Enter code to continue", lock_unlock: "Unlock",
-    lock_wrong: "Access denied",
+    lock_wrong: "Access denied", lock_loading: "Authenticating",
     lock_freeze_msg: "Too many wrong attempts. Input frozen — only master key unlocks now.",
     lock_forgot: "Forgot password?",
     lock_forgot_info: "Enter your JSONBin master key. If it matches the stored one, the lock is removed and you're in.",
@@ -1241,17 +1277,40 @@ function showLockScreen() {
     }, 120);
   }
 }
+// Hide-Variante für Recovery-Pfad (Master-Key): direkter Slide-Out ohne Loader.
 function hideLockScreen() {
   const ls = document.getElementById("lock-screen");
   if (!ls) { appUnlocked = true; return; }
   appUnlocked = true;
-  // Slide-Out-Animation: Lock-Screen schiebt nach links + faded.
-  // Nach 450ms (= transition duration) wird display:none aktiviert via .open-Entfernung.
   ls.classList.add("unlocking");
   setTimeout(() => {
     ls.classList.remove("open");
     ls.classList.remove("unlocking");
   }, 760);
+}
+
+// Erfolgreicher Code → Pentagon-Loader für 5 Sekunden, dann App.
+function unlockWithLoader() {
+  const ls = document.getElementById("lock-screen");
+  const loader = document.getElementById("lock-loader-overlay");
+  if (!loader) { hideLockScreen(); return; }
+  // Pentagon-Animation neu anstoßen (falls schon mal gelaufen)
+  const poly = loader.querySelector(".loader-pentagon");
+  if (poly) { poly.style.animation = "none"; void poly.offsetWidth; poly.style.animation = ""; }
+  // Lock-Screen wegmachen (instant, kein Slide), Loader öffnen
+  if (ls) ls.classList.remove("open");
+  loader.classList.add("open");
+  // Nach 5s Loader-Animation: fade out, danach loader weg + App ist sichtbar
+  setTimeout(() => {
+    loader.classList.add("fade-out");
+    setTimeout(() => {
+      loader.classList.remove("open");
+      loader.classList.remove("fade-out");
+      appUnlocked = true;
+    }, 360);
+  }, 5000);
+  // appUnlocked schon hier setzen, damit kein zweites visibilitychange triggert
+  appUnlocked = true;
 }
 
 function fmtFreezeCountdown(ms) {
@@ -1312,7 +1371,7 @@ async function attemptUnlock() {
   if (h === lockSettings.hash) {
     resetLockAttempts();
     if (lockFreezeTimer) { clearInterval(lockFreezeTimer); lockFreezeTimer = null; }
-    hideLockScreen();
+    unlockWithLoader();
   } else {
     // Falsch — Versuchszähler hochsetzen und ggf. Freeze starten
     const next = { wrongAttempts: state.wrongAttempts + 1, freezeUntil: state.freezeUntil };
