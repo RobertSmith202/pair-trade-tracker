@@ -206,7 +206,10 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
 .basket-card .alarm-pill { vertical-align: middle; }
-.basket-card-del { background: transparent; border: 1px solid var(--neg-bg); color: var(--neg); padding: 4px 9px; min-height: 0; font-size: 13px; line-height: 1; border-radius: 6px; flex-shrink: 0; font-weight: 700; }
+.basket-card-edit, .basket-card-del { background: transparent; padding: 4px 9px; min-height: 0; font-size: 12px; line-height: 1; border-radius: 6px; flex-shrink: 0; font-weight: 600; }
+.basket-card-edit { border: 1px solid var(--border); color: var(--muted); }
+.basket-card-edit:hover { background: var(--card); color: var(--text); border-color: var(--text); }
+.basket-card-del { border: 1px solid var(--neg-bg); color: var(--neg); font-size: 13px; font-weight: 700; }
 .basket-card-del:hover { background: var(--neg-bg); }
 /* Grid-View: Korb-Karte erweitert mit Notional, Alarm-Status und Top-Trades */
 .basket-card-extra { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 8px; }
@@ -2367,6 +2370,7 @@ function renderBasketCard(basket) {
     <div class="basket-card-head">
       <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}${pillsHtml}</div>
       <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
+      <button class="basket-card-edit" data-basket-edit="${basket.id}" aria-label="edit">${t("btn_edit")}</button>
       <button class="basket-card-del" data-basket-del="${basket.id}" aria-label="delete">×</button>
     </div>
     <div class="basket-card-row">
@@ -2380,7 +2384,14 @@ function renderBasketCard(basket) {
       ${constHtml}
     </div>`;
   card.addEventListener("click", () => openBasketModal(basket.id));
-  // Delete-Button direkt auf der Karte — stoppt Propagation, sonst öffnet sich das Modal
+  // Edit- und Delete-Button direkt auf der Karte — stoppen Propagation, sonst öffnet sich das Modal
+  const editBtn = card.querySelector(".basket-card-edit");
+  if (editBtn) {
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openBasketForm(basket.id);
+    });
+  }
   const delBtn = card.querySelector(".basket-card-del");
   if (delBtn) {
     delBtn.addEventListener("click", (e) => {
