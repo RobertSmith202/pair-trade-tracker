@@ -337,6 +337,56 @@ body::before {
 @keyframes dotPop { 0% { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1.05); opacity: 1; } }
 .lock-dot.filled { animation: dotPop 0.18s ease-out; }
 
+/* === Desktop-Sidebar (Ebene 3: Multi-Pane / Bloomberg-Style) =============== */
+.desktop-sidebar { display: none; }
+[data-layout="desktop"] .desktop-sidebar {
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: 220px;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 18px 14px;
+  z-index: 60;
+  overflow-y: auto;
+  box-shadow: 1px 0 0 var(--border);
+}
+[data-layout="desktop"] body { padding-left: 220px; max-width: none; }
+/* Mobile-Toolbar und Ebene-2-Tabs auf Ebene-3-Desktop ausblenden — Sidebar übernimmt */
+[data-layout="desktop"] .toolbar-wrap { display: none; }
+[data-layout="desktop"] .desktop-tabs { display: none; }
+[data-layout="desktop"] .pages-container { max-width: 1100px; margin: 0 auto; }
+/* Brand-Block ganz oben */
+.ds-brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.ds-brand-mark { font-size: 26px; line-height: 1; color: var(--info); }
+.ds-brand-title { font-size: 13px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.2; }
+/* Vertikale Navigation */
+.ds-nav { display: flex; flex-direction: column; gap: 3px; }
+.ds-nav-btn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-weight: 600; font-size: 14px; cursor: pointer; min-height: 0; text-align: left; transition: background-color 0.12s, color 0.12s; }
+.ds-nav-btn:hover { background: var(--bg); color: var(--text); }
+.ds-nav-btn.active { background: var(--bg); color: var(--text); border-color: var(--border); }
+.ds-nav-glyph { display: inline-block; width: 18px; text-align: center; font-size: 13px; opacity: 0.85; }
+.ds-nav-glyph.ds-up { color: var(--pos); }
+.ds-nav-glyph.ds-down { color: var(--neg); }
+.ds-divider { height: 1px; background: var(--border); margin: 14px -4px; }
+/* Action-Buttons (Primary + neutral) */
+.ds-actions { display: flex; flex-direction: column; gap: 6px; }
+.ds-action { width: 100%; padding: 10px 12px; min-height: 0; font-size: 13px; font-weight: 600; border-radius: 8px; text-align: center; }
+.ds-action-primary { background: var(--info); color: white; border-color: var(--info); }
+.ds-action-primary:hover { filter: brightness(1.1); }
+.ds-action-ghost { background: transparent; }
+/* Spacer schiebt Status + Footer nach unten */
+.ds-spacer { flex: 1 1 auto; min-height: 14px; }
+/* Status-Block: Key-Value-Zeilen */
+.ds-status-block { display: flex; flex-direction: column; gap: 4px; padding: 10px 6px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 8px 0 10px; }
+.ds-status-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; gap: 6px; }
+.ds-status-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.ds-status-value { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.ds-status-value.ok  { color: var(--pos); }
+.ds-status-value.err { color: var(--neg); }
+.ds-status-value.warn { color: var(--warn); }
+.ds-status-value.off { color: var(--muted); }
+.ds-footer { padding-top: 4px; }
+
 /* === Desktop-Tabs (Ebene 2) ============================================== */
 /* Tab-Bar wird nur im Desktop-Layout sichtbar; ersetzt die Snap-Page-Dots */
 .desktop-tabs { display: none; gap: 4px; padding: 8px 0 6px; border-top: 1px solid var(--border); margin-top: 6px; }
@@ -539,6 +589,34 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <button class="dt-btn" data-tab="total" role="tab" data-i18n="page_total">Gesamt</button>
   </div>
 </div>
+
+<aside class="desktop-sidebar" id="desktop-sidebar" aria-label="Navigation">
+  <div class="ds-brand">
+    <div class="ds-brand-mark" aria-hidden="true">⌬</div>
+    <div class="ds-brand-title" data-i18n="app_title">Pair Trade Tracker</div>
+  </div>
+  <nav class="ds-nav" role="navigation">
+    <button class="ds-nav-btn" data-tab="pair"  data-i18n="page_pairs"  type="button"><span class="ds-nav-glyph">⇄</span><span data-i18n="page_pairs">Paare</span></button>
+    <button class="ds-nav-btn" data-tab="long"  data-i18n="page_longs"  type="button"><span class="ds-nav-glyph ds-up">▲</span><span data-i18n="page_longs">Longs</span></button>
+    <button class="ds-nav-btn" data-tab="short" data-i18n="page_shorts" type="button"><span class="ds-nav-glyph ds-down">▼</span><span data-i18n="page_shorts">Shorts</span></button>
+    <button class="ds-nav-btn" data-tab="total" data-i18n="page_total"  type="button"><span class="ds-nav-glyph">∑</span><span data-i18n="page_total">Gesamt</span></button>
+  </nav>
+  <div class="ds-divider"></div>
+  <div class="ds-actions">
+    <button class="ds-action ds-action-primary" id="ds-new-trade"   data-i18n="btn_new_trade"  type="button">+ Neuer Trade</button>
+    <button class="ds-action ds-action-primary" id="ds-new-basket"  data-i18n="btn_new_basket" type="button" style="display:none">+ Neuer Korb</button>
+    <button class="ds-action" id="ds-refresh" data-i18n="btn_refresh" type="button">↻ Kurse</button>
+  </div>
+  <div class="ds-spacer"></div>
+  <div class="ds-status-block">
+    <div class="ds-status-row"><span class="ds-status-label" data-i18n="ds_status_label">Status</span><span class="ds-status-value" id="ds-status-value">—</span></div>
+    <div class="ds-status-row"><span class="ds-status-label" data-i18n="ds_autorefresh_label">Auto</span><span class="ds-status-value" id="ds-auto-value">⏱ …</span></div>
+    <div class="ds-status-row"><span class="ds-status-label" data-i18n="ds_sync_label">Sync</span><span class="ds-status-value" id="ds-sync-value">aus</span></div>
+  </div>
+  <div class="ds-footer">
+    <button class="ds-action ds-action-ghost" id="ds-settings" data-i18n="ds_settings_btn" type="button">⚙ Einstellungen</button>
+  </div>
+</aside>
 
 <div class="form-card" id="form">
   <h3 id="form-title" data-i18n="form_title_new">Neuer Trade</h3>
@@ -999,8 +1077,9 @@ const STRINGS = {
     settings_theme: "Erscheinungsbild",
     settings_theme_info: "Sofort angewendet und gespeichert. Pro Gerät (nicht synced).",
     theme_midnight: "Mitternacht", theme_light: "Hell", theme_dark: "Dunkel",
-    settings_layout: "Ansicht", settings_layout_info: "Handy: kompakt, eine Spalte. Desktop: zentriert mit max-Breite, Trade-Karten mehrspaltig, Forms als Dialog. Pro Gerät einstellbar — wird nicht synct.",
+    settings_layout: "Ansicht", settings_layout_info: "Handy: kompakt, eine Spalte. Desktop: linke Sidebar mit Navigation und Aktionen, Trade-Karten mehrspaltig, Forms als Floating-Dialog. Pro Gerät einstellbar — wird nicht synct.",
     layout_mobile: "Handy", layout_desktop: "Desktop",
+    ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Einstellungen",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -1152,8 +1231,9 @@ const STRINGS = {
     settings_theme: "Appearance",
     settings_theme_info: "Applied immediately and saved. Stored per device (not synced).",
     theme_midnight: "Midnight", theme_light: "Light", theme_dark: "Dark",
-    settings_layout: "Layout", settings_layout_info: "Mobile: compact, single column. Desktop: centered with max width, multi-column trade cards, forms as dialog. Per-device — not synced.",
+    settings_layout: "Layout", settings_layout_info: "Mobile: compact, single column. Desktop: left sidebar nav and actions, multi-column trade cards, forms as floating dialog. Per-device — not synced.",
     layout_mobile: "Mobile", layout_desktop: "Desktop",
+    ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Settings",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -3384,6 +3464,10 @@ function activateDesktopPage(pageKey) {
   document.querySelectorAll(".desktop-tabs .dt-btn").forEach(b => {
     b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
   });
+  // Ebene 3: Sidebar-Nav synchron halten
+  document.querySelectorAll(".desktop-sidebar .ds-nav-btn").forEach(b => {
+    b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
+  });
 }
 function setActiveDot(pageKey) { document.querySelectorAll(".page-dot").forEach(d => { d.classList.toggle("active", d.getAttribute("data-dot") === pageKey); }); }
 function onPagesScroll() {
@@ -3529,6 +3613,60 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
     scrollToPage(tp, false);
   });
 });
+// === Ebene 3: Sidebar-Navigation + Actions ====================================
+document.querySelectorAll(".desktop-sidebar .ds-nav-btn[data-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tp = btn.getAttribute("data-tab");
+    if (!PAGES.includes(tp)) return;
+    scrollToPage(tp, false);
+  });
+});
+// Sidebar-Actions: leiten an existierende Handler weiter
+(function wireSidebarActions() {
+  const dsNewTrade  = document.getElementById("ds-new-trade");
+  const dsNewBasket = document.getElementById("ds-new-basket");
+  const dsRefresh   = document.getElementById("ds-refresh");
+  const dsSettings  = document.getElementById("ds-settings");
+  if (dsNewTrade)  dsNewTrade.addEventListener("click", () => openForm(null));
+  if (dsNewBasket) dsNewBasket.addEventListener("click", () => {
+    const tp = (currentPage === "short") ? "short" : "long";
+    openBasketForm(null, tp);
+  });
+  if (dsRefresh)  dsRefresh.addEventListener("click", () => refreshAll(true));
+  if (dsSettings) dsSettings.addEventListener("click", () => openSettings());
+})();
+// updateBasketBtnVisibility erweitern: Sidebar-Korb-Button auch toggeln
+const __origUpdateBasketBtn = (typeof updateBasketBtnVisibility === "function") ? updateBasketBtnVisibility : null;
+updateBasketBtnVisibility = function() {
+  if (__origUpdateBasketBtn) __origUpdateBasketBtn();
+  const dsB = document.getElementById("ds-new-basket");
+  if (dsB) dsB.style.display = (currentPage === "long" || currentPage === "short") ? "" : "none";
+};
+// Status-Mirroring: existierende #status, #auto-status, #sync-status spiegeln in Sidebar
+(function mirrorStatusToSidebar() {
+  const pairs = [
+    { src: "status",      dst: "ds-status-value" },
+    { src: "auto-status", dst: "ds-auto-value" },
+    { src: "sync-status", dst: "ds-sync-value" },
+  ];
+  function syncOne(srcId, dstId) {
+    const s = document.getElementById(srcId), d = document.getElementById(dstId);
+    if (!s || !d) return;
+    d.textContent = s.textContent;
+    // Status-Klassen übernehmen (loading/ok/err/off) für Farbcodierung
+    d.className = "ds-status-value";
+    if (s.classList.contains("loading")) d.classList.add("warn");
+    else if (s.classList.contains("ok")) d.classList.add("ok");
+    else if (s.classList.contains("err")) d.classList.add("err");
+    else if (s.classList.contains("off")) d.classList.add("off");
+  }
+  pairs.forEach(p => syncOne(p.src, p.dst));
+  pairs.forEach(p => {
+    const src = document.getElementById(p.src); if (!src) return;
+    const obs = new MutationObserver(() => syncOne(p.src, p.dst));
+    obs.observe(src, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+  });
+})();
 
 document.querySelectorAll(".type-radio").forEach(el => { el.addEventListener("click", () => applyFormTypeUI(el.getAttribute("data-type"))); });
 document.querySelectorAll(".thr-toggle .tt-btn").forEach(btn => {
