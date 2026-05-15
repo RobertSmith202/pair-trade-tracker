@@ -192,6 +192,40 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .donut-legend-pct { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
 .donut-legend-amount { grid-column: 2 / -1; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: -2px; }
 .donut-help { font-size: 11px; color: var(--muted); margin-top: 12px; line-height: 1.4; }
+/* Basket-Karten auf Long/Short-Page */
+.basket-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; cursor: pointer; user-select: none; position: relative; transition: transform 0.05s, background-color 0.1s; }
+.basket-card:active { transform: scale(0.99); }
+.basket-card.long  { border-left: 4px solid var(--pos); }
+.basket-card.short { border-left: 4px solid var(--neg); }
+.basket-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.basket-card-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.basket-card-name::before { content: "🧺"; font-size: 14px; flex-shrink: 0; }
+.basket-card-count { font-size: 11px; color: var(--muted); font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(127,127,127,0.12); flex-shrink: 0; }
+.basket-card-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.basket-card-pnl { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+.basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+.basket-card .alarm-pill { vertical-align: middle; }
+
+/* "+ Neuer Korb"-Button-Reihe oberhalb der Trade-Liste */
+.basket-actions { padding: 0 0 10px; }
+.basket-actions .btn-new-basket { width: 100%; background: var(--card); color: var(--text); border: 1px dashed var(--border); font-weight: 600; }
+
+/* Basket-Modal */
+.basket-modal { position: fixed; inset: 0; background: var(--bg); z-index: 800; display: none; flex-direction: column; overflow: hidden; }
+.basket-modal.open { display: flex; }
+.basket-modal-head { display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 10px) 14px 10px; background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2; }
+.basket-modal-back { background: transparent; border: none; color: var(--text); font-size: 22px; padding: 6px 10px; min-height: 0; line-height: 1; cursor: pointer; }
+.basket-modal-title { flex: 1; min-width: 0; font-size: 18px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.basket-modal-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.basket-modal-actions button { padding: 6px 10px; min-height: 0; font-size: 11px; }
+.basket-modal-body { flex: 1; overflow-y: auto; padding: 0 14px 50px; }
+.basket-modal-toolbar { display: flex; gap: 8px; padding: 8px 0 4px; align-items: center; }
+.basket-modal-toolbar button { flex: 1; min-width: 0; }
+.basket-modal-toolbar .view-toggle { flex: 0 0 auto; }
+.basket-trade-list { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; padding-bottom: 14px; }
+.basket-trade-list[data-view="list"] { gap: 6px; }
+.basket-trade-list[data-view="list"] .trade-card { padding: 10px 12px; }
 .breakdown-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
 .breakdown-card.bd-pair  { border-left: 3px solid var(--info); }
 .breakdown-card.bd-long  { border-left: 3px solid var(--pos); }
@@ -496,6 +530,50 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   <div class="form-actions"><button id="f-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="f-save" data-i18n="btn_save">Speichern</button></div>
 </div>
 
+<!-- Basket-Form: Korb anlegen/bearbeiten (Name + Pct-Schwellen) -->
+<div class="form-card" id="basket-form">
+  <h3 id="basket-form-title" data-i18n="basket_form_title_new">Neuer Korb</h3>
+  <div class="info-box" id="basket-form-type-hint"></div>
+  <div class="field"><label data-i18n="basket_form_name">Name</label><input id="bf-name" type="text" autocomplete="off" data-i18n-placeholder="basket_form_name_ph" placeholder="z.B. Tech Bullen"></div>
+  <div class="form-section alarm">
+    <h4 data-i18n="basket_form_alarms_title">🚨🎯 Korb-Alarme (optional)</h4>
+    <div class="field-row">
+      <div class="field"><label data-i18n="basket_form_loss_label">Verlust-Schwelle (%)</label><input id="bf-loss" type="text" inputmode="decimal" autocomplete="off" placeholder="10"></div>
+      <div class="field"><label data-i18n="basket_form_profit_label">Gewinn-Schwelle (%)</label><input id="bf-profit" type="text" inputmode="decimal" autocomplete="off" placeholder="25"></div>
+    </div>
+    <div class="help" data-i18n="basket_form_alarms_help"></div>
+  </div>
+  <div class="form-actions"><button id="bf-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="bf-save" data-i18n="btn_save">Speichern</button></div>
+</div>
+
+<!-- Basket-Modal: Sub-Page eines Korbs mit allen enthaltenen Trades -->
+<div class="basket-modal" id="basket-modal" aria-hidden="true">
+  <div class="basket-modal-head">
+    <button class="basket-modal-back" id="bm-back" aria-label="back">←</button>
+    <div class="basket-modal-title" id="bm-title">Korb</div>
+    <div class="basket-modal-actions">
+      <button class="icon" id="bm-edit" data-i18n="btn_edit">Bearbeiten</button>
+      <button class="icon danger" id="bm-delete" aria-label="delete">×</button>
+    </div>
+  </div>
+  <div class="basket-modal-body">
+    <div class="aggregate">
+      <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" id="bm-pnl">—</div><div class="sub" id="bm-pnl-sub">&nbsp;</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" id="bm-pct">—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" id="bm-notional">—</div><div class="sub" id="bm-count">0 Trades</div></div>
+    </div>
+    <div id="bm-alarms"></div>
+    <div class="basket-modal-toolbar">
+      <button class="primary" id="bm-add-trade" data-i18n="basket_modal_add_trade">+ Trade zum Korb</button>
+      <div class="view-toggle" data-view-for="basket">
+        <button class="vt-btn" data-view-mode="grid" aria-label="Grid">⊞</button>
+        <button class="vt-btn" data-view-mode="list" aria-label="List">☰</button>
+      </div>
+    </div>
+    <div class="basket-trade-list" id="bm-trade-list" data-view="grid"></div>
+  </div>
+</div>
+
 <div class="pages-container" id="pages-container">
   <section class="page" data-page="pair">
     <div class="page-head">
@@ -525,6 +603,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
+    <div class="basket-actions"><button class="btn-new-basket" data-basket-new="long" data-i18n="btn_new_basket">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="long"></div>
   </section>
   <section class="page" data-page="short">
@@ -540,6 +619,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
+    <div class="basket-actions"><button class="btn-new-basket" data-basket-new="short" data-i18n="btn_new_basket">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="short"></div>
   </section>
   <section class="page" data-page="total">
@@ -773,6 +853,22 @@ const STRINGS = {
     lock_wrong: "Zugriff verweigert", lock_loading: "Authentifizierung",
     donut_title: "Portfolio-Verteilung nach Notional",
     donut_help: "Anteile der drei Trade-Typen am gesamten Kapitaleinsatz (Long-Notional + Short-Notional). FX-konvertiert in deiner Heimat-Währung.",
+    btn_new_basket: "+ Neuer Korb",
+    basket_default_name: "Korb",
+    basket_count_n: "× {n} Trades",
+    basket_empty: "Noch keine Trades in diesem Korb.",
+    basket_delete_confirm: "Korb „{name}\" löschen? Die {n} Trade(s) im Korb werden zu Standalone-Trades — sie werden NICHT gelöscht.",
+    basket_form_title_new: "Neuer Korb",
+    basket_form_title_edit: "Korb bearbeiten",
+    basket_form_name: "Name",
+    basket_form_name_ph: "z.B. Tech Bullen",
+    basket_form_type_hint: "Korb-Typ: {type}. Trades im Korb sind alle desselben Typs.",
+    basket_form_alarms_title: "🚨🎯 Korb-Alarme (optional, nur Prozent)",
+    basket_form_loss_label: "Verlust-Schwelle (%)",
+    basket_form_profit_label: "Gewinn-Schwelle (%)",
+    basket_form_alarms_help: "Schwellen werden auf das <strong>aggregierte Korb-Ergebnis</strong> angewendet (Summe aller Trade-P&Ls / Summe der Notionals). Beide Felder optional, jeweils positive Zahl. <strong>Verlust-Schwelle</strong>: Telegram-Alarm bei Korb-Performance ≤ −X%, Wiederholung alle 3 Min bis quittiert. <strong>Gewinn-Schwelle</strong>: Telegram-Alarm bei Korb-Performance ≥ +X%, Wiederholung alle 30 Min bis quittiert.",
+    basket_modal_add_trade: "+ Trade zum Korb",
+    err_basket_name_required: "Bitte Korb-Namen eingeben.",
     lock_freeze_msg: "Zu viele Falsch-Eingaben. Eingabe gesperrt — nur über Master-Key entsperrbar.",
     lock_forgot: "Passwort vergessen?",
     lock_forgot_info: "Gib deinen JSONBin Master-Key ein. Wenn er mit dem gespeicherten übereinstimmt, wird die Sperre entfernt und du bist drin.",
@@ -905,6 +1001,22 @@ const STRINGS = {
     lock_wrong: "Access denied", lock_loading: "Authenticating",
     donut_title: "Portfolio split by notional",
     donut_help: "Share of the three trade types in total capital deployed (long notional + short notional). FX-converted into your home currency.",
+    btn_new_basket: "+ New basket",
+    basket_default_name: "Basket",
+    basket_count_n: "× {n} trades",
+    basket_empty: "No trades in this basket yet.",
+    basket_delete_confirm: "Delete basket „{name}\"? The {n} trade(s) in it will become standalone trades — they will NOT be deleted.",
+    basket_form_title_new: "New basket",
+    basket_form_title_edit: "Edit basket",
+    basket_form_name: "Name",
+    basket_form_name_ph: "e.g. Tech bulls",
+    basket_form_type_hint: "Basket type: {type}. Trades in the basket all share this type.",
+    basket_form_alarms_title: "🚨🎯 Basket alerts (optional, % only)",
+    basket_form_loss_label: "Loss threshold (%)",
+    basket_form_profit_label: "Profit threshold (%)",
+    basket_form_alarms_help: "Thresholds apply to the <strong>aggregated basket P&L</strong> (sum of all trade P&Ls / sum of notionals). Both fields optional, positive numbers only. <strong>Loss threshold</strong>: Telegram alert when basket performance ≤ −X%, repeats every 3 min until acknowledged. <strong>Profit threshold</strong>: Telegram alert when basket performance ≥ +X%, repeats every 30 min until acknowledged.",
+    basket_modal_add_trade: "+ Trade to basket",
+    err_basket_name_required: "Please enter a basket name.",
     lock_freeze_msg: "Too many wrong attempts. Input frozen — only master key unlocks now.",
     lock_forgot: "Forgot password?",
     lock_forgot_info: "Enter your JSONBin master key. If it matches the stored one, the lock is removed and you're in.",
@@ -990,6 +1102,7 @@ function applyTranslations() {
   const lossHelp = document.querySelector('#form-loss-section .help'); if (lossHelp) lossHelp.innerHTML = t('form_alarm_loss_help');
   const profitHelp = document.querySelector('#form-profit-section .help'); if (profitHelp) profitHelp.innerHTML = t('form_alarm_profit_help');
   const sqzHelp = document.querySelector('#form-squeeze-section .help'); if (sqzHelp) sqzHelp.innerHTML = t('form_squeeze_help');
+  const basketAlarmHelp = document.querySelector('#basket-form .form-section.alarm .help'); if (basketAlarmHelp) basketAlarmHelp.innerHTML = t('basket_form_alarms_help');
   if (typeof render === 'function') render();
   setAutoStatus();
 }
@@ -1022,12 +1135,16 @@ let lastAutoRefreshAt = 0;
 const lastTotalPnlForFlashByAgg = { pair: null, long: null, short: null, total: null };
 
 let trades = [];
+let baskets = []; // Long-/Short-Körbe; Trade.basketId verweist hierauf. Pair-Trades haben keine Körbe.
 let alertStates = {};
 let localLastModified = 0;
 let syncSettings = loadSyncSettings();
 let priceSettings = loadPriceSettings();
 let homeCurrency = (priceSettings.homeCurrency || "EUR").toUpperCase();
 let editingId = null;
+let editingBasketId = null;          // Basket-Form: null = new, sonst Edit-Mode
+let currentBasketId = null;          // Welcher Basket aktuell im Basket-Modal sichtbar ist
+let tradeFormBasketContext = null;   // Wenn gesetzt: nächstes openForm() bindet Trade an diesen Basket
 let syncDebounce = null;
 
 const PAGES = ["pair", "long", "short", "total"];
@@ -1036,7 +1153,7 @@ let formType = "pair";
 let formAlertMinMode = "pct"; // "pct" | "price"  (per current form session)
 let formAlertMaxMode = "pct";
 let pageScrollDebounce = null;
-let viewModes = { pair: "grid", long: "grid", short: "grid", total: "grid" };
+let viewModes = { pair: "grid", long: "grid", short: "grid", total: "grid", basket: "grid" };
 
 // --- App-Lock state ---
 let lockSettings = { enabled: false, type: "password", hash: null };
@@ -1557,6 +1674,50 @@ function savePriceSettings() { localStorage.setItem(PRICE_KEY, JSON.stringify(pr
 
 function tradeType(tr) { return (tr.type === "long" || tr.type === "short") ? tr.type : "pair"; }
 function hasLong(tr) { const t = tradeType(tr); return t === "pair" || t === "long"; }
+
+// --- Basket-Helper ---
+function findBasket(id) { return baskets.find(b => b.id === id) || null; }
+function tradesInBasket(basketId) { return trades.filter(tr => tr.basketId === basketId); }
+function basketType(b) { return (b && (b.type === "long" || b.type === "short")) ? b.type : "long"; }
+function hasBasketLossThreshold(b) { return b && b.alertPctMin != null && b.alertPctMin !== ""; }
+function hasBasketProfitThreshold(b) { return b && b.alertPctMax != null && b.alertPctMax !== ""; }
+
+// Aggregat eines Korbs aus allen enthaltenen Trades. Returns {totalPnlHome,
+// totalNotionalHome, pct, tradeCount, type, name} — analog zu computeTrade.
+function computeBasket(basket) {
+  const inBasket = tradesInBasket(basket.id);
+  let totalPnl = 0, totalNotional = 0;
+  let hasAnyValue = false;
+  for (const tr of inBasket) {
+    const lp = hasLong(tr)  ? PRICE_CACHE.get((tr.longTicker  || "").toUpperCase()) : null;
+    const sp = hasShort(tr) ? PRICE_CACHE.get((tr.shortTicker || "").toUpperCase()) : null;
+    const c = computeTrade(tr, lp, sp);
+    if (c.totalPnlHome != null && c.totalNotionalHome != null) {
+      totalPnl += c.totalPnlHome;
+      totalNotional += c.totalNotionalHome;
+      hasAnyValue = true;
+    }
+  }
+  const pct = (hasAnyValue && totalNotional > 0) ? (totalPnl / totalNotional) * 100 : null;
+  return {
+    totalPnlHome: hasAnyValue ? totalPnl : null,
+    totalNotionalHome: hasAnyValue ? totalNotional : null,
+    pct,
+    tradeCount: inBasket.length,
+    type: basketType(basket),
+    name: basket.name
+  };
+}
+
+// Alarm-Status für einen Basket (unabhängig von Trade-Status).
+function basketAlarmStateOf(basket) {
+  const st = alertStates[basket.id];
+  if (!st) return { min: "idle", max: "idle" };
+  return {
+    min: st.min?.state || "idle",
+    max: st.max?.state || "idle"
+  };
+}
 function hasShort(tr) { const t = tradeType(tr); return t === "pair" || t === "short"; }
 
 function migrateTrades() {
@@ -1574,11 +1735,11 @@ function migrateTrades() {
 }
 
 function loadStorage() {
-  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
-  try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
-  trades = []; alertStates = {}; localLastModified = 0;
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; baskets = Array.isArray(p.baskets) ? p.baskets : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
+  try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; baskets = []; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
+  trades = []; baskets = []; alertStates = {}; localLastModified = 0;
 }
-function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, alertStates, lastModified: localLastModified })); }
+function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, baskets, alertStates, lastModified: localLastModified })); }
 function markLocalChange() { localLastModified = Date.now(); persistLocal(); scheduleSyncPush(); }
 
 function fmtMoney(n, c) { if (n == null || !isFinite(n)) return "—"; try { return new Intl.NumberFormat("de-DE", { style: "currency", currency: c || homeCurrency, maximumFractionDigits: 2 }).format(n); } catch { return n.toFixed(2) + " " + (c || homeCurrency); } }
@@ -1722,6 +1883,7 @@ async function syncPull() {
     const remoteMod = remote.lastModified || 0;
     if (remoteMod > localLastModified) {
       trades = Array.isArray(remote.trades) ? remote.trades : [];
+      baskets = Array.isArray(remote.baskets) ? remote.baskets : [];
       alertStates = remote.alertStates || {};
       localLastModified = remoteMod;
       migrateTrades();
@@ -1745,7 +1907,7 @@ async function syncPush() {
   try {
     let remoteStates = alertStates;
     try { const remote = await jsonbinPull(); remoteStates = remote.alertStates || alertStates; } catch {}
-    await jsonbinPush({ trades, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
+    await jsonbinPush({ trades, baskets, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
     alertStates = remoteStates;
     persistLocal();
     setSyncStatus("ok", t("status_sync_pushed", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
@@ -2086,6 +2248,47 @@ function renderOneTradeCard(tr, c) {
 function tradesForPage(pageKey) { if (pageKey === "total") return trades.slice(); return trades.filter(tr => tradeType(tr) === pageKey); }
 function emptyTextForPage(pageKey) { if (pageKey === "long") return t("empty_no_longs"); if (pageKey === "short") return t("empty_no_shorts"); return t("empty_no_pairs"); }
 function computeRowsFor(pageTrades) { return pageTrades.map(tr => { const lp = hasLong(tr) ? PRICE_CACHE.get(tr.longTicker.toUpperCase()) : null; const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null; return { trade: tr, c: computeTrade(tr, lp, sp) }; }); }
+function basketsByPageKey(pageKey) {
+  if (pageKey !== "long" && pageKey !== "short") return [];
+  return baskets.filter(b => basketType(b) === pageKey);
+}
+
+// Korb-Karte für die Long/Short-Page. Tap → öffnet Basket-Modal.
+function renderBasketCard(basket) {
+  const card = document.createElement("div");
+  card.className = "basket-card " + basketType(basket);
+  card.setAttribute("data-basket-id", basket.id);
+  const c = computeBasket(basket);
+  const pnlStr = c.totalPnlHome != null ? (c.totalPnlHome > 0 ? "+" : "") + fmtMoney(c.totalPnlHome, homeCurrency) : "—";
+  const pctStr = fmtPct(c.pct);
+  // Alarm-Pills für Korb (vereinfacht: nur Min/Max State, kein Squeeze)
+  const states = basketAlarmStateOf(basket);
+  let pillsHtml = "";
+  if (hasBasketLossThreshold(basket)) {
+    let cls = "watching"; const s = states.min;
+    if (s === "triggered")          cls = "triggered";
+    else if (s === "acknowledged")  cls = "acked";
+    pillsHtml += `<span class="alarm-pill ${cls}" title="${fmtPct(-Math.abs(Number(basket.alertPctMin)))}">🚨</span>`;
+  }
+  if (hasBasketProfitThreshold(basket)) {
+    let cls = "max-watching"; const s = states.max;
+    if (s === "notified")          cls = "max-notified";
+    else if (s === "acknowledged") cls = "max-acked";
+    pillsHtml += `<span class="alarm-pill ${cls}" title="${fmtPct(Math.abs(Number(basket.alertPctMax)))}">🎯</span>`;
+  }
+  card.innerHTML = `
+    <div class="basket-card-head">
+      <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}${pillsHtml}</div>
+      <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
+    </div>
+    <div class="basket-card-row">
+      <span class="basket-card-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+      <span class="basket-card-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
+      <span class="basket-card-arrow">›</span>
+    </div>`;
+  card.addEventListener("click", () => openBasketModal(basket.id));
+  return card;
+}
 
 function render() {
   for (const pageKey of ["pair", "long", "short"]) {
@@ -2094,11 +2297,21 @@ function render() {
     list.setAttribute("data-view", mode);
     list.innerHTML = "";
     const pageTrades = tradesForPage(pageKey);
-    if (pageTrades.length === 0) { list.innerHTML = `<div class="empty">${emptyTextForPage(pageKey)}</div>`; updatePageAggregate(pageKey, []); continue; }
-    const rows = computeRowsFor(pageTrades);
+    const basketsHere = (pageKey === "long" || pageKey === "short") ? basketsByPageKey(pageKey) : [];
+    const standaloneTrades = (pageKey === "long" || pageKey === "short") ? pageTrades.filter(tr => !tr.basketId) : pageTrades;
+    if (pageTrades.length === 0 && basketsHere.length === 0) {
+      list.innerHTML = `<div class="empty">${emptyTextForPage(pageKey)}</div>`;
+      updatePageAggregate(pageKey, []);
+      continue;
+    }
+    // Erst Körbe (Long/Short) oben — dann Standalone-Trades darunter
+    for (const b of basketsHere) list.appendChild(renderBasketCard(b));
+    const rows = computeRowsFor(standaloneTrades);
     const renderFn = mode === "list" ? renderOneTradeRow : renderOneTradeCard;
     for (const row of rows) list.appendChild(renderFn(row.trade, row.c));
-    updatePageAggregate(pageKey, rows);
+    // Aggregat zeigt weiterhin ALLE Trades dieser Page (in Korb oder nicht)
+    const aggRows = computeRowsFor(pageTrades);
+    updatePageAggregate(pageKey, aggRows);
   }
   const totalRows = computeRowsFor(trades);
   updatePageAggregate("total", totalRows);
@@ -2269,10 +2482,22 @@ function applyFormTypeUI(type) {
   const shortSec = document.getElementById("form-short-section");
   longSec.style.display = (type === "pair" || type === "long") ? "block" : "none";
   shortSec.style.display = (type === "pair" || type === "short") ? "block" : "none";
+  // Loss/Profit-Alarme: bei Basket-Kontext ausblenden (Korb hat eigene Aggregat-Alarme)
+  const inBasketCtx = !!tradeFormBasketContext;
+  const lossSec = document.getElementById("form-loss-section");
+  const profitSec = document.getElementById("form-profit-section");
+  if (lossSec) lossSec.style.display = inBasketCtx ? "none" : "block";
+  if (profitSec) profitSec.style.display = inBasketCtx ? "none" : "block";
+  if (inBasketCtx) {
+    const minIn = document.getElementById("f-alert-pct"); if (minIn) minIn.value = "";
+    const maxIn = document.getElementById("f-alert-max"); if (maxIn) maxIn.value = "";
+  }
   // Squeeze-Sektion nur bei type=short oder pair — Long-only-Trades haben keinen Squeeze-Alarm
+  // Im Basket-Kontext: nur Short-Baskets erlauben Squeeze-Alarme pro Trade
   const squeezeSec = document.getElementById("form-squeeze-section");
-  if (squeezeSec) squeezeSec.style.display = (type === "short" || type === "pair") ? "block" : "none";
-  if (type !== "short" && type !== "pair") {
+  const showSqueeze = (type === "short" || type === "pair");
+  if (squeezeSec) squeezeSec.style.display = showSqueeze ? "block" : "none";
+  if (!showSqueeze) {
     const sqzInput = document.getElementById("f-alert-squeeze");
     if (sqzInput) sqzInput.value = "";
   }
@@ -2388,6 +2613,8 @@ function openForm(id = null) {
   if (id) {
     const tr = trades.find(x => x.id === id); if (!tr) return;
     const trType = tradeType(tr);
+    // Wenn Trade in Korb → Form-Kontext setzen, damit Loss/Profit-Sektionen ausgeblendet werden
+    if (tr.basketId) tradeFormBasketContext = tr.basketId;
     // Read stored modes BEFORE applyFormTypeUI (which would reset them for non-single-leg)
     const minMode = (trType === "long" || trType === "short") ? (tr.alertMinMode === "price" ? "price" : "pct") : "pct";
     const maxMode = (trType === "long" || trType === "short") ? (tr.alertMaxMode === "price" ? "price" : "pct") : "pct";
@@ -2427,11 +2654,19 @@ function openForm(id = null) {
     if (!alarmNote) { alarmNote = document.createElement("div"); alarmNote.id = "form-alarm-supertrade-note"; alarmNote.className = "info-box"; const alarmField = document.getElementById("f-alert-pct").closest(".field"); if (alarmField && alarmField.parentNode) alarmField.parentNode.insertBefore(alarmNote, alarmField.nextSibling); }
     alarmNote.textContent = t("alarm_supertrade_note"); alarmNote.style.display = "block";
   } else {
-    const initialType = (currentPage === "total") ? "pair" : currentPage;
+    // Trade-Typ: aus Basket-Kontext, sonst aus aktueller Page
+    let initialType;
+    if (tradeFormBasketContext) {
+      const ctxBasket = findBasket(tradeFormBasketContext);
+      initialType = ctxBasket ? basketType(ctxBasket) : "long";
+    } else {
+      initialType = (currentPage === "total") ? "pair" : currentPage;
+    }
     formAlertMinMode = "pct";
     formAlertMaxMode = "pct";
     applyFormTypeUI(initialType);
-    typeSection.style.display = (currentPage === "total") ? "block" : "none";
+    // Typ-Wahl im Form ausblenden wenn Basket-Kontext: Trade muss zum Korb-Typ passen
+    typeSection.style.display = (tradeFormBasketContext || currentPage !== "total") ? "none" : "block";
     ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max","f-alert-squeeze"].forEach(i => document.getElementById(i).value = "");
     document.getElementById("f-long-native").checked = false;
     document.getElementById("f-short-native").checked = false;
@@ -2443,7 +2678,144 @@ function openForm(id = null) {
   form.scrollIntoView({ behavior: "smooth", block: "start" });
   setTimeout(() => document.getElementById("f-name").focus(), 200);
 }
-function closeForm() { document.getElementById("form").classList.remove("open"); editingId = null; }
+function closeForm() { document.getElementById("form").classList.remove("open"); editingId = null; tradeFormBasketContext = null; }
+
+// --- Basket-Form: Korb anlegen oder bearbeiten ---
+function openBasketForm(basketId = null, presetType = null) {
+  editingBasketId = basketId;
+  applyTranslations();
+  const form = document.getElementById("basket-form");
+  document.getElementById("basket-form-title").textContent = basketId ? t("basket_form_title_edit") : t("basket_form_title_new");
+  const hint = document.getElementById("basket-form-type-hint");
+  if (basketId) {
+    const b = findBasket(basketId); if (!b) { closeBasketForm(); return; }
+    document.getElementById("bf-name").value = b.name || "";
+    document.getElementById("bf-loss").value   = (b.alertPctMin != null) ? formatForInput(Math.abs(b.alertPctMin)) : "";
+    document.getElementById("bf-profit").value = (b.alertPctMax != null) ? formatForInput(Math.abs(b.alertPctMax)) : "";
+    if (hint) { hint.style.display = "block"; hint.textContent = t("basket_form_type_hint", { type: t(b.type === "short" ? "page_shorts" : "page_longs") }); }
+  } else {
+    document.getElementById("bf-name").value = "";
+    document.getElementById("bf-loss").value = "";
+    document.getElementById("bf-profit").value = "";
+    const tp = presetType || (currentPage === "short" ? "short" : "long");
+    if (hint) { hint.style.display = "block"; hint.textContent = t("basket_form_type_hint", { type: t(tp === "short" ? "page_shorts" : "page_longs") }); }
+    // pendingNewBasketType im DOM-Attribut speichern (kein zusätzliches Module-Var nötig)
+    form.setAttribute("data-new-type", tp);
+  }
+  form.classList.add("open");
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+  setTimeout(() => document.getElementById("bf-name").focus(), 200);
+}
+function closeBasketForm() { document.getElementById("basket-form").classList.remove("open"); editingBasketId = null; }
+function saveBasketForm() {
+  const form = document.getElementById("basket-form");
+  const name = document.getElementById("bf-name").value.trim();
+  if (!name) { alert(t("err_basket_name_required")); return; }
+  const lossRaw = document.getElementById("bf-loss").value.trim();
+  const profitRaw = document.getElementById("bf-profit").value.trim();
+  let alertPctMin = null, alertPctMax = null;
+  if (lossRaw) { const p = parseDecimal(lossRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMin = -Math.abs(p); }
+  if (profitRaw) { const p = parseDecimal(profitRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMax = Math.abs(p); }
+  if (editingBasketId) {
+    const b = findBasket(editingBasketId); if (!b) { closeBasketForm(); return; }
+    b.name = name; b.alertPctMin = alertPctMin; b.alertPctMax = alertPctMax; b.updated = Date.now();
+    markLocalChange(); closeBasketForm(); render();
+    if (currentBasketId === b.id) renderBasketModalBody();
+    return;
+  }
+  const type = form.getAttribute("data-new-type") === "short" ? "short" : "long";
+  const newBasket = { id: "b_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, alertPctMin, alertPctMax, created: Date.now(), updated: Date.now() };
+  baskets.push(newBasket);
+  markLocalChange(); closeBasketForm(); render();
+}
+
+// --- Basket-Modal: Drilldown in einen Korb ---
+function openBasketModal(basketId) {
+  const b = findBasket(basketId); if (!b) return;
+  currentBasketId = basketId;
+  const modal = document.getElementById("basket-modal");
+  document.getElementById("bm-title").textContent = b.name || t("basket_default_name");
+  renderBasketModalBody();
+  // View-Mode in basket-trade-list applieren
+  const list = document.getElementById("bm-trade-list");
+  if (list) list.setAttribute("data-view", viewModes.basket || "grid");
+  // View-Toggle-Buttons aktiv markieren
+  document.querySelectorAll('.view-toggle[data-view-for="basket"] .vt-btn').forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-view-mode") === (viewModes.basket || "grid"));
+  });
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+function closeBasketModal() {
+  const modal = document.getElementById("basket-modal");
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  currentBasketId = null;
+}
+
+function renderBasketModalBody() {
+  if (!currentBasketId) return;
+  const b = findBasket(currentBasketId); if (!b) { closeBasketModal(); return; }
+  const c = computeBasket(b);
+  const pnlEl = document.getElementById("bm-pnl");
+  const pctEl = document.getElementById("bm-pct");
+  const notEl = document.getElementById("bm-notional");
+  const countEl = document.getElementById("bm-count");
+  if (pnlEl) { pnlEl.textContent = c.totalPnlHome != null ? (c.totalPnlHome > 0 ? "+" : "") + fmtMoney(c.totalPnlHome, homeCurrency) : "—"; pnlEl.className = "value tabular " + signClass(c.totalPnlHome); }
+  if (pctEl) { pctEl.textContent = fmtPct(c.pct); pctEl.className = "value tabular " + signClass(c.pct); }
+  if (notEl) notEl.textContent = c.totalNotionalHome != null ? fmtMoney(c.totalNotionalHome, homeCurrency) : "—";
+  if (countEl) countEl.textContent = t("basket_count_n", { n: c.tradeCount });
+  // Alarm-Status (Loss + Profit) für den Basket
+  const alarmEl = document.getElementById("bm-alarms");
+  if (alarmEl) {
+    let html = "";
+    const states = basketAlarmStateOf(b);
+    if (hasBasketLossThreshold(b)) {
+      const thr = fmtPct(-Math.abs(Number(b.alertPctMin)));
+      const s = states.min;
+      if (s === "idle")           html += `<div class="alarm-row watching">${t("alarm_watching", { pct: thr })}</div>`;
+      else if (s === "triggered") html += `<div class="alarm-row triggered">${t("alarm_triggered", { pct: thr })}</div>`;
+      else if (s === "acknowledged") html += `<div class="alarm-row acked">${t("alarm_acknowledged", { pct: thr })}</div>`;
+    }
+    if (hasBasketProfitThreshold(b)) {
+      const thr = fmtPct(Math.abs(Number(b.alertPctMax)));
+      const s = states.max;
+      if (s === "idle")              html += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
+      else if (s === "notified")     html += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
+      else if (s === "acknowledged") html += `<div class="alarm-row max-acked">${t("alarm_max_acknowledged", { pct: thr })}</div>`;
+    }
+    alarmEl.innerHTML = html;
+  }
+  // Trade-Liste im Modal — selbes Rendering wie auf Pages
+  const list = document.getElementById("bm-trade-list"); if (!list) return;
+  const mode = viewModes.basket || "grid";
+  list.setAttribute("data-view", mode);
+  list.innerHTML = "";
+  const inBasket = tradesInBasket(b.id);
+  if (inBasket.length === 0) {
+    list.innerHTML = `<div class="empty">${t("basket_empty")}</div>`;
+    return;
+  }
+  const rows = computeRowsFor(inBasket);
+  const renderFn = mode === "list" ? renderOneTradeRow : renderOneTradeCard;
+  for (const row of rows) list.appendChild(renderFn(row.trade, row.c));
+}
+
+// Hilfsfunktion: Korb löschen → enthaltene Trades werden Standalone (basketId=null)
+function deleteBasket(basketId) {
+  const b = findBasket(basketId); if (!b) return;
+  const inBasket = tradesInBasket(basketId);
+  if (!confirm(t("basket_delete_confirm", { name: b.name || "", n: inBasket.length }))) return;
+  // Trades auf standalone setzen
+  for (const tr of inBasket) tr.basketId = null;
+  // Basket entfernen
+  baskets = baskets.filter(x => x.id !== basketId);
+  // Alarm-State des Baskets löschen
+  if (alertStates[basketId]) delete alertStates[basketId];
+  markLocalChange();
+  closeBasketModal();
+  render();
+}
 
 // Builds a minimal trade-shaped object from the in-flight form values, suitable
 // for passing into computeTrade() so we can preview the trade's current perfPct
@@ -2614,9 +2986,11 @@ function saveForm() {
     created: Date.now()
   };
   let matching = null;
+  // Super-Trade-Auto-Merge: nur mit gleichem basketId-Kontext mergen, sonst entstehen Trades fälschlich im Korb oder Standalone
+  const ctxBasketId = (tradeFormBasketContext && (type === "long" || type === "short")) ? tradeFormBasketContext : null;
   if (type === "pair")  matching = trades.find(x => tradeType(x) === "pair"  && x.longTicker === longTicker && x.shortTicker === shortTicker);
-  if (type === "long")  matching = trades.find(x => tradeType(x) === "long"  && x.longTicker === longTicker);
-  if (type === "short") matching = trades.find(x => tradeType(x) === "short" && x.shortTicker === shortTicker);
+  if (type === "long")  matching = trades.find(x => tradeType(x) === "long"  && x.longTicker === longTicker && (x.basketId || null) === ctxBasketId);
+  if (type === "short") matching = trades.find(x => tradeType(x) === "short" && x.shortTicker === shortTicker && (x.basketId || null) === ctxBasketId);
   if (matching) {
     matching.tranches = matching.tranches || [];
     matching.tranches.push(newTranche);
@@ -2645,7 +3019,9 @@ function saveForm() {
     return;
   }
   const newAlertShortPct = (type === "short" || type === "pair") ? alertShortPct : null;
-  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, alertShortPct: newAlertShortPct, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
+  // Wenn aus Basket-Kontext heraus angelegt: Trade an den Korb binden
+  const basketIdForNew = (tradeFormBasketContext && (type === "long" || type === "short")) ? tradeFormBasketContext : null;
+  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, basketId: basketIdForNew, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, alertShortPct: newAlertShortPct, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
   markLocalChange(); closeForm(); refreshAll(true);
 }
 
@@ -2767,6 +3143,40 @@ document.getElementById("btn-new").addEventListener("click", () => openForm(null
 document.getElementById("btn-refresh").addEventListener("click", () => refreshAll(true));
 document.getElementById("f-cancel").addEventListener("click", closeForm);
 document.getElementById("f-save").addEventListener("click", saveForm);
+
+// Basket-Form-Buttons
+document.getElementById("bf-cancel").addEventListener("click", closeBasketForm);
+document.getElementById("bf-save").addEventListener("click", saveBasketForm);
+
+// + Neuer Korb-Buttons auf Long/Short-Pages
+document.querySelectorAll("[data-basket-new]").forEach(btn => {
+  btn.addEventListener("click", () => openBasketForm(null, btn.getAttribute("data-basket-new")));
+});
+
+// Basket-Modal-Steuerung
+document.getElementById("bm-back").addEventListener("click", closeBasketModal);
+document.getElementById("bm-edit").addEventListener("click", () => { if (currentBasketId) { const id = currentBasketId; closeBasketModal(); openBasketForm(id); } });
+document.getElementById("bm-delete").addEventListener("click", () => { if (currentBasketId) deleteBasket(currentBasketId); });
+document.getElementById("bm-add-trade").addEventListener("click", () => {
+  if (!currentBasketId) return;
+  tradeFormBasketContext = currentBasketId;
+  const id = currentBasketId;
+  closeBasketModal();
+  openForm(null);
+  // Behalten der Referenz für späteres Reopen: nach Save kehrt nicht automatisch zurück, das ist OK
+});
+// View-Toggle im Basket-Modal
+document.querySelectorAll('.view-toggle[data-view-for="basket"] .vt-btn').forEach(btn => {
+  btn.addEventListener("click", () => {
+    const mode = btn.getAttribute("data-view-mode");
+    viewModes.basket = mode;
+    saveViewModes();
+    document.querySelectorAll('.view-toggle[data-view-for="basket"] .vt-btn').forEach(b => b.classList.toggle("active", b === btn));
+    const list = document.getElementById("bm-trade-list");
+    if (list) list.setAttribute("data-view", mode);
+    renderBasketModalBody();
+  });
+});
 document.getElementById("btn-menu").addEventListener("click", openMenu);
 document.getElementById("m-close").addEventListener("click", closeMenu);
 document.getElementById("menu-overlay").addEventListener("click", e => { if (e.target.id === "menu-overlay") closeMenu(); });

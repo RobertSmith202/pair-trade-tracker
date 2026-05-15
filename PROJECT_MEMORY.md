@@ -16,10 +16,14 @@ Kern-Features:
 - Live-Kurs-Updates über Yahoo Finance (via eigenen Cloudflare-Worker-Proxy)
 - Multi-Currency mit pfadunabhängiger Einstands-Währung pro Leg
 - **Super-Trades:** Automatisches Mergen von Aufstockungen mit gleichem Ticker und gleichem Typ zu Tranchen mit aggregierter Performance
+- **Körbe (Baskets)** auf den Long- und Short-Pages: Ordner-artige Gruppierungen mehrerer Trades mit aggregierter Performance und eigenen Aggregat-Alarmen (nur Pct, kein Preis-Mode). Modal-Detailansicht statt eigene Page. Trades in einem Korb erscheinen NICHT in der Standalone-Liste der Page (verschoben in den Korb), zählen aber natürlich weiterhin im Gesamt-Aggregat der Page mit.
 - Cloud-Sync zwischen iPhone und Mac über JSONBin
-- **Zwei-Schwellen-Alarm** pro Trade: Verlust (3-Min-Repeat bis Quittung) + Gewinn (30-Min-Repeat bis Quittung), via Telegram-Bot
-- Bei Single-Leg-Trades (Long / Short) zusätzlich: Schwelle wahlweise als Prozentwert oder als absoluter Preis in der Notierungswährung des Tickers
-- **Soft-Warnung beim Speichern** wenn eine eingegebene Schwelle bereits durch den aktuellen Kurs verletzt wäre
+- **Drei Alarm-Typen** pro Trade via Telegram-Bot:
+  - **Verlust** — 3-Min-Repeat bis Quittung
+  - **Gewinn** — 30-Min-Repeat bis Quittung
+  - **Short-Squeeze** — 1× pro Tag bis Quittung. Nur für short-only und pair-Trades, überwacht den shortTicker. Yahoo `quoteSummary/defaultKeyStatistics` als Datenquelle, brauchbar nur für US-Werte (Non-US-Warnung in der UI).
+- Bei Single-Leg-Trades (Long / Short) zusätzlich: Verlust/Gewinn-Schwelle wahlweise als Prozentwert oder als absoluter Preis in der Notierungswährung des Tickers
+- **Soft-Warnung beim Speichern** wenn eine eingegebene Verlust- oder Gewinn-Schwelle bereits durch den aktuellen Kurs verletzt wäre
 - **Optionale App-Sperre** (PIN oder Passwort) — Lock-Screen bei jedem App-Öffnen und nach 30 Sek. im Hintergrund. Pro Gerät einstellbar, nicht synced.
 - **Brute-Force-Schutz**: Eskalierende Eingabe-Freezes nach je 3 falschen Versuchen (1/3/5 Min, dann Verdopplung). Während Freeze nur Master-Key-Recovery möglich.
 - **Master-Key-Recovery** auf dem Lock-Screen: bei vergessenem Code per JSONBin Master-Key entsperren
@@ -54,7 +58,7 @@ Alle App-Daten leben in `localStorage` und überleben Safari-Schließen / App-Sw
 
 | Key | Inhalt |
 |---|---|
-| `pair_trade_tracker_v2` | Trades + AlertStates + lastModified |
+| `pair_trade_tracker_v2` | Trades + Baskets + AlertStates + lastModified |
 | `pair_trade_sync_v1` | JSONBin Master-Key, Bin-ID, enabled-Flag |
 | `pair_trade_price_v1` | Worker-URL + Home-Currency |
 | `pair_trade_lang_v1` | gewählte Sprache (DE/EN) |
@@ -212,6 +216,7 @@ Da das Repo privat ist, hier transparent die Schwachstellen:
       "id": "t_...",
       "type": "pair" | "long" | "short",
       "name": "Optional Anzeigename",
+      "basketId": "b_..." | null,
       "longTicker": "AAPL",
       "shortTicker": "MSFT",
       "alertPctMin": -30,
@@ -220,6 +225,7 @@ Da das Repo privat ist, hier transparent die Schwachstellen:
       "alertPriceMax": null,
       "alertMinMode": "pct" | "price",
       "alertMaxMode": "pct" | "price",
+      "alertShortPct": 25,
       "tranches": [
         {
           "id": "tr_...",
@@ -238,10 +244,22 @@ Da das Repo privat ist, hier transparent die Schwachstellen:
       "updated": 1715432000000
     }
   ],
+  "baskets": [
+    {
+      "id": "b_...",
+      "type": "long" | "short",
+      "name": "Tech-Longs",
+      "alertPctMin": -25,
+      "alertPctMax": 40,
+      "created": 1715432000000,
+      "updated": 1715432000000
+    }
+  ],
   "alertStates": {
-    "<trade-id>": {
-      "min": { "state": "idle" | "triggered" | "acknowledged", "lastAlertAt": <ms> },
-      "max": { "state": "idle" | "notified" | "acknowledged", "lastAlertAt": <ms> }
+    "<trade-id-or-basket-id>": {
+      "min":     { "state": "idle" | "triggered"  | "acknowledged", "lastAlertAt": <ms> },
+      "max":     { "state": "idle" | "notified"   | "acknowledged", "lastAlertAt": <ms> },
+      "squeeze": { "state": "idle" | "triggered"  | "acknowledged", "lastAlertAt": <ms> }
     }
   },
   "lastModified": <ms-timestamp>,
@@ -255,7 +273,13 @@ Da das Repo privat ist, hier transparent die Schwachstellen:
 - `type` wurde später hinzugefügt. Trades ohne `type` werden als `"pair"` interpretiert (Worker + Frontend haben Backward-Compat-Logik in `tradeType()`).
 - `alertPctMin` ersetzte das alte `alertThreshold`. Beide Felder werden bei der Auswertung berücksichtigt.
 - `alertPctMax`, `alertPriceMin`, `alertPriceMax`, `alertMinMode`, `alertMaxMode` sind neuer. Fehlen sie → Default `null` bzw. `"pct"`.
-- `alertStates` hat das alte flache Format `{state, lastAlertAt}` und das neue verschachtelte `{min: {...}, max: {...}}`. `ensureStateShape()` im Worker und `alarmStateOf()` im Frontend migrieren on-read transparent.
+- `alertShortPct` (positive Prozentzahl) ist die jüngste Erweiterung. Nur ausgewertet wenn `type === "short" || "pair"`. Speicherung intern als `Math.abs(input)`. Fehlt das Feld → kein Squeeze-Alarm.
+- `alertStates` hatte mehrere Inkarnationen:
+  1. Legacy flach: `{state, lastAlertAt}` (nur Loss-Alarm)
+  2. Zwei-Schwellen: `{min: {...}, max: {...}}`
+  3. Aktuell: `{min: {...}, max: {...}, squeeze: {...}}`
+  
+  `ensureStateShape()` im Worker und `alarmStateOf()` im Frontend migrieren transparent on-read. Alle drei Achsen sind unabhängig.
 - `tranches` ersetzt die früheren flachen Felder. `migrateTrades()` läuft beim ersten Mal nach Pull.
 
 ---
@@ -286,6 +310,68 @@ Jede Tranche speichert ihre Entry-Currency explizit als `longEntryCcy` / `shortE
 
 `longEntryNative` / `shortEntryNative` erlaubt alternativ „verwende die API-Währung des Tickers".
 
+### Körbe (Baskets) — Long-only und Short-only
+
+Körbe sind ordner-artige Gruppierungen von Trades **innerhalb** einer Long- oder Short-Page. Sie existieren NICHT auf der Pair-Page (Pair-Trades sind per Definition schon Gruppierungen).
+
+**Designentscheidungen (von Robert explizit bestätigt):**
+1. **Separates `baskets`-Array** im Datenmodell. Trades referenzieren einen Korb optional via `basketId`. Keine doppelte Speicherung.
+2. **Modal-Overlay** für die Detail-Ansicht eines Korbs (statt eigene Snap-Page). z-index 800 unter dem Lock-Screen (1000).
+3. **Gesamt-Page bleibt unangetastet.** Die Aggregat-Zahlen der Pages (Long, Short, Gesamt) zählen ALLE Trades, unabhängig davon ob sie in einem Korb sind oder nicht — Körbe sind nur eine Sicht-Gruppierung, kein Cashflow-Filter.
+4. **Worker-Alarme auf Korb-Aggregat** analog zu Single-Trade-Alarmen, plus pro Trade in Short-Körben optional Squeeze-Alarme (siehe unten).
+
+**Render-Reihenfolge auf Long/Short-Pages:** Körbe stehen oben, Standalone-Trades darunter. Körbe sehen aus wie spezielle Cards mit Aggregat-Performance, Trade-Count und Ordner-Icon. Tap öffnet das Modal.
+
+**Korb-Modal-Aufbau:**
+- Header: Name + Typ-Pill + Edit-/Schließen-Buttons
+- Aggregat-Block: P&L (home ccy), Performance %, Anzahl Trades, Alarm-Pills wenn welche aktiv
+- Toolbar: „+ Trade zum Korb" (öffnet Trade-Form mit `tradeFormBasketContext` gesetzt)
+- Trade-Liste: alle Trades mit `basketId === currentBasketId`, dieselbe Card-/List-Darstellung wie auf der Page
+
+**Korb-Form (Create/Edit):** Felder Name, Typ (bei Create fix aus Page-Kontext, bei Edit disabled), Loss-Schwelle Pct, Profit-Schwelle Pct. **Bewusst kein Preis-Modus** — ein Korb hat keinen einzelnen quoted Price.
+
+**Trade-Form mit Basket-Kontext (`tradeFormBasketContext` Global):**
+- Type-Sektion ausgeblendet (Typ kommt aus dem Korb)
+- Loss- und Profit-Alarm-Sektionen ausgeblendet (die Alarme leben am Korb)
+- Squeeze-Sektion nur sichtbar bei Short-Körben (für `type === "short"`)
+- `closeForm()` resettet den Kontext zwingend, auch beim Abbrechen — sonst hängt der Kontext für den nächsten Form-Aufruf
+
+**Edit-Pfad für bestehende Korb-Trades:** `openForm(id)` checkt `tr.basketId` und setzt den Kontext automatisch, damit die Form-Sektionen konsistent ausgeblendet sind.
+
+**Super-Trade-Auto-Merge im Korb-Kontext:** Auto-Merge ist auf die Korb-Zugehörigkeit konstrainiert. Ein AAPL-Long im Korb X und ein freistehender AAPL-Long werden NICHT gemerged. Der `ctxBasketId`-Filter im `matching = trades.find(...)` Aufruf sorgt dafür.
+
+**Korb-Aggregat (`computeBasket` im Frontend, analog im Worker):**
+- Iteriert über alle `trades` mit passendem `basketId`
+- Summiert `totalPnlHome` und `totalNotionalHome` aus `computeTrade(...)`
+- `pct = totalPnl / totalNotional * 100` wenn beide vorhanden, sonst null
+- Wenn kein Trade auswertbar (z.B. alle Live-Preise fehlen): Korb-State unverändert, kein Trigger
+
+**Korb-Alarm-Logik im Worker (`runAlarmCheck`, Basket-Loop nach Trade-Loop):**
+1. Filtert alle Trades mit passendem `basketId`
+2. Ruft pro Trade `computePerf()` auf — dafür wurde `computePerf` erweitert um `notionalHomeStart` (nötig für saubere Aggregation des Performance-Pct, da `notionalHomeNow / (1 + perfPct/100)` bei FX-bewegungen das falsche Ergebnis liefert)
+3. Summiert `pnlHome`, `notionalHomeStart`, `notionalHomeNow` über alle Trades
+4. `aggPerfPct = (aggPnl / aggNotStart) * 100`
+5. State-Machine identisch zu Single-Trade-Alarmen (3-Min-Repeat für Loss, 30-Min-Repeat für Profit, edge-triggered)
+6. `alertStates[basketId]` lebt im gleichen Dict wie Trade-States — IDs kollidieren nicht (`t_…` vs. `b_…`)
+
+**Defensive Doppel-Alarm-Vermeidung:** Wenn ein Trade in einem Korb liegt, **überspringt** der Worker die Loss-/Profit-Alarm-Checks für den Einzeltrade komplett (`if (trade.basketId) continue`) — die laufen dann nur noch über den Korb-Aggregat. Squeeze-Alarme (separater Cron `runShortSqueezeCheck`) bleiben unberührt, weil die explizit pro Trade gewollt sind.
+
+**Telegram-Nachricht für Korb-Alarme (`buildBasketAlarmMessage`):**
+- Titel: `🚨 KORB-VERLUST-SCHWELLE ÜBERSCHRITTEN` / `🎯 KORB-GEWINN-SCHWELLE ERREICHT`
+- Inhalt: Korb-Name + Typ-Label + Anzahl Trades, Performance %, Schwelle, P&L (home ccy), Notional jetzt (home ccy)
+- Ack-Prompt analog zu Trade-Alarmen — eine Reply quittiert alle aktiven Triggered/Notified States über Trades UND Körbe hinweg, weil der Telegram-Webhook über alle `alertStates`-Keys iteriert.
+
+**i18n:** DE/EN-Strings im HTML (`basket_*` Keys: form-Titel, Button-Texte, Aggregat-Labels, Modal-Header, Delete-Confirm) und im Worker `WORKER_STRINGS` (`basket_loss_title`, `basket_profit_title`, `basket_label`, `basket_default_name`).
+
+**Sync:** `baskets` wird in `loadStorage()`, `persistLocal()`, `syncPush()`, `syncPull()` analog zu `trades` mitgeführt. JSONBin enthält jetzt `{trades, baskets, alertStates, lastModified, lang, _device}`.
+
+**View-Modus:** `viewModes` hat einen zusätzlichen Key `basket` für die Trade-Liste innerhalb des Modals. Standalone-Anzeige auf der Page benutzt nach wie vor `viewModes.long` bzw. `viewModes.short`.
+
+**Bekannte Edge-Cases:**
+- Korb ohne Trades: zeigt Aggregat als „—", Alarme greifen nicht (kein Trade → `aggNotStart == 0` → `no_data` ohne State-Change).
+- Trade aus Korb entfernen: nur via Edit → `basketId` auf null setzen. Es gibt aktuell keinen UI-Shortcut „Trade aus Korb verschieben" — das ist bewusst, weil Verschiebe-Operationen leicht zu Verwirrung führen.
+- Korb löschen: zeigt `confirm()` mit Hinweis dass die enthaltenen Trades zu Standalones werden (deren `basketId` wird auf null gesetzt). Trades selbst werden nicht gelöscht.
+
 ### Zwei-Schwellen-Alarm: Verlust + Gewinn
 
 - **Verlust-Schwelle (`alertPctMin`):** Negativwert, intern `-Math.abs(input)`. User gibt im UI nur positive Zahl ein (iOS hat kein Minus auf dem Ziffern-Keyboard). Telegram-Repeat alle 3 Min bis quittiert.
@@ -312,14 +398,56 @@ UI: kleiner Pct/Preis-Toggle pro Schwelle (analog zum Grid/Liste-Toggle), ersche
 
 ### Alarm-State-Machine
 
-Pro Trade zwei unabhängige States im JSONBin (`alertStates[id]`):
+Pro Trade drei unabhängige States im JSONBin (`alertStates[id]`):
 
-- `min`: `idle → triggered → acknowledged → idle`
-- `max`: `idle → notified → acknowledged → idle`
+- `min`:     `idle → triggered → acknowledged → idle`
+- `max`:     `idle → notified  → acknowledged → idle`
+- `squeeze`: `idle → triggered → acknowledged → idle`
 
-Edge-triggered: Alarm feuert nur beim Übergang `idle → triggered`. Telegram-Webhook setzt alle gerade aktiven Triggered/Notified Status im JSONBin auf `acknowledged`.
+Edge-triggered: Alarm feuert nur beim Übergang `idle → triggered/notified`. Telegram-Webhook setzt alle gerade aktiven Triggered/Notified Status im JSONBin auf `acknowledged` (eine Reply quittiert auch alles über alle drei Achsen hinweg).
 
-Worker-Konstanten: `ALERT_REPEAT_MS = 3 * 60 * 1000`, `PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000`. Cron `*/3 * * * *`.
+Worker-Konstanten: `ALERT_REPEAT_MS = 3 * 60 * 1000`, `PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000`. Squeeze hat keinen Repeat-Timer im Code — die einmal-pro-Tag-Cadence ergibt sich implizit aus dem Cron-Schedule.
+
+Crons im Cloudflare-Dashboard:
+- `*/3 * * * *` → `runAlarmCheck()` (Loss + Profit)
+- `0 6 * * *` → `runShortSqueezeCheck()` (täglicher Squeeze-Check 06:00 UTC)
+
+Die Dispatch-Logik im `scheduled()`-Handler unterscheidet anhand des `event.cron`-Strings.
+
+### Short-Squeeze-Alarm
+
+Tägliche Überprüfung des Short-Interest auf Float für leerverkaufte Positionen. Worker holt einmal pro Tag (06:00 UTC) Yahoo-`quoteSummary/defaultKeyStatistics` für den `shortTicker` jedes betroffenen Trades.
+
+**Wer kriegt einen Squeeze-Alarm?**
+- Trade-Typ `short` → überwacht `shortTicker` (= die eigene Short-Position)
+- Trade-Typ `pair` → überwacht ebenfalls `shortTicker` (= der leerverkaufte Leg)
+- Trade-Typ `long` → **explizit ausgeschlossen.** Im Form ist die Squeeze-Sektion bei Long-only gar nicht sichtbar; selbst wenn ein Long-Trade ein `alertShortPct`-Feld hätte (z.B. nach Type-Wechsel), würde der Worker es überspringen.
+
+**Schwellen-Semantik:** `alertShortPct` ist eine positive Prozentzahl (z.B. `25` für 25 %). Im Save-Pfad wird `Math.abs(input)` gespeichert. Yahoo liefert `shortPercentOfFloat` als Dezimalbruch (0.25); der Worker multipliziert mit 100 und vergleicht direkt.
+
+**Yahoo-Datenquelle und Non-US-Problem:**
+
+Yahoo's `defaultKeyStatistics` füllt `shortPercentOfFloat` zuverlässig nur für **US-gelistete Wertpapiere**. Für EU-/Asia-Tickers (SAP.DE, AIR.PA, RYA.IR etc.) ist das Feld meist null oder veraltet — die offizielle europäische Short-Disclosure-Regulation (ESMA/BaFin/FCA) hat eine ganz andere Struktur (Einzel-Positionen ≥ 0,5 %, kein aggregiertes Short-Interest) und Yahoo aggregiert das nicht zurück.
+
+**Wie geht die App damit um?**
+1. **Frontend-Warnung:** `looksLikeNonUsTicker()` checkt auf Punkt-Suffix im shortTicker. Wenn ja, erscheint im Form unter der Squeeze-Schwelle eine deutliche Hinweis-Box: „⚠ Der Short-Ticker hat einen Markt-Suffix — Yahoo liefert für nicht-US-Werte sehr wahrscheinlich keine Short-Interest-Daten." User kann trotzdem speichern (nicht blockiert).
+2. **Worker:** Wenn Yahoo `null`/`undefined` für `shortPercentOfFloat` zurückgibt, lässt der Worker den State unverändert (kein Reset auf `idle`, keine Trigger). Das ist eine **Daten-Lücke**, keine „Erholung". Ergebnis-Liste enthält `{kind: "squeeze", action: "no_data"}` für Debug-Zwecke.
+
+**State-Verhalten:**
+- `idle` + breached → Telegram-Nachricht, State → `triggered`
+- `triggered` + breached → erneute Telegram-Nachricht (nächster Tag), State bleibt `triggered`
+- `triggered` + not breached → State → `idle`
+- `acknowledged` + breached → keine Aktion (wartet bis Wert unter Schwelle fällt)
+- `acknowledged` + not breached → State → `idle` (re-armed für nächste Überschreitung)
+
+**Telegram-Nachricht** ist visuell distinkt:
+- Title: `⚡ SHORT-SQUEEZE-ALARM` (statt `🚨 VERLUST-SCHWELLE ÜBERSCHRITTEN` oder `🎯 GEWINN-SCHWELLE ERREICHT`)
+- Inhalt: Short-Interest %, Days to Cover, Datenstand-Datum, Schwelle
+- Ack-Prompt erwähnt explizit „Wiederholung 1× pro Tag"
+
+**Pill in der App:** ⚡-Icon, orange/gelbe Färbung (über `--warn`), pulsiert bei `triggered`. Klar abgegrenzt von der grünen Profit- und roten Loss-Pill.
+
+**Worker-Endpoint zum manuellen Testen:** `GET /check-squeeze` (analog zu `/check`).
 
 ### Handelszeit-Fenster
 
@@ -350,14 +478,19 @@ Pro Page wählbar zwischen kompakten Listenzeilen oder ausführlichen Cards mit 
 | Endpoint | Zweck |
 |---|---|
 | `GET /?symbol=AAPL` | Yahoo-Passthrough — used by App für Live-Preise und FX-Raten |
-| `GET /check` | Manueller Alarm-Check (Cron ruft das gleiche intern auf) |
+| `GET /check` | Manueller Loss/Profit-Alarm-Check (3-Min-Cron ruft intern dasselbe auf) |
+| `GET /check-squeeze` | Manueller Short-Squeeze-Check (Tages-Cron ruft intern dasselbe auf) |
 | `GET /test-alert` | Sendet Test-Telegram-Nachricht in aktueller Sprache |
 | `GET /setup-webhook` | Registriert Worker-URL als Telegram-Webhook-Target |
-| `POST /telegram-webhook` | Empfängt User-Replies → setzt alle triggered/notified States auf acknowledged |
+| `POST /telegram-webhook` | Empfängt User-Replies → setzt alle triggered/notified States (min/max/squeeze) auf acknowledged |
 
-Cron-Trigger im Cloudflare-Dashboard: `*/3 * * * *` (alle 3 Minuten).
+**Cron-Trigger im Cloudflare-Dashboard — BEIDE müssen aktiv sein:**
+- `*/3 * * * *` für Loss + Profit (3-Min-Intervall)
+- `0 6 * * *` für Short-Squeeze (täglich 06:00 UTC)
 
-Backward-Compat im Worker: `getTranches(trade)` erkennt ob ein Trade die neue oder alte Struktur hat. `ensureStateShape()` migriert alte flache AlertStates on-read. `tradeType()` defaultet auf `"pair"`.
+Wer den zweiten Cron nach einem Worker-Update vergisst zuzufügen, hat keinen Squeeze-Alarm — der Code ist da, wird aber nie aufgerufen. Manuelles Testen via `/check-squeeze` zeigt, ob die Logik selbst funktioniert.
+
+Backward-Compat im Worker: `getTranches(trade)` erkennt ob ein Trade die neue oder alte Struktur hat. `ensureStateShape()` migriert alte AlertStates on-read (flach → `{min, max}` → `{min, max, squeeze}`). `tradeType()` defaultet auf `"pair"`.
 
 ---
 
@@ -401,6 +534,18 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 13. **Worker und Bot kennen die App-Sperre nicht:** Telegram-Alarme laufen unabhängig von der App-Session. Wenn der Cron einen Alarm feuert, kriegt der User die Telegram-Nachricht, egal ob die PWA gerade offen ist oder nicht, egal ob die App gesperrt ist oder nicht. Der Bot ist nur an JSONBin angedockt.
 
 14. **Master-Key-Recovery setzt vorhandene Sync-Config voraus:** Wenn der User die Sperre aktiviert hat OHNE jemals Sync zu konfigurieren (also `syncSettings.apiKey` ist leer), bringt der „Passwort vergessen"-Pfad nichts — es gibt keinen Master-Key zum Verifizieren. Der Lock-Screen zeigt dann „Kein Master-Key gespeichert". In diesem Edge-Case muss der User Safari-Site-Daten löschen.
+
+15. **Squeeze-Alarm braucht den 2. Cron-Trigger im Cloudflare-Dashboard.** Nur den Code zu deployen reicht nicht — der `scheduled()`-Handler wird sonst nur vom 3-Min-Cron aufgerufen und der Squeeze-Check feuert nie. Manuelles Testen via `/check-squeeze`-Endpoint zeigt, ob die Logik selbst klappt. Robert vergisst das gerne nach Worker-Updates.
+
+16. **Yahoo liefert für nicht-US-Werte keine Short-Interest-Daten.** Der `shortPercentOfFloat` ist bei EU-/Asia-Tickern fast immer `null`. Der Worker reagiert auf `null` mit „state unverändert lassen", nicht mit Reset. Das Frontend zeigt eine deutliche Warnung wenn der Short-Ticker einen Punkt-Suffix hat. Wer trotzdem eine Squeeze-Schwelle für SAP.DE setzt, kriegt nie einen Alarm — das ist erwartet, nicht ein Bug.
+
+17. **Loss-Alarm-Titel wurde umbenannt.** Vorherige Worker-Versionen schickten `🚨 ALARM` als Telegram-Titel. Aktuell: `🚨 VERLUST-SCHWELLE ÜBERSCHRITTEN` (parallel zur Gewinn-Schwelle). Der HTML-Pill/Status zeigt davon unabhängig `🚨 VERLUST-ALARM AUSGELÖST` — die App-Texte wurden bewusst nicht angepasst, weil sie im Kontext der App schon spezifisch genug sind.
+
+18. **Korb-Trades dürfen keine eigenen Loss/Profit-Alarme haben.** UI versteckt die Sektionen wenn `tradeFormBasketContext` gesetzt ist; Worker überspringt den Loss/Profit-Check für alle Trades mit `basketId` (`if (trade.basketId) continue`). Wer einen bestehenden Standalone-Trade mit Alarm später in einen Korb verschiebt (manuell via Edit), behält die Alarm-Werte in den Feldern stehen — der Worker ignoriert sie aber. Squeeze-Alarme sind davon ausgenommen und feuern weiter, weil Robert das für Short-Körbe explizit so wollte.
+
+19. **`computePerf()` im Worker liefert seit Basket-Feature auch `notionalHomeStart`.** Das wird für die saubere Aggregation des Korb-Performance-Pct gebraucht (man kann NICHT einfach Pct-Werte mitteln). Wenn jemand eine ältere Worker-Version deployt, in der `notionalHomeStart` fehlt, geht der Basket-Aggregat-Pct entweder kaputt oder feuert falsch. Worker-Update zuerst, dann HTML — wie immer.
+
+20. **`baskets`-Array muss in allen vier Storage-Pfaden mitgeführt werden:** `loadStorage()`, `persistLocal()`, `syncPush()`, `syncPull()`. Wer einen davon vergisst, verliert Körbe entweder lokal oder beim Sync. Trades selbst überleben das, aber ihre `basketId` zeigt dann ins Leere und sie erscheinen als Standalones.
 
 ---
 

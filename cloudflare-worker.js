@@ -20,6 +20,8 @@ const WORKER_STRINGS = {
   de: {
     alarm_title:"🚨 VERLUST-SCHWELLE ÜBERSCHRITTEN", profit_title:"🎯 GEWINN-SCHWELLE ERREICHT",
     squeeze_title:"⚡ SHORT-SQUEEZE-ALARM",
+    basket_loss_title:"🚨 KORB-VERLUST-SCHWELLE ÜBERSCHRITTEN", basket_profit_title:"🎯 KORB-GEWINN-SCHWELLE ERREICHT",
+    basket_label:"Korb", basket_default_name:"Unbenannter Korb",
     pair:"Paar", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Schwelle", pnl:"P&L", notional_now:"Notional jetzt", tranches:"Tranchen",
     current_price:"Aktueller Kurs",
@@ -33,6 +35,8 @@ const WORKER_STRINGS = {
   en: {
     alarm_title:"🚨 LOSS THRESHOLD BREACHED", profit_title:"🎯 PROFIT THRESHOLD REACHED",
     squeeze_title:"⚡ SHORT-SQUEEZE ALERT",
+    basket_loss_title:"🚨 BASKET LOSS THRESHOLD BREACHED", basket_profit_title:"🎯 BASKET PROFIT THRESHOLD REACHED",
+    basket_label:"Basket", basket_default_name:"Unnamed basket",
     pair:"Pair", long_only:"Long", short_only:"Short",
     performance:"Performance", threshold:"Threshold", pnl:"P&L", notional_now:"Notional now", tranches:"Tranches",
     current_price:"Current price",
@@ -146,6 +150,7 @@ async function computePerf(trade) {
   }
   return {
     pnlHome: totalPnl,
+    notionalHomeStart: totalNotStart,
     notionalHomeNow: totalNotNow,
     perfPct: totalNotStart > 0 ? (totalPnl / totalNotStart) * 100 : 0,
     trancheCount: tranches.length,
@@ -403,6 +408,9 @@ async function runAlarmCheck(env) {
       ? (maxPrice != null && maxPrice !== "")
       : (maxPct != null && maxPct !== "");
     if (!hasMin && !hasMax) continue;
+    // Trades innerhalb eines Korbs: Loss/Profit-Alarme laufen über den Korb-Aggregat,
+    // nicht über Einzeltrades. Squeeze-Alarme (separater Cron) bleiben unberührt.
+    if (trade.basketId) continue;
 
     let perf;
     try { perf = await computePerf(trade); } catch (e) { results.push({ id, error: e.message }); continue; }
@@ -469,8 +477,91 @@ async function runAlarmCheck(env) {
 
     if (stChanged) { states[id] = st; stateChanged = true; }
   }
+
+  // --- Basket-Alarme: Aggregat aller im Korb enthaltenen Trades ---
+  const basketsArr = Array.isArray(record.baskets) ? record.baskets : [];
+  for (const basket of basketsArr) {
+    const bId = basket.id;
+    const minPct = basket.alertPctMin;
+    const maxPct = basket.alertPctMax;
+    const hasMin = minPct != null && minPct !== "";
+    const hasMax = maxPct != null && maxPct !== "";
+    if (!hasMin && !hasMax) continue;
+    // Trades dieses Korbs sammeln + Aggregat berechnen
+    const inBasket = trades.filter(tr => tr.basketId === bId);
+    let aggPnl = 0, aggNotStart = 0, aggNotNow = 0, computed = 0;
+    let aggError = null;
+    for (const tr of inBasket) {
+      try { const p = await computePerf(tr); aggPnl += p.pnlHome; aggNotStart += p.notionalHomeStart; aggNotNow += p.notionalHomeNow; computed++; }
+      catch (e) { aggError = e.message; break; }
+    }
+    if (aggError) { results.push({ id: bId, kind: "basket", error: aggError }); continue; }
+    if (computed === 0 || aggNotStart <= 0) {
+      // Kein Trade im Korb auswertbar → State unverändert lassen
+      results.push({ id: bId, kind: "basket", action: "no_data", tradeCount: inBasket.length });
+      continue;
+    }
+    const aggPerfPct = (aggPnl / aggNotStart) * 100;
+    const st = ensureStateShape(states[bId]);
+    let stChanged = false;
+    // LOSS
+    if (hasMin) {
+      const threshold = -Math.abs(Number(minPct));
+      const breached = aggPerfPct <= threshold;
+      const cur = st.min.state;
+      if (breached && cur === "idle") {
+        await sendTelegram(env, buildBasketAlarmMessage(lang, basket, "loss", aggPerfPct, aggPnl, aggNotNow, inBasket.length));
+        st.min = { state: "triggered", lastAlertAt: now }; stChanged = true; results.push({ id: bId, kind: "basket-loss", action: "triggered" });
+      } else if (breached && cur === "triggered" && (now - st.min.lastAlertAt) >= ALERT_REPEAT_MS) {
+        await sendTelegram(env, buildBasketAlarmMessage(lang, basket, "loss", aggPerfPct, aggPnl, aggNotNow, inBasket.length));
+        st.min = { state: "triggered", lastAlertAt: now }; stChanged = true; results.push({ id: bId, kind: "basket-loss", action: "repeated" });
+      } else if (!breached && cur !== "idle") {
+        st.min = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id: bId, kind: "basket-loss", action: "reset" });
+      }
+    }
+    // PROFIT
+    if (hasMax) {
+      const threshold = Math.abs(Number(maxPct));
+      const breached = aggPerfPct >= threshold;
+      const cur = st.max.state;
+      if (breached && cur === "idle") {
+        await sendTelegram(env, buildBasketAlarmMessage(lang, basket, "profit", aggPerfPct, aggPnl, aggNotNow, inBasket.length));
+        st.max = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id: bId, kind: "basket-profit", action: "notified" });
+      } else if (breached && cur === "notified" && (now - st.max.lastAlertAt) >= PROFIT_ALERT_REPEAT_MS) {
+        await sendTelegram(env, buildBasketAlarmMessage(lang, basket, "profit", aggPerfPct, aggPnl, aggNotNow, inBasket.length));
+        st.max = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id: bId, kind: "basket-profit", action: "repeated" });
+      } else if (!breached && cur !== "idle") {
+        st.max = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id: bId, kind: "basket-profit", action: "reset" });
+      }
+    }
+    if (stChanged) { states[bId] = st; stateChanged = true; }
+  }
+
   if (stateChanged) await jsonbinWrite(env, { ...record, alertStates: states });
   return { ok: true, results };
+}
+
+// Telegram-Nachricht für einen Basket-Alarm. Klar als Korb deklariert.
+function buildBasketAlarmMessage(lang, basket, kind, aggPerfPct, aggPnl, aggNotionalNow, tradeCount) {
+  const sign = aggPerfPct >= 0 ? "+" : "";
+  const isProfit = kind === "profit";
+  const titleKey = isProfit ? "basket_profit_title" : "basket_loss_title";
+  const rawThr = isProfit ? (basket.alertPctMax ?? 0) : (basket.alertPctMin ?? 0);
+  const threshold = isProfit ? Math.abs(Number(rawThr)) : -Math.abs(Number(rawThr));
+  const thresholdStr = (isProfit ? "+" : "") + threshold.toFixed(2) + "%";
+  const typeLabel = basket.type === "short" ? workerT(lang, "short_only") : workerT(lang, "long_only");
+  const name = basket.name || workerT(lang, "basket_default_name");
+  const lines = [
+    workerT(lang, titleKey), "",
+    workerT(lang, "basket_label") + ": " + name + " (" + typeLabel + ", " + tradeCount + " " + workerT(lang, "tranches") + ")",
+    workerT(lang, "performance") + ": " + sign + aggPerfPct.toFixed(2) + "%",
+    workerT(lang, "threshold") + ": " + thresholdStr,
+    workerT(lang, "pnl") + ": " + (aggPnl >= 0 ? "+" : "") + aggPnl.toFixed(2) + " " + HOME_CCY,
+    workerT(lang, "notional_now") + ": " + aggNotionalNow.toFixed(2) + " " + HOME_CCY,
+    "",
+    workerT(lang, isProfit ? "profit_ack_prompt" : "ack_prompt")
+  ];
+  return lines.join("\n");
 }
 
 async function sendTestAlert(env) {
