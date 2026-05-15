@@ -342,10 +342,12 @@ body::before {
 .lock-dot.filled { animation: dotPop 0.18s ease-out; }
 
 /* === Desktop-Layout (Ebene 1: sanfter Polish) ============================== */
-/* Inhalt zentrieren auf max. Breite, Trade-Liste mehrspaltig, Forms als Dialog */
-[data-layout="desktop"] .toolbar-wrap { max-width: 1140px; margin-left: auto; margin-right: auto; }
-[data-layout="desktop"] .pages-container { max-width: 1140px; margin-left: auto; margin-right: auto; }
-[data-layout="desktop"] .page-dots { max-width: 1140px; left: 50%; right: auto; transform: translateX(-50%); }
+/* WICHTIG: Body ist im Mobile-Modus hart auf max-width: 640px gekappt (siehe oben).
+   Im Desktop-Modus geben wir das frei, sonst können keine inner Constraints jemals greifen. */
+[data-layout="desktop"] body { max-width: 1280px; }
+[data-layout="desktop"] .toolbar-wrap { max-width: none; }
+[data-layout="desktop"] .pages-container { max-width: none; }
+[data-layout="desktop"] .page-dots { max-width: 1280px; left: 50%; right: auto; transform: translateX(-50%); }
 [data-layout="desktop"] .lock-loader-overlay { /* unverändert: bleibt fullscreen */ }
 /* Trade-Liste: Multi-Column-Grid in Grid-View */
 [data-layout="desktop"] .trade-list[data-view="grid"],
