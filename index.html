@@ -272,6 +272,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .layout-card .theme-card-icon { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 22px; }
 .layout-card[data-layout-choice="mobile"]  .theme-card-icon { letter-spacing: -2px; }
 .layout-card[data-layout-choice="desktop"] .theme-card-icon { font-size: 26px; }
+#font-scale-cards { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.scale-card .scale-icon { background: var(--card); border: 1px solid var(--border); color: var(--text); font-weight: 700; line-height: 1; }
 .theme-card { padding: 14px 8px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--card); user-select: none; transition: border-color 0.15s, background-color 0.15s, transform 0.05s; -webkit-tap-highlight-color: transparent; }
 .theme-card:hover { border-color: var(--muted); }
 .theme-card:active { transform: scale(0.98); }
@@ -963,6 +965,27 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       </div>
     </div>
 
+    <h4 class="section-h" data-i18n="settings_font_scale">Schriftgröße (Desktop)</h4>
+    <div class="info-box" data-i18n="settings_font_scale_info"></div>
+    <div class="theme-cards" id="font-scale-cards">
+      <div class="theme-card scale-card" data-scale-choice="100">
+        <div class="theme-card-icon scale-icon" aria-hidden="true" style="font-size: 16px">A</div>
+        <div class="theme-card-label" data-i18n="scale_small">Klein</div>
+      </div>
+      <div class="theme-card scale-card" data-scale-choice="110">
+        <div class="theme-card-icon scale-icon" aria-hidden="true" style="font-size: 19px">A</div>
+        <div class="theme-card-label" data-i18n="scale_medium">Mittel</div>
+      </div>
+      <div class="theme-card scale-card" data-scale-choice="120">
+        <div class="theme-card-icon scale-icon" aria-hidden="true" style="font-size: 22px">A</div>
+        <div class="theme-card-label" data-i18n="scale_large">Groß</div>
+      </div>
+      <div class="theme-card scale-card" data-scale-choice="130">
+        <div class="theme-card-icon scale-icon" aria-hidden="true" style="font-size: 25px">A</div>
+        <div class="theme-card-label" data-i18n="scale_xl">XL</div>
+      </div>
+    </div>
+
     <h4 class="section-h" data-i18n="settings_language">Sprache</h4>
     <div class="info-box" data-i18n="settings_language_info"></div>
     <div class="field">
@@ -1150,6 +1173,8 @@ const STRINGS = {
     theme_midnight: "Mitternacht", theme_light: "Hell", theme_dark: "Dunkel",
     settings_layout: "Ansicht", settings_layout_info: "Handy: kompakt, eine Spalte. Desktop: linke Sidebar mit Navigation und Aktionen, Trade-Karten mehrspaltig, Forms als Floating-Dialog. Pro Gerät einstellbar — wird nicht synct.",
     layout_mobile: "Handy", layout_desktop: "Desktop",
+    settings_font_scale: "Schriftgröße (Desktop)", settings_font_scale_info: "Skalierung der gesamten Ansicht — Schrift, Padding und Karten vergrößern sich gleichmäßig. Greift nur im Desktop-Modus; auf Handy bleibt's bei der Originalgröße. Pro Gerät einstellbar.",
+    scale_small: "Klein", scale_medium: "Mittel", scale_large: "Groß", scale_xl: "Extra-Groß",
     ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Einstellungen",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
@@ -1304,6 +1329,8 @@ const STRINGS = {
     theme_midnight: "Midnight", theme_light: "Light", theme_dark: "Dark",
     settings_layout: "Layout", settings_layout_info: "Mobile: compact, single column. Desktop: left sidebar nav and actions, multi-column trade cards, forms as floating dialog. Per-device — not synced.",
     layout_mobile: "Mobile", layout_desktop: "Desktop",
+    settings_font_scale: "Font size (desktop)", settings_font_scale_info: "Scales the entire view — text, padding, cards all grow uniformly. Only applies in desktop mode; mobile keeps original size. Per-device.",
+    scale_small: "Small", scale_medium: "Medium", scale_large: "Large", scale_xl: "Extra-large",
     ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Settings",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
@@ -1385,6 +1412,8 @@ const PREVIOUS_PRICES = new Map();
 const THEMES = ["midnight", "light", "dark"];
 const LAYOUT_KEY = "pair_trade_layout_v1";
 const LAYOUTS = ["mobile", "desktop"];
+const FONT_SCALE_KEY = "pair_trade_font_scale_v1";
+const FONT_SCALES = ["100", "110", "120", "130"]; // Prozent
 
 const AUTO_REFRESH_INTERVAL_MS = 1 * 60 * 1000;
 const APP_TZ = "Europe/Berlin";
@@ -1937,10 +1966,34 @@ function saveLayout(v) { try { localStorage.setItem(LAYOUT_KEY, v); } catch {} }
 function applyLayout(v) {
   const layout = LAYOUTS.includes(v) ? v : "mobile";
   document.documentElement.setAttribute("data-layout", layout);
+  // Font-Scale neu anwenden — greift nur im Desktop-Modus, beim Wechsel Reset auf 1
+  if (typeof applyFontScale === "function") applyFontScale(loadFontScale());
 }
 function setActiveLayoutCard(layout) {
   document.querySelectorAll(".layout-card").forEach(c => {
     c.classList.toggle("active", c.getAttribute("data-layout-choice") === layout);
+  });
+}
+
+// --- Schriftgröße (nur im Desktop-Modus aktiv) — geräteabhängig, nicht synct ---
+function loadFontScale() {
+  try { const v = localStorage.getItem(FONT_SCALE_KEY); return FONT_SCALES.includes(v) ? v : "100"; }
+  catch { return "100"; }
+}
+function saveFontScale(v) { try { localStorage.setItem(FONT_SCALE_KEY, v); } catch {} }
+function applyFontScale(v) {
+  const scale = FONT_SCALES.includes(v) ? v : "100";
+  document.documentElement.setAttribute("data-font-scale", scale);
+  const isDesktop = document.documentElement.getAttribute("data-layout") === "desktop";
+  if (isDesktop && scale !== "100") {
+    document.documentElement.style.zoom = (parseInt(scale, 10) / 100).toString();
+  } else {
+    document.documentElement.style.zoom = "";
+  }
+}
+function setActiveFontScaleCard(scale) {
+  document.querySelectorAll(".scale-card").forEach(c => {
+    c.classList.toggle("active", c.getAttribute("data-scale-choice") === scale);
   });
 }
 
@@ -3444,6 +3497,7 @@ function openSettings() {
   document.getElementById("start-page-select").value = loadStartPage();
   setActiveThemeCard(loadTheme());
   setActiveLayoutCard(loadLayout());
+  setActiveFontScaleCard(loadFontScale());
   document.getElementById("home-ccy").value = homeCurrency;
   document.getElementById("worker-url").value = priceSettings.workerUrl || "";
   document.getElementById("sync-key").value = syncSettings.apiKey || "";
@@ -3711,6 +3765,17 @@ document.querySelectorAll(".layout-card[data-layout-choice]").forEach(card => {
   });
 });
 
+// Schriftgröße-Cards (nur Desktop-wirksam, aber pro Gerät einstellbar)
+document.querySelectorAll(".scale-card[data-scale-choice]").forEach(card => {
+  card.addEventListener("click", () => {
+    const choice = card.getAttribute("data-scale-choice");
+    if (!FONT_SCALES.includes(choice)) return;
+    saveFontScale(choice);
+    applyFontScale(choice);
+    setActiveFontScaleCard(choice);
+  });
+});
+
 // Desktop-Tab-Click → Page-Switch (verwendet existierende scrollToPage-Branching-Logik)
 document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -3834,6 +3899,7 @@ window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
 applyTheme(loadTheme());
 applyLayout(loadLayout());
+applyFontScale(loadFontScale());
 viewModes = loadViewModes();
 for (const k of PAGES) applyViewModeUI(k);
 
