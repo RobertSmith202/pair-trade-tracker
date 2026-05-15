@@ -215,6 +215,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
 .basket-card .alarm-pill { vertical-align: middle; }
+.basket-card-pills { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 /* Per-Page „+ Neuer Korb"-Button: dezente, gestrichelte Box zwischen Aggregate und Trade-Liste */
 .basket-actions { padding: 0 0 10px; }
 .basket-actions .btn-new-basket { width: 100%; background: var(--card); color: var(--text); border: 1px dashed var(--border); font-weight: 600; }
@@ -2676,7 +2677,8 @@ function renderBasketCard(basket) {
   }
   card.innerHTML = `
     <div class="basket-card-head">
-      <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}${pillsHtml}</div>
+      <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}</div>
+      ${pillsHtml ? `<div class="basket-card-pills">${pillsHtml}</div>` : ""}
     </div>
     <div class="basket-card-row">
       <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
