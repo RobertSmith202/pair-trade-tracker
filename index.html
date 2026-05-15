@@ -350,11 +350,10 @@ body::before {
   overflow-y: auto;
   box-shadow: 1px 0 0 var(--border);
 }
-[data-layout="desktop"] body { padding-left: 220px; max-width: none; }
+[data-layout="desktop"] body { padding-left: 220px; max-width: none; overflow: hidden; padding-top: 0; padding-bottom: 0; }
 /* Mobile-Toolbar und Ebene-2-Tabs auf Ebene-3-Desktop ausblenden — Sidebar übernimmt */
 [data-layout="desktop"] .toolbar-wrap { display: none; }
 [data-layout="desktop"] .desktop-tabs { display: none; }
-[data-layout="desktop"] .pages-container { max-width: 1100px; margin: 0 auto; }
 /* Brand-Block ganz oben */
 .ds-brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
 .ds-brand-mark { font-size: 26px; line-height: 1; color: var(--info); }
@@ -395,20 +394,42 @@ body::before {
 .desktop-tabs .dt-btn.active { background: var(--card); border-color: var(--border); color: var(--text); }
 [data-layout="desktop"] .desktop-tabs { display: flex; }
 [data-layout="desktop"] .page-dots { display: none; }
-/* Pages-Container: kein Snap-Scroll mehr, sondern Show-Hide via .active-page */
-[data-layout="desktop"] .pages-container { overflow: visible; scroll-snap-type: none; flex-direction: column; }
-[data-layout="desktop"] .page { display: none; flex: none; width: 100%; padding: 8px 14px 30px; }
-[data-layout="desktop"] .page.active-page { display: block; animation: pageEnterNext 0.34s cubic-bezier(0.22, 0.61, 0.36, 1); }
-[data-layout="desktop"] .page.active-page[data-direction="prev"] { animation-name: pageEnterPrev; }
-[data-layout="desktop"] .page.active-page[data-direction="none"] { animation: none; }
+/* Pages-Container: fixed-positioned auf Desktop, füllt verbleibenden Viewport-Bereich.
+   Jede Page wird ein eigener Scroll-Container — Body-Höhe ändert sich nie → kein Scroll-Jitter beim Page-Wechsel. */
+[data-layout="desktop"] .pages-container {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 220px;
+  overflow: hidden;
+  display: block;
+  scroll-snap-type: none;
+  max-width: none; margin: 0;
+}
+[data-layout="desktop"] .page {
+  display: none;
+  position: absolute; inset: 0;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 18px clamp(14px, 4vw, 56px) 40px;
+  will-change: opacity, transform;
+}
+[data-layout="desktop"] .page.active-page {
+  display: block;
+  animation: pageEnterNext 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+}
+[data-layout="desktop"] .page.active-page[data-direction="prev"]  { animation-name: pageEnterPrev; }
+[data-layout="desktop"] .page.active-page[data-direction="none"]  { animation: none; }
+/* Sehr subtile Animation: 10px Slide + Fade, keine Scale, Apple-iOS-Easing */
 @keyframes pageEnterNext {
-  from { opacity: 0; transform: translateY(28px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes pageEnterPrev {
-  from { opacity: 0; transform: translateY(-28px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0)     scale(1); }
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+/* Page-interne Scrollbar dezent (Mac-Style) */
+[data-layout="desktop"] .page::-webkit-scrollbar { width: 8px; }
+[data-layout="desktop"] .page::-webkit-scrollbar-thumb { background: rgba(127,127,127,0.25); border-radius: 4px; }
+[data-layout="desktop"] .page::-webkit-scrollbar-thumb:hover { background: rgba(127,127,127,0.4); }
+[data-layout="desktop"] .page::-webkit-scrollbar-track { background: transparent; }
 
 /* === Desktop-Layout (Ebene 1: sanfter Polish) ============================== */
 /* WICHTIG: Body ist im Mobile-Modus hart auf max-width: 640px gekappt (siehe oben).
@@ -3648,17 +3669,17 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
     if (lock && lock.classList.contains("open")) return true;
     return false;
   }
+  function getActivePageScrollEl() {
+    return document.querySelector(".pages-container > .page.active-page");
+  }
   function nextPage() {
     const idx = PAGES.indexOf(currentPage);
     if (idx < 0 || idx >= PAGES.length - 1) return;
-    // Sofort an Top scrollen (vor dem Page-Switch), damit die Enter-Animation komplett sichtbar ist
-    window.scrollTo({ top: 0, behavior: "auto" });
     scrollToPage(PAGES[idx + 1], false);
   }
   function prevPage() {
     const idx = PAGES.indexOf(currentPage);
     if (idx <= 0) return;
-    window.scrollTo({ top: 0, behavior: "auto" });
     scrollToPage(PAGES[idx - 1], false);
   }
   window.addEventListener("wheel", (e) => {
@@ -3668,7 +3689,8 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
     if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
     const now = Date.now();
     if (now < lockUntil) return;
-    const scrollEl = document.scrollingElement || document.documentElement;
+    const scrollEl = getActivePageScrollEl();
+    if (!scrollEl) return;
     const atTop    = scrollEl.scrollTop <= 1;
     const atBottom = (scrollEl.scrollTop + scrollEl.clientHeight) >= (scrollEl.scrollHeight - 2);
     const dir = Math.sign(e.deltaY);
