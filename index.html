@@ -214,11 +214,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
 .basket-card .alarm-pill { vertical-align: middle; }
-.basket-card-edit, .basket-card-del { background: transparent; padding: 4px 9px; min-height: 0; font-size: 12px; line-height: 1; border-radius: 6px; flex-shrink: 0; font-weight: 600; }
-.basket-card-edit { border: 1px solid var(--border); color: var(--muted); }
-.basket-card-edit:hover { background: var(--card); color: var(--text); border-color: var(--text); }
-.basket-card-del { border: 1px solid var(--neg-bg); color: var(--neg); font-size: 13px; font-weight: 700; }
-.basket-card-del:hover { background: var(--neg-bg); }
+/* Korb-Card Edit/Delete übernehmen die Standard-.icon-Styles für Größen-Parität zu Trade-Cards */
 /* Grid-View: Korb-Karte erweitert mit Notional, Alarm-Status und Top-Trades */
 .basket-card-extra { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 8px; }
 .trade-list[data-view="list"] .basket-card-extra { display: none; }
@@ -340,6 +336,19 @@ body::before {
 .kp-btn.back { font-size: 19px; font-weight: 600; }
 @keyframes dotPop { 0% { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1.05); opacity: 1; } }
 .lock-dot.filled { animation: dotPop 0.18s ease-out; }
+
+/* === Desktop-Tabs (Ebene 2) ============================================== */
+/* Tab-Bar wird nur im Desktop-Layout sichtbar; ersetzt die Snap-Page-Dots */
+.desktop-tabs { display: none; gap: 4px; padding: 8px 0 6px; border-top: 1px solid var(--border); margin-top: 6px; }
+.desktop-tabs .dt-btn { flex: 0 0 auto; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 9px 16px; min-height: 0; color: var(--muted); font-weight: 600; font-size: 14px; cursor: pointer; transition: background-color 0.12s, color 0.12s, border-color 0.12s; }
+.desktop-tabs .dt-btn:hover { color: var(--text); background: var(--card); }
+.desktop-tabs .dt-btn.active { background: var(--card); border-color: var(--border); color: var(--text); }
+[data-layout="desktop"] .desktop-tabs { display: flex; }
+[data-layout="desktop"] .page-dots { display: none; }
+/* Pages-Container: kein Snap-Scroll mehr, sondern Show-Hide via .active-page */
+[data-layout="desktop"] .pages-container { overflow: visible; scroll-snap-type: none; flex-direction: column; }
+[data-layout="desktop"] .page { display: none; flex: none; width: 100%; padding: 8px 14px 30px; }
+[data-layout="desktop"] .page.active-page { display: block; }
 
 /* === Desktop-Layout (Ebene 1: sanfter Polish) ============================== */
 /* WICHTIG: Body ist im Mobile-Modus hart auf max-width: 640px gekappt (siehe oben).
@@ -522,6 +531,12 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="status" id="status" data-i18n="status_ready">Bereit</div>
     <div class="status" id="auto-status">⏱ …</div>
     <div class="status off" id="sync-status" data-i18n="status_sync_off">Sync aus</div>
+  </div>
+  <div class="desktop-tabs" id="desktop-tabs" role="tablist">
+    <button class="dt-btn" data-tab="pair"  role="tab" data-i18n="page_pairs">Paare</button>
+    <button class="dt-btn" data-tab="long"  role="tab" data-i18n="page_longs">Longs</button>
+    <button class="dt-btn" data-tab="short" role="tab" data-i18n="page_shorts">Shorts</button>
+    <button class="dt-btn" data-tab="total" role="tab" data-i18n="page_total">Gesamt</button>
   </div>
 </div>
 
@@ -2458,8 +2473,8 @@ function renderBasketCard(basket) {
     <div class="basket-card-head">
       <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}${pillsHtml}</div>
       <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
-      <button class="basket-card-edit" data-basket-edit="${basket.id}" aria-label="edit">${t("btn_edit")}</button>
-      <button class="basket-card-del" data-basket-del="${basket.id}" aria-label="delete">×</button>
+      <button class="icon" data-basket-edit="${basket.id}" aria-label="edit">${t("btn_edit")}</button>
+      <button class="icon danger" data-basket-del="${basket.id}" aria-label="delete">×</button>
     </div>
     <div class="basket-card-row">
       <span class="basket-card-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
@@ -2473,14 +2488,14 @@ function renderBasketCard(basket) {
     </div>`;
   card.addEventListener("click", () => openBasketModal(basket.id));
   // Edit- und Delete-Button direkt auf der Karte — stoppen Propagation, sonst öffnet sich das Modal
-  const editBtn = card.querySelector(".basket-card-edit");
+  const editBtn = card.querySelector("[data-basket-edit]");
   if (editBtn) {
     editBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       openBasketForm(basket.id);
     });
   }
-  const delBtn = card.querySelector(".basket-card-del");
+  const delBtn = card.querySelector("[data-basket-del]");
   if (delBtn) {
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -3349,16 +3364,31 @@ function importData() {
 function clearAll() { closeMenu(); if (!confirm(t("io_clear_confirm"))) return; trades = []; alertStates = {}; markLocalChange(); render(); }
 
 function scrollToPage(pageKey, smooth = true) {
-  const container = document.getElementById("pages-container");
   const idx = PAGES.indexOf(pageKey); if (idx < 0) return;
+  currentPage = pageKey;
+  setActiveDot(pageKey);
+  if (typeof updateBasketBtnVisibility === "function") updateBasketBtnVisibility();
+  // Desktop-Layout: kein Snap-Scroll, stattdessen Page-Switch via .active-page
+  if (document.documentElement.getAttribute("data-layout") === "desktop") {
+    activateDesktopPage(pageKey);
+    return;
+  }
+  const container = document.getElementById("pages-container");
   const w = container.clientWidth;
   container.scrollTo({ left: idx * w, behavior: smooth ? "smooth" : "auto" });
-  setActiveDot(pageKey);
-  currentPage = pageKey;
-  if (typeof updateBasketBtnVisibility === "function") updateBasketBtnVisibility();
+}
+function activateDesktopPage(pageKey) {
+  document.querySelectorAll(".pages-container > .page").forEach(p => {
+    p.classList.toggle("active-page", p.getAttribute("data-page") === pageKey);
+  });
+  document.querySelectorAll(".desktop-tabs .dt-btn").forEach(b => {
+    b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
+  });
 }
 function setActiveDot(pageKey) { document.querySelectorAll(".page-dot").forEach(d => { d.classList.toggle("active", d.getAttribute("data-dot") === pageKey); }); }
 function onPagesScroll() {
+  // Desktop-Layout: kein horizontaler Snap-Scroll → Listener no-op
+  if (document.documentElement.getAttribute("data-layout") === "desktop") return;
   if (pageScrollDebounce) clearTimeout(pageScrollDebounce);
   pageScrollDebounce = setTimeout(() => {
     const container = document.getElementById("pages-container");
@@ -3482,8 +3512,21 @@ document.querySelectorAll(".layout-card[data-layout-choice]").forEach(card => {
     saveLayout(choice);
     applyLayout(choice);
     setActiveLayoutCard(choice);
-    // Pages neu zur aktuellen Page scrollen, sonst hängt es auf einer falschen Offset-Position
+    // Beim Switch zum Mobile-Modus: alle .active-page-Klassen entfernen, damit Snap-Scroll wieder sauber ist
+    if (choice === "mobile") {
+      document.querySelectorAll(".pages-container > .page").forEach(p => p.classList.remove("active-page"));
+    }
+    // Pages neu positionieren (Mobile: Snap-Scroll, Desktop: active-page setzen)
     requestAnimationFrame(() => scrollToPage(currentPage, false));
+  });
+});
+
+// Desktop-Tab-Click → Page-Switch (verwendet existierende scrollToPage-Branching-Logik)
+document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tp = btn.getAttribute("data-tab");
+    if (!PAGES.includes(tp)) return;
+    scrollToPage(tp, false);
   });
 });
 
