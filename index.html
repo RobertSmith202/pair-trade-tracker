@@ -197,6 +197,14 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card:active { transform: scale(0.99); }
 .basket-card.long  { border-left: 4px solid var(--pos); }
 .basket-card.short { border-left: 4px solid var(--neg); }
+/* List-View: Körbe heben sich elegant von Standalone-Trades ab —
+   Typ-getönter Verlauf von oben (kräftiger Akzent) nach unten (sanfter Wash)
+   plus leicht verstärkte Elevation für "Container-Gefühl" */
+.trade-list[data-view="list"] .basket-card { padding: 14px 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.05); border-color: transparent; }
+.trade-list[data-view="list"] .basket-card.long  { background: linear-gradient(180deg, var(--pos-bg) 0%, var(--pos-soft) 55%, var(--pos-soft) 100%); }
+.trade-list[data-view="list"] .basket-card.short { background: linear-gradient(180deg, var(--neg-bg) 0%, var(--neg-soft) 55%, var(--neg-soft) 100%); }
+.trade-list[data-view="list"] .basket-card .basket-card-count { background: rgba(255,255,255,0.10); }
+[data-theme="light"] .trade-list[data-view="list"] .basket-card .basket-card-count { background: rgba(0,0,0,0.05); }
 .basket-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .basket-card-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
 .basket-card-name::before { content: "🧺"; font-size: 14px; flex-shrink: 0; }
