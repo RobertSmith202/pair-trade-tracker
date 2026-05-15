@@ -209,7 +209,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
 .basket-card-name::before { content: "🧺"; font-size: 14px; flex-shrink: 0; }
 .basket-card-count { font-size: 11px; color: var(--muted); font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(127,127,127,0.12); flex-shrink: 0; }
-.basket-card-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.basket-card-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.basket-card-vals { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .basket-card-pnl { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
@@ -2676,14 +2677,16 @@ function renderBasketCard(basket) {
   card.innerHTML = `
     <div class="basket-card-head">
       <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}${pillsHtml}</div>
-      <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
-      <button class="icon" data-basket-edit="${basket.id}" aria-label="edit">${t("btn_edit")}</button>
-      <button class="icon danger" data-basket-del="${basket.id}" aria-label="delete">×</button>
     </div>
     <div class="basket-card-row">
-      <span class="basket-card-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
-      <span class="basket-card-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
-      <span class="basket-card-arrow">›</span>
+      <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
+      <div class="basket-card-vals">
+        <span class="basket-card-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+        <span class="basket-card-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
+        <button class="icon" data-basket-edit="${basket.id}" aria-label="edit">${t("btn_edit")}</button>
+        <button class="icon danger" data-basket-del="${basket.id}" aria-label="delete">×</button>
+        <span class="basket-card-arrow">›</span>
+      </div>
     </div>
     <div class="basket-card-extra">
       ${metaHtml}
