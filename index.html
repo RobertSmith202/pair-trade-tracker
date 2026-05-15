@@ -415,11 +415,10 @@ body::before {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-/* Inhalt einheitlich links-aligned mit großzügiger Spalten-Breite — füllt den Mac-Display-Bereich
-   sinnvoll aus statt nur eine schmale iPhone-Spalte. Hard-Cap 1400px für ergonomische Lesbarkeit
-   auf ultrawides; ansonsten skaliert die Spalte mit dem verfügbaren Raum. */
+/* Inhalt einheitlich links-aligned, ~1100px Hard-Cap — Mittelweg zwischen schmaler 720-Spalte
+   und ausuferndem 1400. Reicht für komfortable Datenlesedichte ohne dass Pct ans rechte Ende fliegt. */
 [data-layout="desktop"] .page > * {
-  max-width: min(1400px, 100%) !important;
+  max-width: min(1100px, 100%) !important;
   margin-left: 0 !important;
   margin-right: auto !important;
   width: 100%;
