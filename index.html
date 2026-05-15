@@ -268,6 +268,10 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .breakdown-val { font-size: 16px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .theme-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 4px; }
+#layout-cards { grid-template-columns: 1fr 1fr; }
+.layout-card .theme-card-icon { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 22px; }
+.layout-card[data-layout-choice="mobile"]  .theme-card-icon { letter-spacing: -2px; }
+.layout-card[data-layout-choice="desktop"] .theme-card-icon { font-size: 26px; }
 .theme-card { padding: 14px 8px; border: 1.5px solid var(--border); border-radius: 12px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--card); user-select: none; transition: border-color 0.15s, background-color 0.15s, transform 0.05s; -webkit-tap-highlight-color: transparent; }
 .theme-card:hover { border-color: var(--muted); }
 .theme-card:active { transform: scale(0.98); }
@@ -336,6 +340,45 @@ body::before {
 .kp-btn.back { font-size: 19px; font-weight: 600; }
 @keyframes dotPop { 0% { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1.05); opacity: 1; } }
 .lock-dot.filled { animation: dotPop 0.18s ease-out; }
+
+/* === Desktop-Layout (Ebene 1: sanfter Polish) ============================== */
+/* Inhalt zentrieren auf max. Breite, Trade-Liste mehrspaltig, Forms als Dialog */
+[data-layout="desktop"] .toolbar-wrap { max-width: 1140px; margin-left: auto; margin-right: auto; }
+[data-layout="desktop"] .pages-container { max-width: 1140px; margin-left: auto; margin-right: auto; }
+[data-layout="desktop"] .page-dots { max-width: 1140px; left: 50%; right: auto; transform: translateX(-50%); }
+[data-layout="desktop"] .lock-loader-overlay { /* unverändert: bleibt fullscreen */ }
+/* Trade-Liste: Multi-Column-Grid in Grid-View */
+[data-layout="desktop"] .trade-list[data-view="grid"],
+[data-layout="desktop"] .basket-trade-list[data-view="grid"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+/* Form-Card (Trade-Form, Basket-Form) als zentrierter Floating-Dialog */
+[data-layout="desktop"] .form-card.open {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  margin: 0; width: calc(100% - 48px); max-width: 600px;
+  max-height: 88vh; overflow-y: auto;
+  z-index: 300;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.45);
+}
+/* Backdrop hinter geöffneten Form-Cards (via :has() auf body) */
+[data-layout="desktop"] body:has(.form-card.open)::before {
+  content: ""; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 250; pointer-events: none;
+}
+/* Basket-Modal: bleibt Fullscreen-Overlay, aber Inhalt mittig auf 1100px */
+[data-layout="desktop"] .basket-modal-head,
+[data-layout="desktop"] .basket-modal-body {
+  max-width: 1100px; margin-left: auto; margin-right: auto; width: 100%;
+}
+/* Hover-Effekte aktivieren — auf Touch-Devices kontraproduktiv, daher nur Desktop */
+[data-layout="desktop"] .trade-card:hover,
+[data-layout="desktop"] .basket-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
+[data-layout="desktop"] .basket-card:hover { transform: translateY(-1px); }
+
 /* Pentagon-Loader nach erfolgreichem Code */
 .lock-loader-overlay {
   position: fixed; inset: 0;
@@ -741,6 +784,19 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       </div>
     </div>
 
+    <h4 class="section-h" data-i18n="settings_layout">Ansicht</h4>
+    <div class="info-box" data-i18n="settings_layout_info"></div>
+    <div class="theme-cards" id="layout-cards">
+      <div class="theme-card layout-card" data-layout-choice="mobile">
+        <div class="theme-card-icon" aria-hidden="true">▯</div>
+        <div class="theme-card-label" data-i18n="layout_mobile">Handy</div>
+      </div>
+      <div class="theme-card layout-card" data-layout-choice="desktop">
+        <div class="theme-card-icon" aria-hidden="true">▭</div>
+        <div class="theme-card-label" data-i18n="layout_desktop">Desktop</div>
+      </div>
+    </div>
+
     <h4 class="section-h" data-i18n="settings_language">Sprache</h4>
     <div class="info-box" data-i18n="settings_language_info"></div>
     <div class="field">
@@ -926,6 +982,8 @@ const STRINGS = {
     settings_theme: "Erscheinungsbild",
     settings_theme_info: "Sofort angewendet und gespeichert. Pro Gerät (nicht synced).",
     theme_midnight: "Mitternacht", theme_light: "Hell", theme_dark: "Dunkel",
+    settings_layout: "Ansicht", settings_layout_info: "Handy: kompakt, eine Spalte. Desktop: zentriert mit max-Breite, Trade-Karten mehrspaltig, Forms als Dialog. Pro Gerät einstellbar — wird nicht synct.",
+    layout_mobile: "Handy", layout_desktop: "Desktop",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -1077,6 +1135,8 @@ const STRINGS = {
     settings_theme: "Appearance",
     settings_theme_info: "Applied immediately and saved. Stored per device (not synced).",
     theme_midnight: "Midnight", theme_light: "Light", theme_dark: "Dark",
+    settings_layout: "Layout", settings_layout_info: "Mobile: compact, single column. Desktop: centered with max width, multi-column trade cards, forms as dialog. Per-device — not synced.",
+    layout_mobile: "Mobile", layout_desktop: "Desktop",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -1155,6 +1215,8 @@ const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
 const PREVIOUS_PRICES = new Map();
 const THEMES = ["midnight", "light", "dark"];
+const LAYOUT_KEY = "pair_trade_layout_v1";
+const LAYOUTS = ["mobile", "desktop"];
 
 const AUTO_REFRESH_INTERVAL_MS = 1 * 60 * 1000;
 const APP_TZ = "Europe/Berlin";
@@ -1695,6 +1757,22 @@ function applyTheme(v) {
 function setActiveThemeCard(theme) {
   document.querySelectorAll(".theme-card").forEach(c => {
     c.classList.toggle("active", c.getAttribute("data-theme-choice") === theme);
+  });
+}
+
+// --- Layout-Modus (Handy vs. Desktop) — geräteabhängig, nicht synct ---
+function loadLayout() {
+  try { const v = localStorage.getItem(LAYOUT_KEY); return LAYOUTS.includes(v) ? v : "mobile"; }
+  catch { return "mobile"; }
+}
+function saveLayout(v) { try { localStorage.setItem(LAYOUT_KEY, v); } catch {} }
+function applyLayout(v) {
+  const layout = LAYOUTS.includes(v) ? v : "mobile";
+  document.documentElement.setAttribute("data-layout", layout);
+}
+function setActiveLayoutCard(layout) {
+  document.querySelectorAll(".layout-card").forEach(c => {
+    c.classList.toggle("active", c.getAttribute("data-layout-choice") === layout);
   });
 }
 
@@ -3197,6 +3275,7 @@ function openSettings() {
   document.getElementById("lang-select").value = loadLangPreference();
   document.getElementById("start-page-select").value = loadStartPage();
   setActiveThemeCard(loadTheme());
+  setActiveLayoutCard(loadLayout());
   document.getElementById("home-ccy").value = homeCurrency;
   document.getElementById("worker-url").value = priceSettings.workerUrl || "";
   document.getElementById("sync-key").value = syncSettings.apiKey || "";
@@ -3383,13 +3462,26 @@ document.getElementById("sync-disable").addEventListener("click", () => {
   closeSettings(); setSyncStatus("off", t("status_sync_off"));
 });
 
-document.querySelectorAll(".theme-card").forEach(card => {
+document.querySelectorAll(".theme-card[data-theme-choice]").forEach(card => {
   card.addEventListener("click", () => {
     const choice = card.getAttribute("data-theme-choice");
     if (!THEMES.includes(choice)) return;
     saveTheme(choice);
     applyTheme(choice);
     setActiveThemeCard(choice);
+  });
+});
+
+// Layout-Cards (Handy / Desktop) — direkt anwenden, render() & Pages scroll-position neu setzen
+document.querySelectorAll(".layout-card[data-layout-choice]").forEach(card => {
+  card.addEventListener("click", () => {
+    const choice = card.getAttribute("data-layout-choice");
+    if (!LAYOUTS.includes(choice)) return;
+    saveLayout(choice);
+    applyLayout(choice);
+    setActiveLayoutCard(choice);
+    // Pages neu zur aktuellen Page scrollen, sonst hängt es auf einer falschen Offset-Position
+    requestAnimationFrame(() => scrollToPage(currentPage, false));
   });
 });
 
@@ -3423,6 +3515,7 @@ document.getElementById("pages-container").addEventListener("scroll", onPagesScr
 window.addEventListener("resize", () => { scrollToPage(currentPage, false); });
 
 applyTheme(loadTheme());
+applyLayout(loadLayout());
 viewModes = loadViewModes();
 for (const k of PAGES) applyViewModeUI(k);
 
