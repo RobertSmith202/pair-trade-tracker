@@ -415,14 +415,21 @@ body::before {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-/* Inhalt zentrieren und kappen — Pct bleibt visuell nah am Namen, Cmd+/- bleibt sicher */
+/* Inhalt einheitlich links-aligned mit fester Spalten-Breite (Bloomberg-Style).
+   Alle Page-Children landen in derselben 720px-Spalte, gleiche linke Kante, gleiche Breite —
+   das gibt eine ruhige Lesespalte statt fragmentierter, unterschiedlich breiter Karten. */
 [data-layout="desktop"] .page > * {
-  max-width: 760px;
-  margin-left: auto;
-  margin-right: auto;
+  max-width: 720px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  width: 100%;
+  box-sizing: border-box;
 }
-/* Grid-View darf breiter werden für mehrere Karten nebeneinander */
-[data-layout="desktop"] .page > .trade-list[data-view="grid"] { max-width: 1080px; }
+/* Owl-Watermark im Desktop-Layout ausblenden — zu dominant hinter der spärlich befüllten Lesespalte */
+[data-layout="desktop"] body::before { display: none !important; }
+[data-layout="desktop"] .app-watermark,
+[data-layout="desktop"] .owl-watermark,
+[data-layout="desktop"] .watermark { display: none !important; }
 [data-layout="desktop"] .page.active-page {
   display: block;
   animation: pageEnterFromBelow 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
