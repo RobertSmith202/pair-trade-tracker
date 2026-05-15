@@ -415,11 +415,11 @@ body::before {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-/* Inhalt einheitlich links-aligned mit fester Spalten-Breite (Bloomberg-Style).
-   Alle Page-Children landen in derselben 720px-Spalte, gleiche linke Kante, gleiche Breite —
-   das gibt eine ruhige Lesespalte statt fragmentierter, unterschiedlich breiter Karten. */
+/* Inhalt einheitlich links-aligned mit großzügiger Spalten-Breite — füllt den Mac-Display-Bereich
+   sinnvoll aus statt nur eine schmale iPhone-Spalte. Hard-Cap 1400px für ergonomische Lesbarkeit
+   auf ultrawides; ansonsten skaliert die Spalte mit dem verfügbaren Raum. */
 [data-layout="desktop"] .page > * {
-  max-width: 720px !important;
+  max-width: min(1400px, 100%) !important;
   margin-left: 0 !important;
   margin-right: auto !important;
   width: 100%;
@@ -3716,16 +3716,12 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
     scrollToPage(tp, false);
   });
 });
-// === Ebene 3: Trackpad-Swipe-Navigation auf Desktop ===========================
-// Mac-Trackpad sendet wheel-Events mit deltaY beim Zwei-Finger-Swipe.
-// Wir lassen normales Scrollen unangetastet, fangen aber Overscroll am Page-Rand ab
-// und triggern dort den Page-Wechsel (analog zum Mobile-Snap-Scroll, aber vertikal).
-(function setupDesktopWheelNav() {
-  const THRESHOLD = 90;     // px Overscroll-Akkumulation bis Trigger
-  const COOLDOWN_MS = 650;  // Anti-Doppel-Trigger
-  let overscroll = 0;
-  let lockUntil = 0;
-  let lastDir = 0;
+// === Ebene 3: Pfeiltasten-Navigation auf Desktop ==============================
+// Linkspfeil → Page zurück, Rechtspfeil → Page weiter.
+// Wheel-Scrolling im Desktop-Layout bleibt komplett der normalen Page-internen Scroll-Funktion
+// vorbehalten — keine Page-Wechsel über Trackpad-Gesten mehr (würde sonst lange Trade-Listen
+// unscrollbar machen, weil ans Ende-Scrollen automatisch zur nächsten Page springen würde).
+(function setupDesktopArrowKeyNav() {
   function isAnyOverlayOpen() {
     if (document.querySelector(".basket-modal.open")) return true;
     if (document.querySelector(".modal-overlay.open")) return true;
@@ -3734,8 +3730,12 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
     if (lock && lock.classList.contains("open")) return true;
     return false;
   }
-  function getActivePageScrollEl() {
-    return document.querySelector(".pages-container > .page.active-page");
+  function isTypingTarget(el) {
+    if (!el) return false;
+    const tag = (el.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return true;
+    if (el.isContentEditable) return true;
+    return false;
   }
   function nextPage() {
     const idx = PAGES.indexOf(currentPage);
@@ -3747,36 +3747,15 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
     if (idx <= 0) return;
     scrollToPage(PAGES[idx - 1], false);
   }
-  window.addEventListener("wheel", (e) => {
+  window.addEventListener("keydown", (e) => {
     if (document.documentElement.getAttribute("data-layout") !== "desktop") return;
     if (isAnyOverlayOpen()) return;
-    // Nur reagieren wenn vertikaler Scroll dominiert (horizontaler Swipe = Browser-Standard)
-    if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-    const now = Date.now();
-    if (now < lockUntil) return;
-    const scrollEl = getActivePageScrollEl();
-    if (!scrollEl) return;
-    const atTop    = scrollEl.scrollTop <= 1;
-    const atBottom = (scrollEl.scrollTop + scrollEl.clientHeight) >= (scrollEl.scrollHeight - 2);
-    const dir = Math.sign(e.deltaY);
-    // Richtungswechsel → Akku resetten, damit man nicht doppelt feuert
-    if (dir !== lastDir) { overscroll = 0; lastDir = dir; }
-    if (e.deltaY > 0 && atBottom) {
-      overscroll += e.deltaY;
-      if (overscroll >= THRESHOLD) {
-        nextPage();
-        overscroll = 0; lockUntil = now + COOLDOWN_MS;
-      }
-    } else if (e.deltaY < 0 && atTop) {
-      overscroll += e.deltaY;
-      if (overscroll <= -THRESHOLD) {
-        prevPage();
-        overscroll = 0; lockUntil = now + COOLDOWN_MS;
-      }
-    } else {
-      overscroll = 0;
-    }
-  }, { passive: true });
+    if (isTypingTarget(e.target)) return;
+    // Modifier-Kombos NICHT abfangen (Cmd+Shift+1..4 läuft separat, Browser-Shortcuts auch)
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); nextPage(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); prevPage(); }
+  });
 })();
 // === Ebene 3: Sidebar-Navigation + Actions ====================================
 document.querySelectorAll(".desktop-sidebar .ds-nav-btn[data-tab]").forEach(btn => {
