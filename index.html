@@ -398,7 +398,17 @@ body::before {
 /* Pages-Container: kein Snap-Scroll mehr, sondern Show-Hide via .active-page */
 [data-layout="desktop"] .pages-container { overflow: visible; scroll-snap-type: none; flex-direction: column; }
 [data-layout="desktop"] .page { display: none; flex: none; width: 100%; padding: 8px 14px 30px; }
-[data-layout="desktop"] .page.active-page { display: block; }
+[data-layout="desktop"] .page.active-page { display: block; animation: pageEnterNext 0.34s cubic-bezier(0.22, 0.61, 0.36, 1); }
+[data-layout="desktop"] .page.active-page[data-direction="prev"] { animation-name: pageEnterPrev; }
+[data-layout="desktop"] .page.active-page[data-direction="none"] { animation: none; }
+@keyframes pageEnterNext {
+  from { opacity: 0; transform: translateY(28px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes pageEnterPrev {
+  from { opacity: 0; transform: translateY(-28px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)     scale(1); }
+}
 
 /* === Desktop-Layout (Ebene 1: sanfter Polish) ============================== */
 /* WICHTIG: Body ist im Mobile-Modus hart auf max-width: 640px gekappt (siehe oben).
@@ -3445,21 +3455,28 @@ function clearAll() { closeMenu(); if (!confirm(t("io_clear_confirm"))) return; 
 
 function scrollToPage(pageKey, smooth = true) {
   const idx = PAGES.indexOf(pageKey); if (idx < 0) return;
+  const prevIdx = PAGES.indexOf(currentPage);
   currentPage = pageKey;
   setActiveDot(pageKey);
   if (typeof updateBasketBtnVisibility === "function") updateBasketBtnVisibility();
-  // Desktop-Layout: kein Snap-Scroll, stattdessen Page-Switch via .active-page
+  // Desktop-Layout: kein Snap-Scroll, stattdessen Page-Switch via .active-page (mit Enter-Animation)
   if (document.documentElement.getAttribute("data-layout") === "desktop") {
-    activateDesktopPage(pageKey);
+    const direction = (prevIdx < 0 || prevIdx === idx) ? "none" : (idx > prevIdx ? "next" : "prev");
+    activateDesktopPage(pageKey, direction);
     return;
   }
   const container = document.getElementById("pages-container");
   const w = container.clientWidth;
   container.scrollTo({ left: idx * w, behavior: smooth ? "smooth" : "auto" });
 }
-function activateDesktopPage(pageKey) {
+function activateDesktopPage(pageKey, direction = "next") {
   document.querySelectorAll(".pages-container > .page").forEach(p => {
-    p.classList.toggle("active-page", p.getAttribute("data-page") === pageKey);
+    const isTarget = p.getAttribute("data-page") === pageKey;
+    if (isTarget) {
+      // Direction VOR active-page setzen, damit CSS-Animation die richtige Keyframe-Sequenz wählt
+      p.setAttribute("data-direction", direction);
+    }
+    p.classList.toggle("active-page", isTarget);
   });
   document.querySelectorAll(".desktop-tabs .dt-btn").forEach(b => {
     b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
@@ -3634,16 +3651,15 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
   function nextPage() {
     const idx = PAGES.indexOf(currentPage);
     if (idx < 0 || idx >= PAGES.length - 1) return;
+    // Sofort an Top scrollen (vor dem Page-Switch), damit die Enter-Animation komplett sichtbar ist
+    window.scrollTo({ top: 0, behavior: "auto" });
     scrollToPage(PAGES[idx + 1], false);
-    // Nach Page-Wechsel an den Anfang scrollen, damit der nächste Swipe nicht direkt am Bottom landet
-    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
   }
   function prevPage() {
     const idx = PAGES.indexOf(currentPage);
     if (idx <= 0) return;
+    window.scrollTo({ top: 0, behavior: "auto" });
     scrollToPage(PAGES[idx - 1], false);
-    // Beim Zurückgehen ans Ende der neuen (vorigen) Page scrollen — fühlt sich „natürlich rückwärts" an
-    requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" in window ? "instant" : "auto" }));
   }
   window.addEventListener("wheel", (e) => {
     if (document.documentElement.getAttribute("data-layout") !== "desktop") return;
