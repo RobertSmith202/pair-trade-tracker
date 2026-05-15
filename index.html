@@ -206,10 +206,23 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
 .basket-card .alarm-pill { vertical-align: middle; }
+/* Grid-View: Korb-Karte erweitert mit Notional, Alarm-Status und Top-Trades */
+.basket-card-extra { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 8px; }
+.trade-list[data-view="list"] .basket-card-extra { display: none; }
+.trade-list[data-view="grid"] .basket-card { padding: 14px 16px; }
+.basket-card-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }
+.basket-card-meta .bm-label { color: var(--muted); margin-right: 4px; }
+.basket-card-meta .bm-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.basket-card-alarms { display: flex; flex-direction: column; gap: 4px; }
+.basket-card-alarms .alarm-row { display: block; }
+.basket-card-constituents { display: flex; flex-direction: column; gap: 3px; }
+.bc-const-head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 2px; }
+.bc-const-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; font-size: 12px; align-items: baseline; }
+.bc-const-row .bc-ticker { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-const-row .bc-pct, .bc-const-row .bc-pnl { font-variant-numeric: tabular-nums; font-weight: 600; }
+.bc-const-row.muted { color: var(--muted); font-style: italic; }
 
 /* "+ Neuer Korb"-Button-Reihe oberhalb der Trade-Liste */
-.basket-actions { padding: 0 0 10px; }
-.basket-actions .btn-new-basket { width: 100%; background: var(--card); color: var(--text); border: 1px dashed var(--border); font-weight: 600; }
 
 /* Basket-Modal */
 .basket-modal { position: fixed; inset: 0; background: var(--bg); z-index: 800; display: none; flex-direction: column; overflow: hidden; }
@@ -443,6 +456,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 <div class="toolbar-wrap">
   <div class="toolbar">
     <button class="primary" id="btn-new" data-i18n="btn_new_trade">+ Neuer Trade</button>
+    <button class="primary" id="btn-new-basket" data-i18n="btn_new_basket" style="display:none">+ Neuer Korb</button>
     <button id="btn-refresh" data-i18n="btn_refresh">↻ Kurse</button>
     <button class="menu-btn icon" id="btn-menu" aria-label="Menü">⋯</button>
   </div>
@@ -603,7 +617,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
-    <div class="basket-actions"><button class="btn-new-basket" data-basket-new="long" data-i18n="btn_new_basket">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="long"></div>
   </section>
   <section class="page" data-page="short">
@@ -619,7 +632,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
-    <div class="basket-actions"><button class="btn-new-basket" data-basket-new="short" data-i18n="btn_new_basket">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="short"></div>
   </section>
   <section class="page" data-page="total">
@@ -857,6 +869,9 @@ const STRINGS = {
     basket_default_name: "Korb",
     basket_count_n: "× {n} Trades",
     basket_empty: "Noch keine Trades in diesem Korb.",
+    basket_top_trades: "Top Trades",
+    basket_more_n: "+ {n} weitere",
+    basket_type_label: "Typ",
     basket_delete_confirm: "Korb „{name}\" löschen? Die {n} Trade(s) im Korb werden zu Standalone-Trades — sie werden NICHT gelöscht.",
     basket_form_title_new: "Neuer Korb",
     basket_form_title_edit: "Korb bearbeiten",
@@ -1005,6 +1020,9 @@ const STRINGS = {
     basket_default_name: "Basket",
     basket_count_n: "× {n} trades",
     basket_empty: "No trades in this basket yet.",
+    basket_top_trades: "Top trades",
+    basket_more_n: "+ {n} more",
+    basket_type_label: "Type",
     basket_delete_confirm: "Delete basket „{name}\"? The {n} trade(s) in it will become standalone trades — they will NOT be deleted.",
     basket_form_title_new: "New basket",
     basket_form_title_edit: "Edit basket",
@@ -2276,6 +2294,73 @@ function renderBasketCard(basket) {
     else if (s === "acknowledged") cls = "max-acked";
     pillsHtml += `<span class="alarm-pill ${cls}" title="${fmtPct(Math.abs(Number(basket.alertPctMax)))}">🎯</span>`;
   }
+  // --- Erweiterter Inhalt für Grid-View ---
+  // (CSS blendet `.basket-card-extra` in List-View aus)
+  const notionalStr = c.totalNotionalHome != null ? fmtMoney(c.totalNotionalHome, homeCurrency) : "—";
+  // Meta-Zeile: Notional + Typ
+  const typeLabel = basketType(basket) === "short" ? t("page_shorts") : t("page_longs");
+  const metaHtml = `
+    <div class="basket-card-meta">
+      <div><span class="bm-label">${t("card_notional", { ccy: homeCurrency })}:</span><span class="bm-value">${notionalStr}</span></div>
+      <div><span class="bm-label">${t("basket_type_label")}:</span><span class="bm-value">${typeLabel}</span></div>
+    </div>`;
+  // Alarm-Status-Zeilen (analog zu alarmStatusHtml für Einzeltrades)
+  let alarmsHtml = "";
+  if (hasBasketLossThreshold(basket)) {
+    const thr = fmtPct(-Math.abs(Number(basket.alertPctMin)));
+    const s = states.min;
+    if (s === "triggered")          alarmsHtml += `<div class="alarm-row triggered">${t("alarm_triggered", { pct: thr })}</div>`;
+    else if (s === "acknowledged")  alarmsHtml += `<div class="alarm-row acked">${t("alarm_acknowledged", { pct: thr })}</div>`;
+    else                            alarmsHtml += `<div class="alarm-row watching">${t("alarm_watching", { pct: thr })}</div>`;
+  }
+  if (hasBasketProfitThreshold(basket)) {
+    const thr = fmtPct(Math.abs(Number(basket.alertPctMax)));
+    const s = states.max;
+    if (s === "notified")           alarmsHtml += `<div class="alarm-row max-notified">${t("alarm_max_notified", { pct: thr })}</div>`;
+    else if (s === "acknowledged")  alarmsHtml += `<div class="alarm-row max-acked">${t("alarm_max_acknowledged", { pct: thr })}</div>`;
+    else                            alarmsHtml += `<div class="alarm-row max-watching">${t("alarm_max_watching", { pct: thr })}</div>`;
+  }
+  const alarmsBlockHtml = alarmsHtml ? `<div class="basket-card-alarms">${alarmsHtml}</div>` : "";
+  // Top-Trades nach |Performance| absteigend (max 3)
+  const inBasket = tradesInBasket(basket.id);
+  const constituents = inBasket.map(tr => {
+    const lp = hasLong(tr)  ? PRICE_CACHE.get((tr.longTicker  || "").toUpperCase()) : null;
+    const sp = hasShort(tr) ? PRICE_CACHE.get((tr.shortTicker || "").toUpperCase()) : null;
+    const cc = computeTrade(tr, lp, sp);
+    const tt = tradeType(tr);
+    const ticker = tt === "long" ? (tr.longTicker || "") : tt === "short" ? (tr.shortTicker || "") : ((tr.longTicker || "") + "/" + (tr.shortTicker || ""));
+    const label = tr.name || ticker || t("basket_default_name");
+    return { label, pct: cc.pct, pnl: cc.totalPnlHome };
+  });
+  constituents.sort((a, b) => {
+    const ap = (a.pct == null) ? -Infinity : Math.abs(a.pct);
+    const bp = (b.pct == null) ? -Infinity : Math.abs(b.pct);
+    return bp - ap;
+  });
+  const TOP_N = 3;
+  const top = constituents.slice(0, TOP_N);
+  let constHtml = "";
+  if (top.length > 0) {
+    const rowsHtml = top.map(it => {
+      const pctStrC = (it.pct == null) ? "—" : fmtPct(it.pct);
+      const pnlStrC = (it.pnl == null) ? "—" : ((it.pnl >= 0 ? "+" : "") + fmtMoney(it.pnl, homeCurrency));
+      return `<div class="bc-const-row">
+        <span class="bc-ticker">${escapeHtml(it.label)}</span>
+        <span class="bc-pct pnl-pct ${signClass(it.pct)}">${pctStrC}</span>
+        <span class="bc-pnl ${signClass(it.pnl)}">${pnlStrC}</span>
+      </div>`;
+    }).join("");
+    const moreHtml = constituents.length > TOP_N
+      ? `<div class="bc-const-row muted"><span>${t("basket_more_n", { n: constituents.length - TOP_N })}</span><span></span><span></span></div>`
+      : "";
+    constHtml = `<div class="basket-card-constituents">
+      <div class="bc-const-head">${t("basket_top_trades")}</div>
+      ${rowsHtml}
+      ${moreHtml}
+    </div>`;
+  } else {
+    constHtml = `<div class="basket-card-constituents"><div class="bc-const-head">${t("basket_top_trades")}</div><div class="bc-const-row muted"><span>${t("basket_empty")}</span><span></span><span></span></div></div>`;
+  }
   card.innerHTML = `
     <div class="basket-card-head">
       <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}${pillsHtml}</div>
@@ -2285,6 +2370,11 @@ function renderBasketCard(basket) {
       <span class="basket-card-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
       <span class="basket-card-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
       <span class="basket-card-arrow">›</span>
+    </div>
+    <div class="basket-card-extra">
+      ${metaHtml}
+      ${alarmsBlockHtml}
+      ${constHtml}
     </div>`;
   card.addEventListener("click", () => openBasketModal(basket.id));
   return card;
@@ -2799,6 +2889,34 @@ function renderBasketModalBody() {
   const rows = computeRowsFor(inBasket);
   const renderFn = mode === "list" ? renderOneTradeRow : renderOneTradeCard;
   for (const row of rows) list.appendChild(renderFn(row.trade, row.c));
+  // Click-Handler für Edit/Delete/Tranche-Toggle innerhalb des Modals neu verdrahten:
+  // render() läuft nur für die Page-Listen, nicht für die Modal-Liste.
+  list.querySelectorAll("button[data-act]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const act = btn.getAttribute("data-act");
+      const tid = btn.getAttribute("data-id");
+      if (act === "edit") {
+        // Modal schließen → Form öffnet danach mit basketId-Kontext (über tr.basketId)
+        closeBasketModal();
+        openForm(tid);
+      } else if (act === "del") {
+        deleteTrade(tid);
+        // Trade wurde entfernt → Modal-Body neu rendern statt Modal schließen
+        if (currentBasketId) renderBasketModalBody();
+      } else if (act === "del-tranche") {
+        deleteTranche(btn.getAttribute("data-trade"), btn.getAttribute("data-tranche"));
+        if (currentBasketId) renderBasketModalBody();
+      }
+    });
+  });
+  list.querySelectorAll(".trade-head.tappable, .trade-row.tappable").forEach(head => {
+    head.addEventListener("click", () => {
+      const id = head.getAttribute("data-toggle-tranches");
+      const panel = document.getElementById("tranche-panel-" + id);
+      if (panel) panel.classList.toggle("open");
+    });
+  });
 }
 
 // Hilfsfunktion: Korb löschen → enthaltene Trades werden Standalone (basketId=null)
@@ -3126,6 +3244,7 @@ function scrollToPage(pageKey, smooth = true) {
   container.scrollTo({ left: idx * w, behavior: smooth ? "smooth" : "auto" });
   setActiveDot(pageKey);
   currentPage = pageKey;
+  if (typeof updateBasketBtnVisibility === "function") updateBasketBtnVisibility();
 }
 function setActiveDot(pageKey) { document.querySelectorAll(".page-dot").forEach(d => { d.classList.toggle("active", d.getAttribute("data-dot") === pageKey); }); }
 function onPagesScroll() {
@@ -3135,7 +3254,7 @@ function onPagesScroll() {
     const w = container.clientWidth; if (w <= 0) return;
     const idx = Math.round(container.scrollLeft / w);
     const pageKey = PAGES[Math.max(0, Math.min(PAGES.length - 1, idx))];
-    if (pageKey !== currentPage) { currentPage = pageKey; setActiveDot(pageKey); }
+    if (pageKey !== currentPage) { currentPage = pageKey; setActiveDot(pageKey); if (typeof updateBasketBtnVisibility === "function") updateBasketBtnVisibility(); }
   }, 80);
 }
 
@@ -3148,10 +3267,15 @@ document.getElementById("f-save").addEventListener("click", saveForm);
 document.getElementById("bf-cancel").addEventListener("click", closeBasketForm);
 document.getElementById("bf-save").addEventListener("click", saveBasketForm);
 
-// + Neuer Korb-Buttons auf Long/Short-Pages
-document.querySelectorAll("[data-basket-new]").forEach(btn => {
-  btn.addEventListener("click", () => openBasketForm(null, btn.getAttribute("data-basket-new")));
+// + Neuer Korb-Button in der Toolbar (nur sichtbar auf Long/Short-Pages, sonst hidden)
+document.getElementById("btn-new-basket").addEventListener("click", () => {
+  const tp = (currentPage === "short") ? "short" : "long";
+  openBasketForm(null, tp);
 });
+function updateBasketBtnVisibility() {
+  const b = document.getElementById("btn-new-basket"); if (!b) return;
+  b.style.display = (currentPage === "long" || currentPage === "short") ? "" : "none";
+}
 
 // Basket-Modal-Steuerung
 document.getElementById("bm-back").addEventListener("click", closeBasketModal);
