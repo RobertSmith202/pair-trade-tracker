@@ -407,23 +407,41 @@ body::before {
   display: none;
   position: absolute; inset: 0;
   overflow-y: auto; overflow-x: hidden;
-  padding: 18px clamp(14px, 4vw, 56px) 40px;
-  will-change: opacity, transform;
+  /* Padding skaliert: Min 14px, danach zentriert auf max. 1100px Content-Breite, danach Hard-Cap 120px */
+  padding: 18px clamp(14px, calc((100% - 1100px) / 2), 120px) 40px;
+  scrollbar-gutter: stable;
+  will-change: transform;
 }
 [data-layout="desktop"] .page.active-page {
   display: block;
-  animation: pageEnterNext 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+  animation: pageEnterFromBelow 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
-[data-layout="desktop"] .page.active-page[data-direction="prev"]  { animation-name: pageEnterPrev; }
+[data-layout="desktop"] .page.active-page[data-direction="prev"]  { animation-name: pageEnterFromAbove; }
 [data-layout="desktop"] .page.active-page[data-direction="none"]  { animation: none; }
-/* Sehr subtile Animation: 10px Slide + Fade, keine Scale, Apple-iOS-Easing */
-@keyframes pageEnterNext {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+[data-layout="desktop"] .page.leaving {
+  display: block;
+  pointer-events: none;
+  animation: pageLeaveToAbove 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  z-index: 1;
 }
-@keyframes pageEnterPrev {
-  from { opacity: 0; transform: translateY(-10px); }
-  to   { opacity: 1; transform: translateY(0); }
+[data-layout="desktop"] .page.leaving[data-direction="prev"] { animation-name: pageLeaveToBelow; }
+[data-layout="desktop"] .page.active-page { z-index: 2; }
+/* iOS-Control-Center-Style: alte Page schiebt voll raus, neue Page kommt voll rein, synchron */
+@keyframes pageEnterFromBelow {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes pageLeaveToAbove {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-100%); }
+}
+@keyframes pageEnterFromAbove {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes pageLeaveToBelow {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
 }
 /* Page-interne Scrollbar dezent (Mac-Style) */
 [data-layout="desktop"] .page::-webkit-scrollbar { width: 8px; }
@@ -3491,18 +3509,46 @@ function scrollToPage(pageKey, smooth = true) {
   container.scrollTo({ left: idx * w, behavior: smooth ? "smooth" : "auto" });
 }
 function activateDesktopPage(pageKey, direction = "next") {
-  document.querySelectorAll(".pages-container > .page").forEach(p => {
-    const isTarget = p.getAttribute("data-page") === pageKey;
-    if (isTarget) {
-      // Direction VOR active-page setzen, damit CSS-Animation die richtige Keyframe-Sequenz wählt
-      p.setAttribute("data-direction", direction);
+  const allPages = Array.from(document.querySelectorAll(".pages-container > .page"));
+  const incoming = allPages.find(p => p.getAttribute("data-page") === pageKey);
+  const outgoing = allPages.find(p => p.classList.contains("active-page") && p !== incoming);
+  // In-Flight-Transitions abräumen — verhindert Mid-Animation-Bugs bei schnellem Switch
+  allPages.forEach(p => {
+    if (p !== outgoing && p !== incoming && p.classList.contains("leaving")) {
+      p.classList.remove("leaving");
+      p.removeAttribute("data-direction");
     }
-    p.classList.toggle("active-page", isTarget);
   });
+  if (!incoming) return;
+  const skip = (direction === "none");
+  // Ausgehende Page: leaving-Klasse startet die slide-out-Animation
+  if (outgoing) {
+    outgoing.classList.remove("active-page");
+    if (!skip) {
+      outgoing.setAttribute("data-direction", direction);
+      outgoing.classList.add("leaving");
+      const cleanup = (ev) => {
+        if (ev && ev.target !== outgoing) return;
+        outgoing.classList.remove("leaving");
+        outgoing.removeAttribute("data-direction");
+        outgoing.removeEventListener("animationend", cleanup);
+      };
+      outgoing.addEventListener("animationend", cleanup);
+      // Safety-Net falls animationend nicht feuert
+      setTimeout(cleanup, 500);
+    }
+  }
+  // Eingehende Page: scroll auf top resetten (frischer Start, wie iOS), dann active-page setzen
+  if (incoming !== outgoing) incoming.scrollTop = 0;
+  incoming.setAttribute("data-direction", direction);
+  // force reflow → Animation wird neu getriggert, auch wenn Klasse schon dran wäre
+  incoming.classList.remove("active-page");
+  void incoming.offsetWidth;
+  incoming.classList.add("active-page");
+
   document.querySelectorAll(".desktop-tabs .dt-btn").forEach(b => {
     b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
   });
-  // Ebene 3: Sidebar-Nav synchron halten
   document.querySelectorAll(".desktop-sidebar .ds-nav-btn").forEach(b => {
     b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
   });
