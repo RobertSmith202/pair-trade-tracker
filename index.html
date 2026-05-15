@@ -214,6 +214,10 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
 .basket-card .alarm-pill { vertical-align: middle; }
+/* Per-Page „+ Neuer Korb"-Button: dezente, gestrichelte Box zwischen Aggregate und Trade-Liste */
+.basket-actions { padding: 0 0 10px; }
+.basket-actions .btn-new-basket { width: 100%; background: var(--card); color: var(--text); border: 1px dashed var(--border); font-weight: 600; }
+.basket-actions .btn-new-basket:hover { border-color: var(--text); }
 /* Korb-Card Edit/Delete übernehmen die Standard-.icon-Styles für Größen-Parität zu Trade-Cards */
 /* Grid-View: Korb-Karte erweitert mit Notional, Alarm-Status und Top-Trades */
 .basket-card-extra { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 8px; }
@@ -640,7 +644,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 <div class="toolbar-wrap">
   <div class="toolbar">
     <button class="primary" id="btn-new" data-i18n="btn_new_trade">+ Neuer Trade</button>
-    <button class="primary" id="btn-new-basket" data-i18n="btn_new_basket" style="display:none">+ Neuer Korb</button>
     <button id="btn-refresh" data-i18n="btn_refresh">↻ Kurse</button>
     <button class="menu-btn icon" id="btn-menu" aria-label="Menü">⋯</button>
   </div>
@@ -671,7 +674,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   <div class="ds-divider"></div>
   <div class="ds-actions">
     <button class="ds-action ds-action-primary" id="ds-new-trade"   data-i18n="btn_new_trade"  type="button">+ Neuer Trade</button>
-    <button class="ds-action ds-action-primary" id="ds-new-basket"  data-i18n="btn_new_basket" type="button" style="display:none">+ Neuer Korb</button>
     <button class="ds-action" id="ds-refresh" data-i18n="btn_refresh" type="button">↻ Kurse</button>
   </div>
   <div class="ds-spacer"></div>
@@ -835,6 +837,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
+    <div class="basket-actions"><button class="btn-new-basket" data-basket-new="long" data-i18n="btn_new_basket" type="button">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="long"></div>
   </section>
   <section class="page" data-page="short">
@@ -850,6 +853,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
+    <div class="basket-actions"><button class="btn-new-basket" data-basket-new="short" data-i18n="btn_new_basket" type="button">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="short"></div>
   </section>
   <section class="page" data-page="total">
@@ -3594,15 +3598,15 @@ document.getElementById("f-save").addEventListener("click", saveForm);
 document.getElementById("bf-cancel").addEventListener("click", closeBasketForm);
 document.getElementById("bf-save").addEventListener("click", saveBasketForm);
 
-// + Neuer Korb-Button in der Toolbar (nur sichtbar auf Long/Short-Pages, sonst hidden)
-document.getElementById("btn-new-basket").addEventListener("click", () => {
-  const tp = (currentPage === "short") ? "short" : "long";
-  openBasketForm(null, tp);
+// Per-Page „+ Neuer Korb"-Buttons (direkt auf der Long-/Short-Page)
+document.querySelectorAll("[data-basket-new]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tp = btn.getAttribute("data-basket-new");
+    openBasketForm(null, tp === "short" ? "short" : "long");
+  });
 });
-function updateBasketBtnVisibility() {
-  const b = document.getElementById("btn-new-basket"); if (!b) return;
-  b.style.display = (currentPage === "long" || currentPage === "short") ? "" : "none";
-}
+// No-Op-Stub: bestehende Aufrufstellen erwarten diese Funktion, jetzt nicht mehr nötig
+function updateBasketBtnVisibility() { /* no-op: Korb-Button ist immer per-page sichtbar */ }
 
 // Basket-Modal-Steuerung
 document.getElementById("bm-back").addEventListener("click", closeBasketModal);
@@ -3764,27 +3768,15 @@ document.querySelectorAll(".desktop-sidebar .ds-nav-btn[data-tab]").forEach(btn 
     scrollToPage(tp, false);
   });
 });
-// Sidebar-Actions: leiten an existierende Handler weiter
+// Sidebar-Actions: leiten an existierende Handler weiter (Korb-Button entfernt — per-page eingebaut)
 (function wireSidebarActions() {
   const dsNewTrade  = document.getElementById("ds-new-trade");
-  const dsNewBasket = document.getElementById("ds-new-basket");
   const dsRefresh   = document.getElementById("ds-refresh");
   const dsSettings  = document.getElementById("ds-settings");
   if (dsNewTrade)  dsNewTrade.addEventListener("click", () => openForm(null));
-  if (dsNewBasket) dsNewBasket.addEventListener("click", () => {
-    const tp = (currentPage === "short") ? "short" : "long";
-    openBasketForm(null, tp);
-  });
   if (dsRefresh)  dsRefresh.addEventListener("click", () => refreshAll(true));
   if (dsSettings) dsSettings.addEventListener("click", () => openSettings());
 })();
-// updateBasketBtnVisibility erweitern: Sidebar-Korb-Button auch toggeln
-const __origUpdateBasketBtn = (typeof updateBasketBtnVisibility === "function") ? updateBasketBtnVisibility : null;
-updateBasketBtnVisibility = function() {
-  if (__origUpdateBasketBtn) __origUpdateBasketBtn();
-  const dsB = document.getElementById("ds-new-basket");
-  if (dsB) dsB.style.display = (currentPage === "long" || currentPage === "short") ? "" : "none";
-};
 // Status-Mirroring: existierende #status, #auto-status, #sync-status spiegeln in Sidebar
 (function mirrorStatusToSidebar() {
   const pairs = [
