@@ -524,37 +524,44 @@ body::before {
 [data-layout="desktop"] .app-watermark,
 [data-layout="desktop"] .owl-watermark,
 [data-layout="desktop"] .watermark { display: none !important; }
+/* === Desktop Page-Transition: iPad-Home-Screen-Style ======================
+   Horizontaler Slide + leichter Scale-Recede der leavenden Page + Cross-Fade.
+   Iteration 1: 280ms iOS-Vollscreen-Vertikal-Slide (zu cinematic für 30× pro Stunde)
+   Iteration 2: 120ms reiner Opacity-Fade (zu subtil, kein Richtungs-Cue)
+   Iteration 3 (jetzt): 220ms, 48px-Horizontal-Slide auf der kommenden Page mit
+   subtilem Scale 0.985→1.0; leavende Page rückt 12px in Gegenrichtung und scaled
+   auf 0.97 + Fade. cubic-bezier(0.22, 1, 0.36, 1) = decelerate mit kaum sichtbarem
+   Einpendeln. Direction-aware: "next" und "prev" gespiegelt.
+   translate3d erzwingt GPU-Compositing → flüssig bei vielen Trade-Cards. */
 [data-layout="desktop"] .page.active-page {
   display: block;
-  animation: pageEnterFromBelow 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pageEnterDesktop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  z-index: 2;
 }
-[data-layout="desktop"] .page.active-page[data-direction="prev"]  { animation-name: pageEnterFromAbove; }
+[data-layout="desktop"] .page.active-page[data-direction="prev"]  { animation-name: pageEnterDesktopPrev; }
 [data-layout="desktop"] .page.active-page[data-direction="none"]  { animation: none; }
 [data-layout="desktop"] .page.leaving {
   display: block;
   pointer-events: none;
-  animation: pageLeaveToAbove 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pageLeaveDesktop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
   z-index: 1;
 }
-[data-layout="desktop"] .page.leaving[data-direction="prev"] { animation-name: pageLeaveToBelow; }
-[data-layout="desktop"] .page.active-page { z-index: 2; }
-/* iOS-Control-Center-Style: alte Page schiebt voll raus, neue Page kommt voll rein, synchron.
-   translate3d statt translateY → erzwingt GPU-Compositing → flüssig auch bei vielen Trade-Cards */
-@keyframes pageEnterFromBelow {
-  from { transform: translate3d(0, 100%, 0); }
-  to   { transform: translate3d(0, 0, 0); }
+[data-layout="desktop"] .page.leaving[data-direction="prev"] { animation-name: pageLeaveDesktopPrev; }
+@keyframes pageEnterDesktop {
+  from { opacity: 0; transform: translate3d(48px, 0, 0) scale(0.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
-@keyframes pageLeaveToAbove {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(0, -100%, 0); }
+@keyframes pageEnterDesktopPrev {
+  from { opacity: 0; transform: translate3d(-48px, 0, 0) scale(0.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
-@keyframes pageEnterFromAbove {
-  from { transform: translate3d(0, -100%, 0); }
-  to   { transform: translate3d(0, 0, 0); }
+@keyframes pageLeaveDesktop {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to   { opacity: 0; transform: translate3d(-12px, 0, 0) scale(0.97); }
 }
-@keyframes pageLeaveToBelow {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(0, 100%, 0); }
+@keyframes pageLeaveDesktopPrev {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to   { opacity: 0; transform: translate3d(12px, 0, 0) scale(0.97); }
 }
 /* Page-interne Scrollbar dezent (Mac-Style) */
 [data-layout="desktop"] .page::-webkit-scrollbar { width: 8px; }
@@ -704,26 +711,6 @@ body::before {
 [data-layout="desktop"] .trade-perf .pnl-abs { font-size: 26px; }
 [data-layout="desktop"] .trade-perf .pnl-pct { font-size: 20px; padding: 4px 12px; }
 [data-layout="desktop"] .trade-perf { padding: 14px 16px; border-radius: 12px; }
-
-/* === Page-Transitions weicher auf Desktop ================================= */
-/* Die ursprüngliche iOS-Control-Center-Slide-Animation (280ms full-viewport-slide)
-   ist auf Mobile spannend, auf einem Trading-Desktop nach 20× Page-Wechsel nervig.
-   Stattdessen ein knapper 120ms-Opacity-Fade — direction-agnostisch, kein Slide.
-   Die ursprünglichen Keyframes (pageEnterFromBelow etc.) bleiben oben definiert,
-   werden aber durch diese Regeln überschrieben. */
-[data-layout="desktop"] .page.active-page,
-[data-layout="desktop"] .page.active-page[data-direction="prev"],
-[data-layout="desktop"] .page.active-page[data-direction="next"] {
-  animation: pageFadeIn 0.12s ease-out both;
-}
-[data-layout="desktop"] .page.active-page[data-direction="none"] { animation: none; }
-[data-layout="desktop"] .page.leaving,
-[data-layout="desktop"] .page.leaving[data-direction="prev"],
-[data-layout="desktop"] .page.leaving[data-direction="next"] {
-  animation: pageFadeOut 0.12s ease-out both;
-}
-@keyframes pageFadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pageFadeOut { from { opacity: 1; } to { opacity: 0; } }
 
 /* Pentagon-Loader nach erfolgreichem Code */
 .lock-loader-overlay {
