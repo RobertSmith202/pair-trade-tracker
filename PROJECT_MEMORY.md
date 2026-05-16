@@ -33,8 +33,9 @@ Kern-Features:
 - **Schriftgrößen-Skalierung** (100/110/120/130%) nur im Desktop-Modus via `zoom`-CSS auf `<html>` — geräteabhängig
 - Standard-Page in Settings konfigurierbar — pro Gerät
 - Grid/Liste-View-Toggle pro Page (touch-freundlich groß) — pro Gerät
-- Keyboard-Shortcuts Cmd/Ctrl+Shift+1..4 zum direkten Page-Switch (alle Layouts)
-- **Pfeiltasten (← →)** zum sequenziellen Page-Durchblättern im Desktop-Modus
+- Keyboard-Shortcuts: **plain `1`/`2`/`3`/`4`** (ohne Modifier) für direkten Page-Switch in allen Layouts. Pfeiltasten **← →** für sequenzielles Page-Durchblättern (Desktop). `?` öffnet eine Shortcut-Übersicht, `Esc` schließt Modals/Forms hierarchisch.
+- **Intro-/Welcome-Screen** beim App-Boot wenn keine Lock-Sperre aktiv ist: Owl-Wasserzeichen, App-Titel, Auto-Progress-Bar (2.5s), dann Pentagon-Loader. Tap/Klick/Enter/Esc skipt sofort.
+- **Empty-State-Illustration** mit Owl-SVG + page-spezifischem Titel + Beschreibung + Primary-CTA-Button auf leeren Pages.
 - Auto-Refresh jede Minute wenn App im Foreground während Handelszeit (Mo-Fr, 09:00-23:00 Berlin)
 - Bloomberg-style Price-Flash-Animationen (grün/rot Hintergrund-Flash bei Kursänderung)
 
@@ -314,7 +315,7 @@ Der Layout-Modus wird an `<html data-layout="mobile|desktop">` angeheftet. Alle 
 - Sticky-Toolbar oben mit `+ Neuer Trade`, `↻ Kurse`, Menü-Button
 - Forms (Trade-, Korb-Form) als Inline-Expand unter der Toolbar
 - Basket-Modal als Vollbild-Overlay
-- Page-Wechsel via Swipe (Touch), Klick auf Dots, oder Cmd+Shift+1..4
+- Page-Wechsel via Swipe (Touch), Klick auf Dots, oder Ziffer `1`/`2`/`3`/`4` (ohne Modifier)
 
 **Desktop-Modus** (Ebene 3 — drei iterative Layout-Levels wurden gebaut, Ebene 3 ist der finale Stand):
 - Body `max-width: none; padding-left: 220px; overflow: hidden` — Body selbst scrollt nicht mehr
@@ -355,6 +356,78 @@ Eigener Settings-Block „Schriftgröße (Desktop)" mit 4 Card-Buttons: Klein/Mi
 `applyFontScale(v)` setzt `document.documentElement.style.zoom = (parseInt(v) / 100)` — aber **nur wenn `data-layout === "desktop"`**. Im Mobile-Modus wird das Inline-Zoom auf leer gesetzt. Damit bleibt das iPhone-Layout in nativer Größe, während der Mac auf 110-130% skalieren kann.
 
 CSS `zoom` skaliert layout-uniform (Schrift + Padding + Sidebar-Breite + Spacing) — fühlt sich an wie Browser-Zoom, ist aber an die App gebunden. Browser-Kompatibilität: Chrome/Safari seit jeher, Firefox seit 126 (Mai 2024).
+
+### Intro-Screen (Welcome-View)
+
+Beim App-Boot **wenn keine Lock-Sperre aktiv ist** (`!lockSettings.enabled || !lockSettings.hash`): zeigt `showIntroScreen()` einen Vollbild-Welcome mit:
+- App-Titel „Pair Trade Tracker" als Hero
+- Subtile Tagline „Live-Performance · Tranchen · Alarme"
+- Owl-Wasserzeichen im Hintergrund (gleicher CSS-Mask-SVG wie Lock-Screen, via shared `::before`-Pseudo)
+- Pulsierender Hint-Text „Tippen zum Starten" (Mobile) / „Klicken oder Enter drücken" (Desktop)
+- Linear füllende Progress-Bar (0% → 100% über 2500ms)
+
+**Dismiss-Trigger:** Click anywhere, Touch-Tap, Enter, Space, Esc, oder Auto nach 2.5s.
+
+**Nach Dismiss:** `intro-screen.classList.add("dismissing")` → 350ms Slide-Out-Animation (`opacity: 0; transform: translateY(-30px)`) → `unlockWithLoader()` wird aufgerufen → Pentagon-Hexagon-Loader läuft 1500ms + 360ms fade → App. **Sync und Kurs-Refresh laufen parallel** während des Loaders (kein zusätzlicher Wait).
+
+**Architektur:** Eigenes `<div class="intro-screen" id="intro-screen">` HTML-Element, eigenes CSS, eigene `showIntroScreen()` / `dismissIntroScreen()` JS-Funktionen. Boot-Logic checkt: wenn Lock aktiv → `showLockScreen()`, sonst → `showIntroScreen()`. Niemals beide gleichzeitig (Lock und Intro sind mutually exclusive).
+
+### Keyboard-Shortcut-Overlay
+
+**Trigger:** `?` (= Shift+/) öffnet ein modales Overlay mit allen Tastatur-Kürzeln. `Esc` oder erneut `?` schließt. Click auf Backdrop schließt.
+
+**Inhalt** in zwei Spalten (Navigation / Allgemein):
+- ← →: Page zurück / weiter (nur Desktop)
+- `1`/`2`/`3`/`4`: direkter Page-Sprung (alle Layouts, **ohne Modifier**)
+- `?`: dieses Overlay
+- `Esc`: Modal/Form schließen
+- `Enter`: Intro-Screen überspringen
+
+**Visual-Design:** Gestylte `<kbd>`-Elemente mit dünnen Borders, verstärkter Unterkante (wie echte Tastatur-Caps), monospace-mäßiger Höhe. Mac-Symbol-Glyphen (⌘, ⇧) werden NICHT benutzt seit der Umstellung auf modifier-freie Shortcuts.
+
+**Esc-Hierarchie** für sauberes Schließen mehrerer offener Layer:
+1. Shortcut-Overlay (höchste Priorität)
+2. Trade-Form (`.form-card.open`)
+3. Korb-Form (`#basket-form.open`)
+4. Basket-Modal (`.basket-modal.open`)
+5. Settings-Modal (`#settings-modal.open`)
+
+Esc tastet sich von oben nach unten durch — das erste offene Element wird geschlossen, Event-Propagation stoppt.
+
+### Keyboard-Shortcuts: warum ohne Modifier
+
+**Originalplan** war `Cmd+Shift+1..4` für Page-Switch. Das hat folgende Konflikte:
+- `Cmd+Shift+3` = macOS-Vollbild-Screenshot (OS-Level, kann Browser nicht überschreiben)
+- `Cmd+Shift+4` = macOS-Bereichs-Screenshot
+- `Cmd+1`, `Cmd+2` etc. = Browser-Tab-Switching
+
+**Lösung:** Plain Ziffern `1`/`2`/`3`/`4` ohne irgendeinen Modifier. Funktioniert weil:
+- Kein OS-Konflikt
+- Kein Browser-Konflikt
+- Guard `isTypingTarget()` verhindert dass die Ziffer einen Trade-Input überschreibt
+- Guard `isAnyOverlayOpen()` verhindert Page-Switch wenn ein Modal/Form/Lock offen ist
+
+Implementiert in einem einzigen `window.addEventListener("keydown")` der auch ← → (nur Desktop), `?` (Shortcut-Overlay-Toggle), `Esc` (Modal-Close-Hierarchie) handelt. Alle Guards laufen vor jedem Action-Branch.
+
+### Empty-State-Illustration
+
+Wenn eine Page (Pair/Long/Short/Total) ohne Trades ist: statt nur „Noch keine Trades"-Text rendert `renderEmptyState(pageKey)` eine zentrierte Box mit:
+- Inline-Owl-SVG-Symbol (~64×64, opacity 0.4) — gleiche Pfade wie das Watermark aber als sichtbares Element
+- Page-spezifischer Titel („Noch keine Pair-Trades" etc.)
+- Beschreibung mit relevanten Konzepten (Körbe, Squeeze-Monitoring, Spreads etc.) — kann `<kbd>` und `<strong>`-Tags enthalten weil's via Template-Literal in `innerHTML` rendert
+- Primary CTA-Button „+ Ersten Pair-Trade anlegen" — setzt `currentPage` auf den Page-Type und ruft `openForm(null)` auf
+
+**Total-Page hat KEINEN CTA-Button**, weil sie ein Aggregat ist und kein direkter Anlegepunkt. Stattdessen: „Wechsle auf eine der Pages..." mit `<kbd>?</kbd>`-Hinweis auf die Shortcut-Übersicht.
+
+### i18n-System: `data-i18n` vs. `data-i18n-html`
+
+**`data-i18n="key"`** (Standard): `applyTranslations()` setzt `element.textContent = t(key)`. HTML-Tags im String werden literal angezeigt.
+
+**`data-i18n-html="key"`** (Opt-in für Tags): setzt `element.innerHTML = t(key)`. Erlaubt `<kbd>`, `<strong>`, `<em>` in Übersetzungs-Strings. Wird verwendet für:
+- `shortcut_note` (enthält `<kbd>`-Tags)
+- Andere Strings mit Inline-Markup-Bedarf
+
+**Wichtig:** Beim Hinzufügen neuer i18n-Strings prüfen ob HTML-Tags drin sind. Wenn ja → `data-i18n-html` benutzen, sonst rendert Browser literale `<kbd>`-Texte als Code.
 
 ### Super-Trade / Tranchen-Modell — typ-isoliert
 
@@ -681,5 +754,24 @@ Du bist jetzt informiert genug um Änderungen vorzunehmen. Empfohlenes Vorgehen:
 | Page-Child-Spalte | `.page > * { max-width: ... }` | nicht beschränkt | `max-width: min(1100px, 100%); margin-left: 0` (left-aligned) |
 | Owl-Watermark | `body::before` mit Mask-SVG | sichtbar mit 5% Opacity | versteckt (`display: none !important`) |
 | Schriftgröße | `applyFontScale(v)` | wird in Mobile auf leer gesetzt (kein Zoom) | `document.documentElement.style.zoom = v/100` |
+| Boot ohne Lock | `showIntroScreen()` | identisches Verhalten (Intro über App) | identisches Verhalten |
+| Boot mit Lock | `showLockScreen()` | identisches Verhalten (Lock + Keypad) | identisches Verhalten |
+| Page-Shortcuts | `1`/`2`/`3`/`4` keydown | aktiv, ohne Modifier | aktiv, ohne Modifier |
+| Sequenz-Navigation | `← →` keydown | NICHT aktiv (Swipe ersetzt das) | aktiv |
+| Shortcut-Overlay | `?` keydown | aktiv (öffnet Hilfe-Modal) | aktiv (öffnet Hilfe-Modal) |
 
 **Robert's typischer Workflow:** Mac für Entwicklung + sitzendes Trading (Desktop-Layout), iPhone für unterwegs + Telegram-Alarme-Acknowledgement (Mobile-Layout). Beide Geräte syncen Trades über JSONBin, aber Layout-Modus, Theme, Sprache, Schriftgröße sind geräteabhängig (pro localStorage, nicht über JSONBin).
+
+**Kritische Konventionen die in einer neuen Session nicht vergessen werden dürfen:**
+
+1. **Layout-Modus ist die wichtigste Verzweigung in der App.** Fast jede UI-Logik branched auf `data-layout="mobile|desktop"`. Bei jeder neuen Funktion fragen: Wie verhält sie sich auf der jeweils anderen Plattform?
+
+2. **Mobile-Layout darf NIE durch Desktop-Polish verschlechtert werden.** Alle Desktop-Regeln sind in `[data-layout="desktop"]`-Selektoren gescoped. Wer das übersieht, bricht das iPhone-Erlebnis.
+
+3. **`scrollToPage(pageKey)` ist der ZENTRALE Page-Switch-Entry-Point.** Sidebar-Klicks, Pfeiltasten, Ziffern-Shortcuts, Empty-State-CTAs — alle gehen hier durch. Branching auf data-layout intern (Snap-Scroll vs. activateDesktopPage).
+
+4. **Tastatur-Shortcuts haben einen einzigen `keydown`-Handler** (in der `setupDesktopArrowKeyNav` IIFE). Reihenfolge der Checks: Esc → ? → Plain 1-4 → Arrow Keys. Jeder Branch hat Guards: `isAnyOverlayOpen`, `isTypingTarget`, Modifier-Checks.
+
+5. **Worker zuerst deployen wenn HTML-Datenmodell sich ändert.** Worker ist rückwärts-kompatibel; HTML ist's nicht (neue Felder, die alter Worker ignoriert → Alarme stillschweigend tot).
+
+6. **PROJECT_MEMORY.md ist Teil des Projekts, nicht Beiwerk.** Bei jeder substanziellen Änderung mitaktualisieren — sonst weiß keine neue Session warum die App so ist wie sie ist.
