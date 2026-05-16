@@ -315,13 +315,12 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   background-color: var(--text);
   pointer-events: none;
 }
-.lock-screen::before, .intro-screen::before {
+.lock-screen::before {
   content: "";
   position: absolute;
   inset: 0;
   opacity: 0.08;
 }
-.lock-screen::before { /* gemeinsame Owl-Mask-Eigenschaften */ }
 body::before {
   content: "";
   position: fixed;
@@ -329,8 +328,8 @@ body::before {
   opacity: 0.05;
   z-index: -1;
 }
-/* Owl-Mask-Styles auf alle drei ::before-Elemente anwenden (Lock, Intro, Body-App) */
-.lock-screen::before, body::before, .intro-screen::before {
+/* Owl-Mask-Styles auf Lock und Body-App anwenden */
+.lock-screen::before, body::before {
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 320'><path d='M 55 80 L 38 25 L 88 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 225 80 L 242 25 L 192 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 60 95 Q 75 70 100 85 Q 125 100 140 95 Q 155 100 180 85 Q 205 70 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round' stroke-linecap='round'/><path d='M 60 95 Q 45 120 50 145 Q 60 175 90 175 L 190 175 Q 220 175 230 145 Q 235 120 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><circle cx='95' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='95' cy='130' r='10' fill='white'/><circle cx='185' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='185' cy='130' r='10' fill='white'/><path d='M 130 155 L 140 172 L 150 155 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 50 175 Q 35 220 60 260 Q 90 285 140 285 Q 190 285 220 260 Q 245 220 230 175' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><path d='M 95 178 Q 105 235 140 255 Q 175 235 185 178' stroke='white' stroke-width='3.5' fill='none'/><line x1='115' y1='285' x2='115' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='130' y1='287' x2='130' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='150' y1='287' x2='150' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='165' y1='285' x2='165' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='225' y2='303' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='30' y2='293' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='30' y1='293' x2='14' y2='287' stroke='white' stroke-width='3' stroke-linecap='round'/><line x1='225' y1='303' x2='250' y2='313' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='250' y1='313' x2='266' y2='317' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>") center 52% / min(125vmin, 820px) auto no-repeat;
   mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 320'><path d='M 55 80 L 38 25 L 88 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 225 80 L 242 25 L 192 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 60 95 Q 75 70 100 85 Q 125 100 140 95 Q 155 100 180 85 Q 205 70 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round' stroke-linecap='round'/><path d='M 60 95 Q 45 120 50 145 Q 60 175 90 175 L 190 175 Q 220 175 230 145 Q 235 120 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><circle cx='95' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='95' cy='130' r='10' fill='white'/><circle cx='185' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='185' cy='130' r='10' fill='white'/><path d='M 130 155 L 140 172 L 150 155 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 50 175 Q 35 220 60 260 Q 90 285 140 285 Q 190 285 220 260 Q 245 220 230 175' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><path d='M 95 178 Q 105 235 140 255 Q 175 235 185 178' stroke='white' stroke-width='3.5' fill='none'/><line x1='115' y1='285' x2='115' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='130' y1='287' x2='130' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='150' y1='287' x2='150' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='165' y1='285' x2='165' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='225' y2='303' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='30' y2='293' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='30' y1='293' x2='14' y2='287' stroke='white' stroke-width='3' stroke-linecap='round'/><line x1='225' y1='303' x2='250' y2='313' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='250' y1='313' x2='266' y2='317' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>") center 52% / min(125vmin, 820px) auto no-repeat;
   background-color: var(--text);
@@ -372,17 +371,48 @@ body::before {
 [data-layout="desktop"] .toolbar-wrap { display: none; }
 [data-layout="desktop"] .desktop-tabs { display: none; }
 /* Brand-Block ganz oben */
-.ds-brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
-.ds-brand-mark { font-size: 26px; line-height: 1; color: var(--info); }
-.ds-brand-title { font-size: 13px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.2; }
-/* Vertikale Navigation */
-.ds-nav { display: flex; flex-direction: column; gap: 3px; }
-.ds-nav-btn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-weight: 600; font-size: 14px; cursor: pointer; min-height: 0; text-align: left; transition: background-color 0.12s, color 0.12s; }
+.ds-brand { display: flex; align-items: center; gap: 10px; padding: 2px 4px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.ds-brand-mark { font-size: 28px; line-height: 1; color: var(--info); flex-shrink: 0; }
+.ds-brand-title { font-size: 14px; font-weight: 700; letter-spacing: 0.1px; line-height: 1.2; }
+/* Vertikale Navigation — aktive Page mit linkem Akzent-Balken via position:relative + ::before,
+   damit der Aktiv-Zustand auf Blick erkennbar ist (vorher nur subtile Border, kaum sichtbar). */
+.ds-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.ds-nav-btn {
+  display: flex; align-items: center; gap: 10px;
+  position: relative;
+  padding: 10px 12px 10px 14px;
+  background: transparent; border: 1px solid transparent; border-radius: 8px;
+  color: var(--muted); font-weight: 600; font-size: 14px;
+  cursor: pointer; min-height: 0; text-align: left;
+  transition: background-color 0.12s, color 0.12s;
+}
+.ds-nav-btn::before {
+  content: ""; position: absolute; left: 2px; top: 8px; bottom: 8px;
+  width: 3px; border-radius: 2px;
+  background: transparent;
+  transition: background-color 0.12s;
+}
 .ds-nav-btn:hover { background: var(--bg); color: var(--text); }
-.ds-nav-btn.active { background: var(--bg); color: var(--text); border-color: var(--border); }
-.ds-nav-glyph { display: inline-block; width: 18px; text-align: center; font-size: 13px; opacity: 0.85; }
+.ds-nav-btn.active { background: var(--bg); color: var(--text); }
+.ds-nav-btn.active::before { background: var(--info); }
+.ds-nav-glyph { display: inline-block; width: 18px; text-align: center; font-size: 13px; opacity: 0.85; flex-shrink: 0; }
 .ds-nav-glyph.ds-up { color: var(--pos); }
 .ds-nav-glyph.ds-down { color: var(--neg); }
+.ds-nav-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-nav-kbd {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 5px;
+  background: rgba(127,127,127,0.10);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--muted);
+  letter-spacing: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ds-nav-btn.active .ds-nav-kbd { color: var(--text); border-color: var(--border); background: var(--card); }
 .ds-divider { height: 1px; background: var(--border); margin: 14px -4px; }
 /* Action-Buttons (Primary + neutral) */
 .ds-actions { display: flex; flex-direction: column; gap: 6px; }
@@ -390,17 +420,35 @@ body::before {
 .ds-action-primary { background: var(--info); color: white; border-color: var(--info); }
 .ds-action-primary:hover { filter: brightness(1.1); }
 .ds-action-ghost { background: transparent; }
-/* Spacer schiebt Status + Footer nach unten */
+/* Spacer schiebt Footer nach unten — Status sitzt jetzt direkt unter Brand,
+   nicht mehr versteckt am Ende der Sidebar */
 .ds-spacer { flex: 1 1 auto; min-height: 14px; }
-/* Status-Block: Key-Value-Zeilen */
-.ds-status-block { display: flex; flex-direction: column; gap: 4px; padding: 10px 6px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 8px 0 10px; }
-.ds-status-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; gap: 6px; }
-.ds-status-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.ds-status-value { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
-.ds-status-value.ok  { color: var(--pos); }
-.ds-status-value.err { color: var(--neg); }
+/* Status-Block direkt unter dem Brand: kompakte Key-Value-Zeilen mit Status-Dot links.
+   Vorher unten in der Sidebar versteckt — jetzt im Top-Third wo der Blick landet. */
+.ds-status-block {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 12px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0 0 14px;
+}
+.ds-status-row { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; font-size: 11px; }
+.ds-status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+  transition: background-color 0.15s;
+}
+.ds-status-dot.ok   { background: var(--pos); box-shadow: 0 0 0 2px rgba(107,196,110,0.18); }
+.ds-status-dot.err  { background: var(--neg); box-shadow: 0 0 0 2px rgba(255,107,125,0.18); }
+.ds-status-dot.warn { background: var(--warn); box-shadow: 0 0 0 2px rgba(255,194,102,0.18); animation: pulse 1.6s ease-in-out infinite; }
+.ds-status-dot.off  { background: var(--muted); opacity: 0.5; }
+.ds-status-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+.ds-status-value { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--text); }
+.ds-status-value.ok   { color: var(--pos); }
+.ds-status-value.err  { color: var(--neg); }
 .ds-status-value.warn { color: var(--warn); }
-.ds-status-value.off { color: var(--muted); }
+.ds-status-value.off  { color: var(--muted); }
 .ds-footer { padding-top: 4px; }
 
 /* === Desktop-Tabs (Ebene 2) ============================================== */
@@ -519,10 +567,111 @@ body::before {
 [data-layout="desktop"] .basket-modal-body {
   max-width: 1100px; margin-left: auto; margin-right: auto; width: 100%;
 }
-/* Hover-Effekte aktivieren — auf Touch-Devices kontraproduktiv, daher nur Desktop */
+/* Hover-Effekte aktivieren — auf Touch-Devices kontraproduktiv, daher nur Desktop.
+   Subtile Border-Akzent-Färbung (var(--info) auf ~30% Opacity) gibt visuelles Affordance
+   ohne die Card-Form aufzublasen. */
+[data-layout="desktop"] .trade-card,
+[data-layout="desktop"] .basket-card {
+  border-radius: 16px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
 [data-layout="desktop"] .trade-card:hover,
-[data-layout="desktop"] .basket-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
+[data-layout="desktop"] .basket-card:hover {
+  box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+  border-color: rgba(127, 192, 238, 0.45);
+}
 [data-layout="desktop"] .basket-card:hover { transform: translateY(-1px); }
+/* Tabular-Nums hart erzwingen für alle Zahlen-Spalten — auf Desktop willst du dass
+   Werte über Cards hinweg in derselben Pixel-Spalte stehen, damit scanbar. */
+[data-layout="desktop"] .trade-row-pnl,
+[data-layout="desktop"] .trade-row-pct,
+[data-layout="desktop"] .trade-perf .pnl-abs,
+[data-layout="desktop"] .trade-perf .pnl-pct,
+[data-layout="desktop"] .agg-cell .value,
+[data-layout="desktop"] .leg .v,
+[data-layout="desktop"] .ds-status-value {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* === Desktop-Header-Meta (Floating Live-Info top-right) ==================== */
+/* Permanent sichtbarer Block oben rechts mit Markt-Offen-Indikator + Uhrzeit.
+   Auf Mobile via display:none ausgeblendet. */
+.desktop-header-meta { display: none; }
+[data-layout="desktop"] .desktop-header-meta {
+  display: flex; align-items: center; gap: 18px;
+  position: fixed; top: 16px; right: 28px;
+  z-index: 30;
+  font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.dhm-cell { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.dhm-clock { font-size: 14px; letter-spacing: 0.5px; color: var(--text); }
+.dhm-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.dhm-market.open .dhm-dot   { background: var(--pos); box-shadow: 0 0 0 3px rgba(107,196,110,0.18); }
+.dhm-market.closed .dhm-dot { background: var(--neg); box-shadow: 0 0 0 3px rgba(255,107,125,0.18); }
+.dhm-market .dhm-text { letter-spacing: 0.7px; text-transform: uppercase; }
+.dhm-market.open .dhm-text   { color: var(--pos); }
+.dhm-market.closed .dhm-text { color: var(--neg); }
+
+/* === Desktop-Typografie-Hierarchie ========================================= */
+/* Mobile-Größen sind iPhone-skaliert und wirken auf 1440px wie ein Notion-Dokument,
+   nicht wie ein Trading-Dashboard. Heroes gehören groß, Details schmaler. */
+[data-layout="desktop"] .page-title {
+  font-size: 42px;
+  letter-spacing: -0.9px;
+  padding: 4px 2px 6px;
+}
+[data-layout="desktop"] .page-head { padding: 20px 2px 10px; align-items: flex-end; }
+[data-layout="desktop"] .aggregate {
+  padding: 22px 26px;
+  gap: 22px;
+  border-radius: 16px;
+}
+[data-layout="desktop"] .agg-cell .label {
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  margin-bottom: 6px;
+}
+[data-layout="desktop"] .agg-cell .value {
+  font-size: 32px;
+  line-height: 1.0;
+  letter-spacing: -0.6px;
+}
+[data-layout="desktop"] .agg-cell.wide .value {
+  font-size: 48px;
+  letter-spacing: -1px;
+}
+[data-layout="desktop"] .agg-cell .sub { font-size: 12px; margin-top: 6px; }
+[data-layout="desktop"] .trade-card { padding: 16px 18px; }
+[data-layout="desktop"] .trade-perf .pnl-abs { font-size: 26px; }
+[data-layout="desktop"] .trade-perf .pnl-pct { font-size: 20px; padding: 4px 12px; }
+[data-layout="desktop"] .trade-perf { padding: 14px 16px; border-radius: 12px; }
+
+/* === Page-Transitions weicher auf Desktop ================================= */
+/* Die ursprüngliche iOS-Control-Center-Slide-Animation (280ms full-viewport-slide)
+   ist auf Mobile spannend, auf einem Trading-Desktop nach 20× Page-Wechsel nervig.
+   Stattdessen ein knapper 120ms-Opacity-Fade — direction-agnostisch, kein Slide.
+   Die ursprünglichen Keyframes (pageEnterFromBelow etc.) bleiben oben definiert,
+   werden aber durch diese Regeln überschrieben. */
+[data-layout="desktop"] .page.active-page,
+[data-layout="desktop"] .page.active-page[data-direction="prev"],
+[data-layout="desktop"] .page.active-page[data-direction="next"] {
+  animation: pageFadeIn 0.12s ease-out both;
+}
+[data-layout="desktop"] .page.active-page[data-direction="none"] { animation: none; }
+[data-layout="desktop"] .page.leaving,
+[data-layout="desktop"] .page.leaving[data-direction="prev"],
+[data-layout="desktop"] .page.leaving[data-direction="next"] {
+  animation: pageFadeOut 0.12s ease-out both;
+}
+@keyframes pageFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pageFadeOut { from { opacity: 1; } to { opacity: 0; } }
 
 /* Pentagon-Loader nach erfolgreichem Code */
 .lock-loader-overlay {
@@ -539,35 +688,8 @@ body::before {
 .lock-loader-overlay.open { display: flex; }
 .lock-loader-overlay.fade-out { opacity: 0; }
 
-/* === Intro/Welcome-Screen (ohne Lock-Sperre) =============================== */
-.intro-screen {
-  position: fixed; inset: 0;
-  background: var(--bg);
-  z-index: 950;  /* unter dem Pentagon-Loader (1100), aber über Lock (1000) wäre kollidiert.
-                    Da hier KEIN Lock parallel offen ist, ist 950 unbedenklich.
-                    Loader bleibt höchste Priorität. */
-  display: none;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  padding: calc(env(safe-area-inset-top) + 50px) 20px calc(env(safe-area-inset-bottom) + 60px);
-  cursor: pointer;
-  user-select: none;
-  transition: opacity 0.35s cubic-bezier(0.32, 0.72, 0, 1), transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
-}
-.intro-screen.open { display: flex; }
-.intro-screen.dismissing { opacity: 0; transform: translateY(-30px); pointer-events: none; }
-.intro-content { position: relative; z-index: 1; text-align: center; margin-top: clamp(40px, 12vh, 120px); }
-.intro-app-title { font-size: clamp(28px, 5vw, 42px); font-weight: 800; letter-spacing: -0.5px; color: var(--text); margin-bottom: 10px; line-height: 1.1; }
-.intro-tagline { font-size: 13px; color: var(--muted); font-weight: 500; letter-spacing: 0.3px; }
-.intro-cta { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; max-width: 280px; }
-.intro-hint { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; animation: introHintPulse 2.4s ease-in-out infinite; }
-@keyframes introHintPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
-.intro-progress-bar { width: 100%; height: 2px; background: rgba(127,127,127,0.18); border-radius: 1px; overflow: hidden; }
-.intro-progress-fill { height: 100%; width: 0%; background: var(--text); border-radius: 1px; transition: width 0.1s linear; }
-/* Im Desktop-Modus: Intro-Screen sieht weniger „Tap"-mäßig aus, mehr „Klick / Enter" */
-[data-layout="desktop"] .intro-screen { cursor: default; }
-[data-layout="desktop"] .intro-cta { max-width: 360px; }
+/* Intro/Welcome-Screen wurde entfernt — ohne Lock-Sperre startet die App jetzt direkt
+   ohne Theater-Wartezeit. Lock-Pfad geht weiterhin Lock → Code → Pentagon-Loader → App. */
 
 /* === Keyboard-Shortcut-Overlay ============================================= */
 .shortcut-modal { max-width: 580px; }
@@ -689,19 +811,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   </div>
 </div>
 
-<!-- Intro/Welcome-Screen: wird beim Boot gezeigt wenn keine Lock-Sperre aktiv ist.
-     Mit Owl-Wasserzeichen + App-Titel + Tap-to-Enter-Hinweis. Auto-Progress nach 2.5s. -->
-<div class="intro-screen" id="intro-screen" aria-hidden="true">
-  <div class="intro-content">
-    <div class="intro-app-title" data-i18n="app_title">Pair Trade Tracker</div>
-    <div class="intro-tagline" data-i18n="intro_tagline">Live-Performance · Tranchen · Alarme</div>
-  </div>
-  <div class="intro-cta">
-    <div class="intro-hint" id="intro-hint" data-i18n="intro_hint_mobile">Tippen zum Starten</div>
-    <div class="intro-progress-bar"><div class="intro-progress-fill" id="intro-progress-fill"></div></div>
-  </div>
-</div>
-
 <!-- Hexagon-Loader nach erfolgreichem Code: feine Schlange wandert um statisches Hexagon -->
 <div class="lock-loader-overlay" id="lock-loader-overlay" aria-hidden="true">
   <svg class="lock-loader-svg" viewBox="0 0 100 100" aria-hidden="true">
@@ -735,11 +844,18 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="ds-brand-mark" aria-hidden="true">⌬</div>
     <div class="ds-brand-title" data-i18n="app_title">Pair Trade Tracker</div>
   </div>
+  <!-- Status-Block direkt unter Brand statt unten versteckt: das ist Information,
+       die man beim Trading permanent im Blick haben will. Dots links statt nur Farbtext. -->
+  <div class="ds-status-block">
+    <div class="ds-status-row"><span class="ds-status-dot" id="ds-status-dot"></span><span class="ds-status-label" data-i18n="ds_status_label">Status</span><span class="ds-status-value" id="ds-status-value">—</span></div>
+    <div class="ds-status-row"><span class="ds-status-dot" id="ds-auto-dot"></span><span class="ds-status-label" data-i18n="ds_autorefresh_label">Auto</span><span class="ds-status-value" id="ds-auto-value">⏱ …</span></div>
+    <div class="ds-status-row"><span class="ds-status-dot" id="ds-sync-dot"></span><span class="ds-status-label" data-i18n="ds_sync_label">Sync</span><span class="ds-status-value" id="ds-sync-value">aus</span></div>
+  </div>
   <nav class="ds-nav" role="navigation">
-    <button class="ds-nav-btn" data-tab="pair"  data-i18n="page_pairs"  type="button"><span class="ds-nav-glyph">⇄</span><span data-i18n="page_pairs">Paare</span></button>
-    <button class="ds-nav-btn" data-tab="long"  data-i18n="page_longs"  type="button"><span class="ds-nav-glyph ds-up">▲</span><span data-i18n="page_longs">Longs</span></button>
-    <button class="ds-nav-btn" data-tab="short" data-i18n="page_shorts" type="button"><span class="ds-nav-glyph ds-down">▼</span><span data-i18n="page_shorts">Shorts</span></button>
-    <button class="ds-nav-btn" data-tab="total" data-i18n="page_total"  type="button"><span class="ds-nav-glyph">∑</span><span data-i18n="page_total">Gesamt</span></button>
+    <button class="ds-nav-btn" data-tab="pair"  type="button"><span class="ds-nav-glyph">⇄</span><span class="ds-nav-label" data-i18n="page_pairs">Paare</span><kbd class="ds-nav-kbd">1</kbd></button>
+    <button class="ds-nav-btn" data-tab="long"  type="button"><span class="ds-nav-glyph ds-up">▲</span><span class="ds-nav-label" data-i18n="page_longs">Longs</span><kbd class="ds-nav-kbd">2</kbd></button>
+    <button class="ds-nav-btn" data-tab="short" type="button"><span class="ds-nav-glyph ds-down">▼</span><span class="ds-nav-label" data-i18n="page_shorts">Shorts</span><kbd class="ds-nav-kbd">3</kbd></button>
+    <button class="ds-nav-btn" data-tab="total" type="button"><span class="ds-nav-glyph">∑</span><span class="ds-nav-label" data-i18n="page_total">Gesamt</span><kbd class="ds-nav-kbd">4</kbd></button>
   </nav>
   <div class="ds-divider"></div>
   <div class="ds-actions">
@@ -747,15 +863,19 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <button class="ds-action" id="ds-refresh" data-i18n="btn_refresh" type="button">↻ Kurse</button>
   </div>
   <div class="ds-spacer"></div>
-  <div class="ds-status-block">
-    <div class="ds-status-row"><span class="ds-status-label" data-i18n="ds_status_label">Status</span><span class="ds-status-value" id="ds-status-value">—</span></div>
-    <div class="ds-status-row"><span class="ds-status-label" data-i18n="ds_autorefresh_label">Auto</span><span class="ds-status-value" id="ds-auto-value">⏱ …</span></div>
-    <div class="ds-status-row"><span class="ds-status-label" data-i18n="ds_sync_label">Sync</span><span class="ds-status-value" id="ds-sync-value">aus</span></div>
-  </div>
   <div class="ds-footer">
     <button class="ds-action ds-action-ghost" id="ds-settings" data-i18n="ds_settings_btn" type="button">⚙ Einstellungen</button>
   </div>
 </aside>
+
+<!-- Floating Live-Info: top-right des Desktop-Viewports, immer sichtbar.
+     Zeigt aktuelle Uhrzeit + Markt-Offen-Status. Auf Mobile via CSS versteckt. -->
+<div class="desktop-header-meta" id="desktop-header-meta" aria-hidden="true">
+  <div class="dhm-cell dhm-market" id="dhm-market">
+    <span class="dhm-dot"></span><span class="dhm-text" id="dhm-market-text">—</span>
+  </div>
+  <div class="dhm-cell dhm-clock" id="dhm-clock">—</div>
+</div>
 
 <div class="form-card" id="form">
   <h3 id="form-title" data-i18n="form_title_new">Neuer Trade</h3>
@@ -1147,7 +1267,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         <h4 data-i18n="shortcut_general_section">Allgemein</h4>
         <div class="shortcut-row"><span class="shortcut-keys"><kbd>?</kbd></span><span class="shortcut-desc" data-i18n="shortcut_help">Diese Hilfe öffnen / schließen</span></div>
         <div class="shortcut-row"><span class="shortcut-keys"><kbd>Esc</kbd></span><span class="shortcut-desc" data-i18n="shortcut_esc">Modal / Form schließen</span></div>
-        <div class="shortcut-row"><span class="shortcut-keys"><kbd>Enter</kbd></span><span class="shortcut-desc" data-i18n="shortcut_enter">Intro-Screen überspringen</span></div>
       </section>
     </div>
     <div class="shortcut-note" data-i18n="shortcut_note">Auf Windows/Linux: <kbd>Ctrl</kbd> statt <kbd>⌘</kbd>. Pfeiltasten nur im Desktop-Layout aktiv.</div>
@@ -1158,16 +1277,13 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 const STRINGS = {
   de: {
     html_lang: "de", app_title: "Pair Trade Tracker",
-    intro_tagline: "Live-Performance · Tranchen · Alarme",
-    intro_hint_mobile: "Tippen zum Starten",
-    intro_hint_desktop: "Klicken oder Enter drücken",
+    dhm_market_open: "Markt offen", dhm_market_closed: "Markt zu",
     shortcut_title: "Tastatur-Kürzel",
     shortcut_nav_section: "Navigation",
     shortcut_general_section: "Allgemein",
     shortcut_arrows: "Page zurück / weiter",
     shortcut_help: "Diese Hilfe öffnen / schließen",
     shortcut_esc: "Modal / Form schließen",
-    shortcut_enter: "Intro-Screen überspringen",
     shortcut_note: "Pfeiltasten und Ziffern-Shortcuts funktionieren nur wenn kein Eingabefeld fokussiert ist. <kbd>1</kbd>–<kbd>4</kbd> bewusst ohne Modifier, damit's nicht mit macOS-Screenshots (⌘⇧3/4) oder Browser-Tabs kollidiert.",
     agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
     agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
@@ -1336,16 +1452,13 @@ const STRINGS = {
   },
   en: {
     html_lang: "en", app_title: "Pair Trade Tracker",
-    intro_tagline: "Live performance · Tranches · Alerts",
-    intro_hint_mobile: "Tap to start",
-    intro_hint_desktop: "Click or press Enter",
+    dhm_market_open: "Market open", dhm_market_closed: "Market closed",
     shortcut_title: "Keyboard shortcuts",
     shortcut_nav_section: "Navigation",
     shortcut_general_section: "General",
     shortcut_arrows: "Previous / next page",
     shortcut_help: "Open / close this help",
     shortcut_esc: "Close modal / form",
-    shortcut_enter: "Skip intro screen",
     shortcut_note: "Arrow keys and digit shortcuts only fire when no input is focused. <kbd>1</kbd>–<kbd>4</kbd> deliberately without modifier to avoid conflicts with macOS screenshots (⌘⇧3/4) and browser tabs.",
     agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
     agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
@@ -1842,66 +1955,8 @@ async function applyLockChange() {
   updateLockUiState();
 }
 
-// === Intro-Screen (kein Lock-Setup): Welcome-View mit Owl + Auto-Progress ===
-const INTRO_AUTO_DISMISS_MS = 2500;
-let introState = { dismissed: false, progressTimer: null, keydownHandler: null, dismissTimer: null };
-
-function showIntroScreen() {
-  const intro = document.getElementById("intro-screen");
-  if (!intro) return;
-  appUnlocked = false; // gate analog zum Lock-Screen bis dismiss
-  introState.dismissed = false;
-  // Hint-Text je nach Layout: Tap (Mobile) vs. Klicken/Enter (Desktop)
-  const isDesktop = document.documentElement.getAttribute("data-layout") === "desktop";
-  const hintEl = document.getElementById("intro-hint");
-  if (hintEl) hintEl.textContent = t(isDesktop ? "intro_hint_desktop" : "intro_hint_mobile");
-  // Progress-Bar von 0 auf 100% über INTRO_AUTO_DISMISS_MS
-  const fillEl = document.getElementById("intro-progress-fill");
-  if (fillEl) {
-    fillEl.style.transition = "none";
-    fillEl.style.width = "0%";
-    // Doppelt-RAF damit die initiale Width gepaintet ist bevor die Transition startet
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      fillEl.style.transition = `width ${INTRO_AUTO_DISMISS_MS}ms linear`;
-      fillEl.style.width = "100%";
-    }));
-  }
-  intro.classList.add("open");
-  // Auto-dismiss nach 2.5s
-  introState.dismissTimer = setTimeout(() => dismissIntroScreen(), INTRO_AUTO_DISMISS_MS);
-  // Click/Tap dismissed sofort
-  intro.onclick = () => dismissIntroScreen();
-  // Keyboard: Enter / Space / Escape dismissed
-  introState.keydownHandler = (e) => {
-    if (introState.dismissed) return;
-    if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
-      e.preventDefault();
-      dismissIntroScreen();
-    }
-  };
-  window.addEventListener("keydown", introState.keydownHandler);
-}
-
-function dismissIntroScreen() {
-  const intro = document.getElementById("intro-screen");
-  if (!intro || introState.dismissed) return;
-  introState.dismissed = true;
-  // Timer + Keydown-Listener aufräumen
-  if (introState.dismissTimer) { clearTimeout(introState.dismissTimer); introState.dismissTimer = null; }
-  if (introState.keydownHandler) {
-    window.removeEventListener("keydown", introState.keydownHandler);
-    introState.keydownHandler = null;
-  }
-  // Slide-Out: opacity + translateY-Animation via .dismissing-Klasse
-  intro.classList.add("dismissing");
-  // Nach ~350ms (Slide-Out fertig): Intro entfernen + Pentagon-Loader anstoßen
-  setTimeout(() => {
-    intro.classList.remove("open");
-    intro.classList.remove("dismissing");
-    // unlockWithLoader teilen wir mit dem Lock-Pfad — kümmert sich um Loader + Sync + Refresh
-    unlockWithLoader();
-  }, 350);
-}
+// Intro/Welcome-Screen wurde entfernt — ohne Lock-Sperre startet die App direkt.
+// Der Pentagon-Loader bleibt nur für den echten Auth-Pfad (Code-Eingabe → unlockWithLoader).
 
 function showLockScreen() {
   appUnlocked = false;
@@ -2294,11 +2349,34 @@ function isAppWithinTradingHours() {
 }
 
 function setAutoStatus() {
+  // Floating Desktop-Header-Meta (top-right) immer zuerst — unabhängig von Worker/Trade-Status,
+  // damit Markt-Indikator + Uhr weiterlaufen wenn nix konfiguriert ist.
+  updateDesktopHeaderMeta();
   const el = document.getElementById("auto-status"); if (!el) return;
   if (!priceSettings.workerUrl || trades.length === 0) { el.textContent = t("status_auto_off"); return; }
   if (!isAppWithinTradingHours()) { el.textContent = t("status_auto_outside_hours"); return; }
   if (lastAutoRefreshAt > 0) { const next = new Date(lastAutoRefreshAt + AUTO_REFRESH_INTERVAL_MS); el.textContent = t("status_auto_next", { time: next.toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }); }
   else { el.textContent = t("status_auto_active"); }
+}
+
+// Floating Live-Info-Widget oben rechts (Markt-Status + Uhrzeit).
+// Nur im Desktop-Layout sichtbar (CSS-Schutz via display:none auf .desktop-header-meta).
+// Wird von setAutoStatus + dem 60s-Interval angetriggert plus initial beim Boot.
+function updateDesktopHeaderMeta() {
+  const mkt   = document.getElementById("dhm-market");
+  const mktTx = document.getElementById("dhm-market-text");
+  const clock = document.getElementById("dhm-clock");
+  if (!mkt && !clock) return;
+  const open = isAppWithinTradingHours();
+  if (mkt) {
+    mkt.classList.toggle("open", open);
+    mkt.classList.toggle("closed", !open);
+  }
+  if (mktTx) mktTx.textContent = t(open ? "dhm_market_open" : "dhm_market_closed");
+  if (clock) {
+    const now = new Date();
+    clock.textContent = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  }
 }
 
 function startAutoRefresh() {
@@ -4144,28 +4222,40 @@ document.querySelectorAll(".desktop-sidebar .ds-nav-btn[data-tab]").forEach(btn 
   if (dsRefresh)  dsRefresh.addEventListener("click", () => refreshAll(true));
   if (dsSettings) dsSettings.addEventListener("click", () => openSettings());
 })();
-// Status-Mirroring: existierende #status, #auto-status, #sync-status spiegeln in Sidebar
+// Status-Mirroring: existierende #status, #auto-status, #sync-status spiegeln in Sidebar.
+// Spiegelt sowohl den Text in die ds-status-value-Spans als auch den State (ok/err/warn/off)
+// in den ds-status-dot daneben — die Dots sind das primäre Glance-Signal jetzt.
 (function mirrorStatusToSidebar() {
   const pairs = [
-    { src: "status",      dst: "ds-status-value" },
-    { src: "auto-status", dst: "ds-auto-value" },
-    { src: "sync-status", dst: "ds-sync-value" },
+    { src: "status",      dst: "ds-status-value", dot: "ds-status-dot" },
+    { src: "auto-status", dst: "ds-auto-value",   dot: "ds-auto-dot" },
+    { src: "sync-status", dst: "ds-sync-value",   dot: "ds-sync-dot" },
   ];
-  function syncOne(srcId, dstId) {
-    const s = document.getElementById(srcId), d = document.getElementById(dstId);
-    if (!s || !d) return;
-    d.textContent = s.textContent;
-    // Status-Klassen übernehmen (loading/ok/err/off) für Farbcodierung
-    d.className = "ds-status-value";
-    if (s.classList.contains("loading")) d.classList.add("warn");
-    else if (s.classList.contains("ok")) d.classList.add("ok");
-    else if (s.classList.contains("err")) d.classList.add("err");
-    else if (s.classList.contains("off")) d.classList.add("off");
+  function stateFromSource(s) {
+    if (s.classList.contains("loading")) return "warn";
+    if (s.classList.contains("ok"))      return "ok";
+    if (s.classList.contains("err"))     return "err";
+    if (s.classList.contains("off"))     return "off";
+    return "";
   }
-  pairs.forEach(p => syncOne(p.src, p.dst));
+  function syncOne(p) {
+    const s = document.getElementById(p.src);
+    const d = document.getElementById(p.dst);
+    const dot = document.getElementById(p.dot);
+    if (!s) return;
+    const state = stateFromSource(s);
+    if (d) {
+      d.textContent = s.textContent;
+      d.className = "ds-status-value" + (state ? " " + state : "");
+    }
+    if (dot) {
+      dot.className = "ds-status-dot" + (state ? " " + state : "");
+    }
+  }
+  pairs.forEach(p => syncOne(p));
   pairs.forEach(p => {
     const src = document.getElementById(p.src); if (!src) return;
-    const obs = new MutationObserver(() => syncOne(p.src, p.dst));
+    const obs = new MutationObserver(() => syncOne(p));
     obs.observe(src, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ["class"] });
   });
 })();
@@ -4213,8 +4303,9 @@ lockSettings = loadLockSettings();
 if (lockSettings.enabled && lockSettings.hash) {
   showLockScreen();
 } else {
-  // Kein Lock → Intro-Screen mit Owl + Auto-Progress → Pentagon-Loader → App
-  showIntroScreen();
+  // Kein Lock → App startet direkt, ohne Intro-Screen/Loader-Theater.
+  // Der Pentagon-Loader macht nur Sinn nach einem echten Auth-Schritt.
+  appUnlocked = true;
 }
 loadStorage();
 render();

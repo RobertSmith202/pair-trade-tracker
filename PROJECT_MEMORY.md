@@ -34,7 +34,7 @@ Kern-Features:
 - Standard-Page in Settings konfigurierbar — pro Gerät
 - Grid/Liste-View-Toggle pro Page (touch-freundlich groß) — pro Gerät
 - Keyboard-Shortcuts: **plain `1`/`2`/`3`/`4`** (ohne Modifier) für direkten Page-Switch in allen Layouts. Pfeiltasten **← →** für sequenzielles Page-Durchblättern (Desktop). `?` öffnet eine Shortcut-Übersicht, `Esc` schließt Modals/Forms hierarchisch.
-- **Intro-/Welcome-Screen** beim App-Boot wenn keine Lock-Sperre aktiv ist: Owl-Wasserzeichen, App-Titel, Auto-Progress-Bar (2.5s), dann Pentagon-Loader. Tap/Klick/Enter/Esc skipt sofort.
+- **Boot ohne Lock-Sperre:** App startet direkt, ohne Welcome-Screen / Progress-Bar / Pentagon-Loader. Der Loader-Pfad lebt nur noch nach einer echten Code-Eingabe (Lock → Code → Pentagon-Loader → App). Ohne echten Auth-Schritt war das Lade-Theater Reibung ohne Funktion. Frühere Intro-Phase (Owl-Wasserzeichen + Tagline + 2.5s Auto-Progress-Bar) wurde entfernt.
 - **Empty-State-Illustration** mit Owl-SVG + page-spezifischem Titel + Beschreibung + Primary-CTA-Button auf leeren Pages.
 - Auto-Refresh jede Minute wenn App im Foreground während Handelszeit (Mo-Fr, 09:00-23:00 Berlin)
 - Bloomberg-style Price-Flash-Animationen (grün/rot Hintergrund-Flash bei Kursänderung)
@@ -357,20 +357,39 @@ Eigener Settings-Block „Schriftgröße (Desktop)" mit 4 Card-Buttons: Klein/Mi
 
 CSS `zoom` skaliert layout-uniform (Schrift + Padding + Sidebar-Breite + Spacing) — fühlt sich an wie Browser-Zoom, ist aber an die App gebunden. Browser-Kompatibilität: Chrome/Safari seit jeher, Firefox seit 126 (Mai 2024).
 
-### Intro-Screen (Welcome-View)
+### Boot ohne Lock — direkt in die App
 
-Beim App-Boot **wenn keine Lock-Sperre aktiv ist** (`!lockSettings.enabled || !lockSettings.hash`): zeigt `showIntroScreen()` einen Vollbild-Welcome mit:
-- App-Titel „Pair Trade Tracker" als Hero
-- Subtile Tagline „Live-Performance · Tranchen · Alarme"
-- Owl-Wasserzeichen im Hintergrund (gleicher CSS-Mask-SVG wie Lock-Screen, via shared `::before`-Pseudo)
-- Pulsierender Hint-Text „Tippen zum Starten" (Mobile) / „Klicken oder Enter drücken" (Desktop)
-- Linear füllende Progress-Bar (0% → 100% über 2500ms)
+Wenn `!lockSettings.enabled || !lockSettings.hash`: Boot-Logic setzt `appUnlocked = true` und ruft sofort `loadStorage()` + `render()` auf. **Kein Welcome-Screen, kein Progress-Bar, kein Pentagon-Loader.** Begründung: ohne echten Auth-Schritt ist die „wird geladen"-Visualisierung Theater — Refresh und Sync laufen ohnehin im Hintergrund über die normalen `refreshAll()` / `syncFull()` Aufrufe im Boot-Path (direkt nach `render()`).
 
-**Dismiss-Trigger:** Click anywhere, Touch-Tap, Enter, Space, Esc, oder Auto nach 2.5s.
+Frühere Intro-Phase (`showIntroScreen()` / `dismissIntroScreen()`, `<div class="intro-screen">` HTML, intro-screen-CSS, `INTRO_AUTO_DISMISS_MS`, `introState`) wurde vollständig entfernt — keine Dead-Code-Reste. Wenn jemand den Welcome wiederhaben will: Git-History nach „intro-screen" durchsuchen, der Block ist atomar wiederherstellbar.
 
-**Nach Dismiss:** `intro-screen.classList.add("dismissing")` → 350ms Slide-Out-Animation (`opacity: 0; transform: translateY(-30px)`) → `unlockWithLoader()` wird aufgerufen → Pentagon-Hexagon-Loader läuft 1500ms + 360ms fade → App. **Sync und Kurs-Refresh laufen parallel** während des Loaders (kein zusätzlicher Wait).
+**Lock-Pfad bleibt unverändert:** Lock-Screen → Code-Eingabe → `unlockWithLoader()` → Pentagon-Hexagon-Loader 1500ms + 360ms Fade → App. Hier macht der Loader Sinn, weil tatsächlich ein Auth-Schritt + Sync/Refresh parallel laufen.
 
-**Architektur:** Eigenes `<div class="intro-screen" id="intro-screen">` HTML-Element, eigenes CSS, eigene `showIntroScreen()` / `dismissIntroScreen()` JS-Funktionen. Boot-Logic checkt: wenn Lock aktiv → `showLockScreen()`, sonst → `showIntroScreen()`. Niemals beide gleichzeitig (Lock und Intro sind mutually exclusive).
+### Desktop-Visual-Polish (gelandet)
+
+- **Typografie-Hierarchie deutlich hochskaliert** (nur unter `[data-layout="desktop"]`, Mobile pixelgenau unverändert):
+  - `.page-title` 30 → 42px, letter-spacing −0.9px
+  - `.agg-cell .value` 22 → 32px, `.agg-cell.wide .value` 28 → 48px (Hero-Stat)
+  - `.aggregate` Padding 16 → 22/26px, Radius 14 → 16px
+  - `.trade-perf .pnl-abs` 22 → 26px, `.pnl-pct` 18 → 20px
+  - Trade-Card-Padding 14 → 16/18px, Radius 14 → 16px
+- **Sidebar-Restructure (HTML-Reihenfolge):** Brand → Status-Block → Nav → Divider → Actions → Spacer → Footer. Status sitzt jetzt im Top-Third statt unten.
+- **Sidebar-Status-Block visuell:** eigene Card (`var(--bg)` BG + Border + 10px Radius). Pro Zeile Status-Dot (`.ds-status-dot.ok|err|warn|off`) als Glance-Signal links, dann Label, dann Wert rechts. `mirrorStatusToSidebar()` synct sowohl Text als auch State (`.ok` / `.err` / `.warn` / `.off`) in Dot UND Value-Span.
+- **Sidebar-Nav aktiver State:** linker 3px-Akzent-Balken via `.ds-nav-btn::before` (background `var(--info)`) — vorher nur dezenter Border, kaum sichtbar.
+- **Sidebar-Nav Tastatur-Hints:** jeder Nav-Button hat ein `<kbd class="ds-nav-kbd">1..4</kbd>` rechts. Macht die existierenden Plain-Ziffern-Shortcuts discoverable. Active-Button bekommt einen kontrastierten Card-Background im Kbd.
+- **`data-i18n` runter vom Nav-Button selber** (nur noch auf `<span class="ds-nav-label">` innen). Vorher war es auch auf dem `<button>`-Element, was beim Sprachwechsel via `applyTranslations()` (`textContent = t(key)`) den Glyph + Kbd weggewischt hätte. Latenter Bug — beim Layout-Wechsel oder Sprachwechsel war die Sidebar potentiell kaputt.
+- **Floating Desktop-Header-Meta** (`.desktop-header-meta` oben rechts, position fixed): Markt-Offen-Indikator (Dot + Label „MARKT OFFEN / ZU") + Uhrzeit HH:MM. Permanent sichtbar. Auf Mobile via `display:none`. Update über `updateDesktopHeaderMeta()`, getriggert durch `setAutoStatus()` (das wiederum von `setInterval(setAutoStatus, 60000)` und dem Auto-Refresh-Loop aufgerufen wird). i18n: `dhm_market_open` / `dhm_market_closed`.
+- **Page-Transitions auf Desktop**: 280ms iOS-Control-Center-Slide → 120ms simple Opacity-Fade (`@keyframes pageFadeIn` / `pageFadeOut`). Direction-agnostisch, kein translate3d mehr. Die alten Keyframes `pageEnterFromBelow / pageEnterFromAbove / pageLeaveToAbove / pageLeaveToBelow` sind noch definiert (für Backward-Compat), werden aber per Spezifität von den neuen Regeln überschrieben. Mobile-Snap-Scroll unangetastet.
+- **Trade-Card-Hover**: jetzt `border-color: rgba(127,192,238,0.45)` (info-tint) zusätzlich zum bestehenden Box-Shadow. Subtile Affordance.
+- **Tabular-Nums hart erzwungen** auf allen Zahlen-Spalten unter Desktop (`.trade-row-pnl`, `.trade-row-pct`, `.trade-perf .pnl-abs/.pnl-pct`, `.agg-cell .value`, `.leg .v`, `.ds-status-value`) — Zahlen stehen über Cards hinweg in derselben Pixel-Spalte, scanbar.
+- **Brand-Mark** 26 → 28px, Brand-Title 13 → 14px, Layout etwas atmender.
+
+**Was bewusst NICHT angefasst wurde** (würde Layout-Architektur tangieren, gehört nicht in einen Polish-Pass):
+- 220px Sidebar-Breite
+- 1100px Content-Cap auf `.page > *`
+- 4-Page-Snap-Navigation
+- Mobile-Layout (überhaupt)
+- Worker / Sync / Storage / Alarm-Logik
 
 ### Keyboard-Shortcut-Overlay
 
@@ -702,7 +721,11 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 
 24. **CSS `zoom` ist non-standard aber breit unterstützt.** Chrome/Safari schon ewig, Firefox seit 126 (Mai 2024). Auf älteren Firefox-Versionen würde der Font-Scale-Setting visuell nichts tun. Robert verwendet Safari/Chrome — kein Problem in der Praxis.
 
-25. **`activateDesktopPage` setzt `data-direction` BEVOR `active-page`-Klasse.** Reihenfolge ist kritisch: wenn man `.active-page` zuerst setzt, läuft die CSS-Animation mit dem ALTEN `data-direction`-Wert. Plus ein `void incoming.offsetWidth` (force-Reflow) zwischen `classList.remove("active-page")` und `classList.add("active-page")` damit die Animation auch dann neu feuert, wenn man auf dieselbe Page erneut navigiert.
+25. **Desktop-Page-Animation ist seit dem Polish-Pass ein simpler Opacity-Fade (`pageFadeIn` / `pageFadeOut`, 120ms).** Direction-agnostisch — `data-direction` wird in `activateDesktopPage()` weiterhin gesetzt, hat aber CSS-mäßig keine sichtbare Auswirkung mehr (die alten direction-spezifischen Keyframes `pageEnterFromBelow`/`pageEnterFromAbove`/`pageLeaveToAbove`/`pageLeaveToBelow` werden durch die neueren Fade-Regeln überschrieben). Die JS-Logik (data-direction-Setzen vor `.active-page`-Klasse, force-Reflow via `void offsetWidth`) ist defensiv beibehalten, falls jemand die iOS-Slides wieder aktivieren will — dann muss man nur die Fade-Regeln entfernen.
+
+26. **`data-i18n` darf NICHT direkt auf einem Element stehen das Kind-Elemente mit eigenem Inhalt hat.** `applyTranslations()` macht `el.textContent = t(key)` — das wischt ALLE Kinder weg. Beispiel-Bug der vor dem Polish-Pass im Code stand: `<button data-i18n="page_pairs"><span class="ds-nav-glyph">⇄</span><span data-i18n="page_pairs">Paare</span></button>` → nach erstem Sprachwechsel: nur noch "Paare", Glyph weg. Lösung: `data-i18n` nur auf den innersten Text-Span, nicht auf den Wrapper-Button.
+
+27. **`updateDesktopHeaderMeta()` muss alle Stellen aufrufen die den Markt-Offen-Status oder die Uhrzeit visuell ändern können.** Aktuell nur über `setAutoStatus()` (= `setInterval(..., 60000)` + Auto-Refresh-Loop). Wer einen früheren Trigger braucht (z.B. wenn der User die Settings-Modal-Trading-Hours editiert, falls das je hinzukommt), muss `updateDesktopHeaderMeta()` selbst aufrufen.
 
 ---
 
@@ -754,11 +777,14 @@ Du bist jetzt informiert genug um Änderungen vorzunehmen. Empfohlenes Vorgehen:
 | Page-Child-Spalte | `.page > * { max-width: ... }` | nicht beschränkt | `max-width: min(1100px, 100%); margin-left: 0` (left-aligned) |
 | Owl-Watermark | `body::before` mit Mask-SVG | sichtbar mit 5% Opacity | versteckt (`display: none !important`) |
 | Schriftgröße | `applyFontScale(v)` | wird in Mobile auf leer gesetzt (kein Zoom) | `document.documentElement.style.zoom = v/100` |
-| Boot ohne Lock | `showIntroScreen()` | identisches Verhalten (Intro über App) | identisches Verhalten |
-| Boot mit Lock | `showLockScreen()` | identisches Verhalten (Lock + Keypad) | identisches Verhalten |
-| Page-Shortcuts | `1`/`2`/`3`/`4` keydown | aktiv, ohne Modifier | aktiv, ohne Modifier |
+| Boot ohne Lock | `appUnlocked = true` direkt | App startet sofort | App startet sofort |
+| Boot mit Lock | `showLockScreen()` | Lock + Keypad → Pentagon-Loader → App | Lock + Keypad → Pentagon-Loader → App |
+| Page-Shortcuts | `1`/`2`/`3`/`4` keydown | aktiv, ohne Modifier | aktiv, ohne Modifier — Kbd-Pills in Sidebar sichtbar |
 | Sequenz-Navigation | `← →` keydown | NICHT aktiv (Swipe ersetzt das) | aktiv |
 | Shortcut-Overlay | `?` keydown | aktiv (öffnet Hilfe-Modal) | aktiv (öffnet Hilfe-Modal) |
+| Page-Transition | (Snap-Scroll = Animation) | nativ | `@keyframes pageFadeIn/Out` 120ms (vorher 280ms iOS-Slide) |
+| Header-Meta (Live) | `.desktop-header-meta` | `display: none` | floating top-right, Markt-Dot + HH:MM Uhr, Update über `updateDesktopHeaderMeta()` |
+| Sidebar-Status-Dots | `.ds-status-dot` | nicht relevant (Sidebar versteckt) | farbcodiert via `mirrorStatusToSidebar()` aus `#status`/`#auto-status`/`#sync-status` |
 
 **Robert's typischer Workflow:** Mac für Entwicklung + sitzendes Trading (Desktop-Layout), iPhone für unterwegs + Telegram-Alarme-Acknowledgement (Mobile-Layout). Beide Geräte syncen Trades über JSONBin, aber Layout-Modus, Theme, Sprache, Schriftgröße sind geräteabhängig (pro localStorage, nicht über JSONBin).
 
