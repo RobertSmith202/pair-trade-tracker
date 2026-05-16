@@ -1138,10 +1138,10 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <section class="shortcut-section">
         <h4 data-i18n="shortcut_nav_section">Navigation</h4>
         <div class="shortcut-row"><span class="shortcut-keys"><kbd>←</kbd><kbd>→</kbd></span><span class="shortcut-desc" data-i18n="shortcut_arrows">Page zurück / weiter</span></div>
-        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>1</kbd></span><span class="shortcut-desc" data-i18n="page_pairs">Paare</span></div>
-        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd></span><span class="shortcut-desc" data-i18n="page_longs">Longs</span></div>
-        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>3</kbd></span><span class="shortcut-desc" data-i18n="page_shorts">Shorts</span></div>
-        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>4</kbd></span><span class="shortcut-desc" data-i18n="page_total">Gesamt</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>1</kbd></span><span class="shortcut-desc" data-i18n="page_pairs">Paare</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>2</kbd></span><span class="shortcut-desc" data-i18n="page_longs">Longs</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>3</kbd></span><span class="shortcut-desc" data-i18n="page_shorts">Shorts</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>4</kbd></span><span class="shortcut-desc" data-i18n="page_total">Gesamt</span></div>
       </section>
       <section class="shortcut-section">
         <h4 data-i18n="shortcut_general_section">Allgemein</h4>
@@ -1168,7 +1168,7 @@ const STRINGS = {
     shortcut_help: "Diese Hilfe öffnen / schließen",
     shortcut_esc: "Modal / Form schließen",
     shortcut_enter: "Intro-Screen überspringen",
-    shortcut_note: "Auf Windows/Linux: <kbd>Ctrl</kbd> statt <kbd>⌘</kbd>. Pfeiltasten nur im Desktop-Layout aktiv.",
+    shortcut_note: "Pfeiltasten und Ziffern-Shortcuts funktionieren nur wenn kein Eingabefeld fokussiert ist. <kbd>1</kbd>–<kbd>4</kbd> bewusst ohne Modifier, damit's nicht mit macOS-Screenshots (⌘⇧3/4) oder Browser-Tabs kollidiert.",
     agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
     agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "Trade", agg_trade_plural: "Trades",
@@ -1346,7 +1346,7 @@ const STRINGS = {
     shortcut_help: "Open / close this help",
     shortcut_esc: "Close modal / form",
     shortcut_enter: "Skip intro screen",
-    shortcut_note: "On Windows/Linux: <kbd>Ctrl</kbd> instead of <kbd>⌘</kbd>. Arrow keys only active in desktop layout.",
+    shortcut_note: "Arrow keys and digit shortcuts only fire when no input is focused. <kbd>1</kbd>–<kbd>4</kbd> deliberately without modifier to avoid conflicts with macOS screenshots (⌘⇧3/4) and browser tabs.",
     agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
     agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trades",
@@ -4091,9 +4091,10 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
       else showShortcutOverlay();
       return;
     }
-    // Cmd+Shift+1..4 → direkter Page-Sprung. In allen Layouts.
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !isTypingTarget(e.target)) {
-      const map = { "1": "pair", "2": "long", "3": "short", "4": "total", "!": "pair", "@": "long", "#": "short", "$": "total" };
+    // Plain 1..4 → direkter Page-Sprung. Ohne Modifier um OS-Konflikte zu vermeiden
+    // (Cmd+Shift+3/4 = macOS Screenshot, Cmd+1..n = Browser-Tabs).
+    if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !isTypingTarget(e.target)) {
+      const map = { "1": "pair", "2": "long", "3": "short", "4": "total" };
       const tp = map[e.key];
       if (tp && !isAnyOverlayOpen()) {
         e.preventDefault();
