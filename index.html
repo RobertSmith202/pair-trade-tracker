@@ -2620,6 +2620,44 @@ function computeTrade(tr, lp, sp) {
   return { type, tranches: trancheResults, long: firstResult.long || null, short: firstResult.short || null, totalNotionalHome, totalPnlHome, pct, aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome, aggLongNotionalHome, aggShortNotionalHome, longApiCcy, shortApiCcy, lpx, spx };
 }
 
+// Resettet die Alarm-State-Achsen deren Schwellen-Konfig sich beim Speichern geändert hat.
+// Ohne diesen Reset bleibt der State zwischen alten und neuen Alarm-Configs gekoppelt:
+// Triggered → quittiert (acknowledged) → User entfernt Schwelle + speichert → User setzt
+// später neue Schwelle → State ist immer noch "acknowledged" → neuer Alarm feuert erst,
+// wenn der Wert mal unter die neue Schwelle fällt und wieder hoch (re-armt).
+// Robert's gewünschtes Verhalten: jede Config-Änderung soll wie ein Erst-Setup wirken,
+// also für die betroffene Achse `idle` als Ausgangszustand.
+// Wirkt für Trades UND Baskets — beide nutzen alertStates[id].{min,max,squeeze}.
+function resetAlarmStateOnConfigChange(id, oldConfig, newConfig) {
+  const st = alertStates[id];
+  if (!st) return;
+  const norm = v => (v == null || v === "") ? null : Number(v);
+  const same = (a, b) => {
+    const na = norm(a), nb = norm(b);
+    if (na == null && nb == null) return true;
+    if (na == null || nb == null) return false;
+    return na === nb;
+  };
+  const minChanged = !same(oldConfig.alertPctMin, newConfig.alertPctMin)
+                  || !same(oldConfig.alertPriceMin, newConfig.alertPriceMin)
+                  || (oldConfig.alertMinMode || "pct") !== (newConfig.alertMinMode || "pct");
+  const maxChanged = !same(oldConfig.alertPctMax, newConfig.alertPctMax)
+                  || !same(oldConfig.alertPriceMax, newConfig.alertPriceMax)
+                  || (oldConfig.alertMaxMode || "pct") !== (newConfig.alertMaxMode || "pct");
+  const squeezeChanged = !same(oldConfig.alertShortPct, newConfig.alertShortPct);
+  if (!minChanged && !maxChanged && !squeezeChanged) return;
+  // Wenn st noch im Legacy-Flat-Format ({state, lastAlertAt}) liegt: hochmigrieren und voll resetten.
+  if (!st.min && !st.max && !st.squeeze) {
+    const empty = { state: "idle", lastAlertAt: 0 };
+    alertStates[id] = { min: { ...empty }, max: { ...empty }, squeeze: { ...empty } };
+    return;
+  }
+  const idle = () => ({ state: "idle", lastAlertAt: 0 });
+  if (minChanged     && st.min)     st.min     = idle();
+  if (maxChanged     && st.max)     st.max     = idle();
+  if (squeezeChanged && st.squeeze) st.squeeze = idle();
+}
+
 // Normalize the alert-state shape: handles legacy {current/state, ...}
 // and the new {min: {...}, max: {...}} side-by-side.
 function alarmStateOf(tr) {
@@ -3483,7 +3521,11 @@ function saveBasketForm() {
   if (profitRaw) { const p = parseDecimal(profitRaw); if (!isFinite(p)) { alert(t("err_alarm_invalid")); return; } alertPctMax = Math.abs(p); }
   if (editingBasketId) {
     const b = findBasket(editingBasketId); if (!b) { closeBasketForm(); return; }
+    // Snapshot der Alarm-Config (Baskets haben nur min/max, kein Squeeze, kein Preis-Mode)
+    const _oldAlarmCfg = { alertPctMin: b.alertPctMin, alertPctMax: b.alertPctMax };
     b.name = name; b.alertPctMin = alertPctMin; b.alertPctMax = alertPctMax; b.updated = Date.now();
+    // Wenn Schwelle geändert: State-Achse(n) auf idle zurück, gleiche Logik wie bei Trades
+    resetAlarmStateOnConfigChange(b.id, _oldAlarmCfg, b);
     markLocalChange(); closeBasketForm(); render();
     if (currentBasketId === b.id) renderBasketModalBody();
     return;
@@ -3730,7 +3772,13 @@ function saveForm() {
         (eType === "pair" || eType === "short") ? shortTicker : null, shortQty, shortEntry, shortEntryNative, shortEntryCcyProbe);
     }
     if (!confirmAlertWouldFire(probeForWarn, alertPctMin, alertPriceMin, alertPctMax, alertPriceMax, minMode, maxMode)) return;
-    // OK — now apply the edit
+    // OK — now apply the edit. Vorher Alarm-Config snapshot machen für State-Reset (siehe unten).
+    const _oldAlarmCfg = {
+      alertPctMin: existing.alertPctMin, alertPctMax: existing.alertPctMax,
+      alertPriceMin: existing.alertPriceMin, alertPriceMax: existing.alertPriceMax,
+      alertMinMode: existing.alertMinMode, alertMaxMode: existing.alertMaxMode,
+      alertShortPct: existing.alertShortPct
+    };
     existing.name = name;
     existing.alertPctMin = alertPctMin; existing.alertPctMax = alertPctMax;
     existing.alertPriceMin = alertPriceMin; existing.alertPriceMax = alertPriceMax;
@@ -3738,6 +3786,10 @@ function saveForm() {
     // Squeeze nur für short/pair speichern, sonst null (kein Alarm für Long-only)
     existing.alertShortPct = (eType === "short" || eType === "pair") ? alertShortPct : null;
     existing.updated = Date.now();
+    // Wenn sich Alarm-Schwellen geändert haben: zugehörige State-Achse(n) auf idle zurück.
+    // Sonst hängen "acknowledged"/"triggered"-States von alter Config weiter und blockieren
+    // den nächsten Alarm bis der Wert mal kurz unter die neue Schwelle fällt.
+    resetAlarmStateOnConfigChange(existing.id, _oldAlarmCfg, existing);
     if (!isMulti) {
       const oldT = existing.tranches[0] || {};
       const longEntryCcy  = (eType === "pair" || eType === "long")  ? (longEntryNative  ? null : (oldT.longEntryCcy  || homeCurrency)) : null;
@@ -3787,6 +3839,13 @@ function saveForm() {
   if (matching) {
     matching.tranches = matching.tranches || [];
     matching.tranches.push(newTranche);
+    // Snapshot der Alarm-Config vor potenzieller Übernahme — für State-Reset (siehe unten)
+    const _oldAlarmCfg = {
+      alertPctMin: matching.alertPctMin, alertPctMax: matching.alertPctMax,
+      alertPriceMin: matching.alertPriceMin, alertPriceMax: matching.alertPriceMax,
+      alertMinMode: matching.alertMinMode, alertMaxMode: matching.alertMaxMode,
+      alertShortPct: matching.alertShortPct
+    };
     // Inherit thresholds + modes only if matching has none yet for that side.
     const matchingHasMin = (matching.alertPctMin != null && matching.alertPctMin !== "") || (matching.alertPriceMin != null && matching.alertPriceMin !== "");
     const matchingHasMax = (matching.alertPctMax != null && matching.alertPctMax !== "") || (matching.alertPriceMax != null && matching.alertPriceMax !== "");
@@ -3807,6 +3866,8 @@ function saveForm() {
       matching.alertShortPct = alertShortPct;
     }
     matching.updated = Date.now();
+    // Wenn beim Mergen eine neue Schwelle übernommen wurde: zugehörige State-Achse(n) auf idle.
+    resetAlarmStateOnConfigChange(matching.id, _oldAlarmCfg, matching);
     markLocalChange(); closeForm(); refreshAll(true);
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 100);
     return;

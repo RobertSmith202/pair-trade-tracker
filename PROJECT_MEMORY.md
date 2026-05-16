@@ -587,6 +587,8 @@ Pro Trade drei unabhängige States im JSONBin (`alertStates[id]`):
 
 Edge-triggered: Alarm feuert nur beim Übergang `idle → triggered/notified`. Telegram-Webhook setzt alle gerade aktiven Triggered/Notified Status im JSONBin auf `acknowledged` (eine Reply quittiert auch alles über alle drei Achsen hinweg).
 
+**State-Reset bei Config-Änderung (`resetAlarmStateOnConfigChange` im Frontend, seit Mai-2026):** Wenn der User eine Alarm-Schwelle ändert oder entfernt und den Trade/Korb speichert, wird die zugehörige State-Achse (min/max/squeeze) zurück auf `idle` gesetzt. Sonst hängt z.B. ein „acknowledged" aus der alten Schwellen-Periode an einer neuen Schwelle — Folge: der neue Alarm würde erst feuern, wenn der Wert mal unter die neue Schwelle fällt und wieder darüber steigt (das Re-Arm). Robert hat das explizit so gewollt: jede Config-Änderung soll wie ein Erst-Setup wirken. Aufgerufen in drei Save-Pfaden: Trade-Edit, Trade-Auto-Merge (wenn neue Tranche eine Schwelle „erbt"), Basket-Edit. Helper vergleicht pro Achse alle relevanten Felder (Pct + Preis + Mode für min/max, nur Pct für squeeze); resettet selektiv pro Achse statt pauschal. Bei Legacy-flat-States wird die Struktur on-touch auf die neue {min, max, squeeze}-Form migriert.
+
 Worker-Konstanten: `ALERT_REPEAT_MS = 3 * 60 * 1000`, `PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000`. Squeeze hat keinen Repeat-Timer im Code — die einmal-pro-Tag-Cadence ergibt sich implizit aus dem Cron-Schedule.
 
 Crons im Cloudflare-Dashboard:
