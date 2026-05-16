@@ -519,8 +519,23 @@ body::before {
   width: 100%;
   box-sizing: border-box;
 }
-/* Owl-Watermark im Desktop-Layout ausblenden — zu dominant hinter der spärlich befüllten Lesespalte */
-[data-layout="desktop"] body::before { display: none !important; }
+/* Owl-Watermark auf Desktop — tuned damit's Präsenz hat ohne dem Content
+   in die Quere zu kommen. Ursprünglich war's komplett ausgeblendet weil
+   "zu dominant" (Mobile-Settings 5 % Opacity + min(125vmin, 820px) Größe
+   füllten auf einem 1440er+ Display fast den ganzen Hintergrund mit Owl).
+   Jetzt: nur im Pages-Container-Bereich (left: 220px, also nicht hinter der
+   Sidebar), kleiner (~380px statt 820px), gleichbleibend 5 % Opacity, leicht
+   nach rechts versetzt damit der Owl in der Whitespace-Wüste rechts vom
+   Content-Spalten-Cap sitzt und nicht hinter den Trade-Cards. */
+[data-layout="desktop"] body::before {
+  display: block !important;
+  left: 220px;
+  -webkit-mask-size: min(45vmin, 380px) auto;
+          mask-size: min(45vmin, 380px) auto;
+  -webkit-mask-position: 78% 50%;
+          mask-position: 78% 50%;
+  opacity: 0.05;
+}
 [data-layout="desktop"] .app-watermark,
 [data-layout="desktop"] .owl-watermark,
 [data-layout="desktop"] .watermark { display: none !important; }

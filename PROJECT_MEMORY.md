@@ -342,7 +342,7 @@ Der Layout-Modus wird an `<html data-layout="mobile|desktop">` angeheftet. Alle 
 - **`.page > *` Content-Constraint:** `max-width: min(1100px, 100%); margin-left: 0; margin-right: auto` — alle direkten Page-Children (Page-Head, Aggregate, Trade-Liste, Total-Breakdown, Donut, Basket-Cards) landen in derselben Spalte links-aligned, identische Breite. Verhindert Cmd+/- Zoom-Probleme und gibt eine konsistente Lesespalte
 - **Multi-Column Trade-Grid:** in Grid-View `display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr))` mit max-width 1080px → 3 Karten nebeneinander auf breiten Displays
 - **Forms als zentrierte Floating-Dialoge** statt Inline-Expand: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 600px`. Backdrop via `body:has(.form-card.open)::before`
-- **Owl-Watermark im Desktop-Modus ausgeblendet** (`body::before { display: none }`) — wirkt im breiteren Layout zu dominant. Lock-Screen behält den Owl
+- **Owl-Watermark im Desktop-Modus reaktiviert (Mai 2026)** — ursprünglich ausgeblendet weil mit Mobile-Settings (820px Größe, full viewport) zu dominant. Jetzt scoped auf den Pages-Container-Bereich (`left: 220px`, also nicht hinter der Sidebar), kleiner (`min(45vmin, 380px)`), rechts versetzt (`mask-position: 78% 50%`) damit der Owl in der Whitespace-Wüste rechts vom 1280px-Content-Cap sitzt und nicht hinter den Trade-Cards. 5 % Opacity wie auf Mobile. Lock-Screen-Owl unverändert
 - Toolbar im Desktop-Modus komplett verborgen (Sidebar übernimmt deren Funktionen)
 
 **Layout-Switch im laufenden Betrieb** (`applyLayout(v)`):
@@ -811,7 +811,7 @@ Du bist jetzt informiert genug um Änderungen vorzunehmen. Empfohlenes Vorgehen:
 | Forms | `.form-card.open` | Inline-Expand unter Toolbar | Floating-Dialog mit Backdrop via `body:has(.form-card.open)::before` |
 | Content-Breite | `body { max-width: 640px; margin: 0 auto }` | aktiv | overridden zu `max-width: none; padding-left: 220px` (eine konkurrierende `body { max-width: 1280px }`-Regel wurde im 2. Polish-Pass entfernt) |
 | Page-Child-Spalte | `.page > * { max-width: ... }` | nicht beschränkt | `max-width: min(1280px, 100%); margin-left: 0` (left-aligned, war vorher 1100) |
-| Owl-Watermark | `body::before` mit Mask-SVG | sichtbar mit 5% Opacity | versteckt (`display: none !important`) |
+| Owl-Watermark | `body::before` mit Mask-SVG | sichtbar mit 5% Opacity, full-viewport (820px) | sichtbar mit 5% Opacity, scoped auf Pages-Bereich (380px), rechts versetzt (78%/50%) |
 | Schriftgröße | `applyFontScale(v)` | wird in Mobile auf leer gesetzt (kein Zoom) | `document.documentElement.style.zoom = v/100` |
 | Boot ohne Lock | `appUnlocked = true` direkt | App startet sofort | App startet sofort |
 | Boot mit Lock | `showLockScreen()` | Lock + Keypad → Pentagon-Loader → App | Lock + Keypad → Pentagon-Loader → App |
