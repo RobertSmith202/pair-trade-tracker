@@ -524,18 +524,28 @@ body::before {
 [data-layout="desktop"] .app-watermark,
 [data-layout="desktop"] .owl-watermark,
 [data-layout="desktop"] .watermark { display: none !important; }
-/* === Desktop Page-Transition: iPad-Home-Screen-Style ======================
-   Horizontaler Slide + leichter Scale-Recede der leavenden Page + Cross-Fade.
-   Iteration 1: 280ms iOS-Vollscreen-Vertikal-Slide (zu cinematic für 30× pro Stunde)
-   Iteration 2: 120ms reiner Opacity-Fade (zu subtil, kein Richtungs-Cue)
-   Iteration 3 (jetzt): 220ms, 48px-Horizontal-Slide auf der kommenden Page mit
-   subtilem Scale 0.985→1.0; leavende Page rückt 12px in Gegenrichtung und scaled
-   auf 0.97 + Fade. cubic-bezier(0.22, 1, 0.36, 1) = decelerate mit kaum sichtbarem
-   Einpendeln. Direction-aware: "next" und "prev" gespiegelt.
-   translate3d erzwingt GPU-Compositing → flüssig bei vielen Trade-Cards. */
+/* === Desktop Page-Transition: vertikaler Slide + Cross-Fade ==============
+   Iterations-Verlauf:
+     1) 280ms iOS-Vollscreen-Vertikal-Slide — cinematic aber bremste spürbar
+     2) 120ms reiner Opacity-Fade — zu subtil, kein Richtungs-Cue
+     3) 220ms iPad-Home-Style mit Scale-Recede — Scale verursachte Text-Re-Rasterung
+        auf großen Monitoren = sichtbares Wackeln der Buchstaben-Kanten
+     4) 220ms reiner Horizontal-Slide ohne Scale — fixte das Wackeln, aber 40px
+        horizontale Bewegung sind auf 4K-Displays proportional minimal und der
+        Content-Spalten-Cap (1280px) auf einem 3840er-Screen rutschte einsam
+        in einer Whitespace-Wüste herum
+     5) Jetzt: 200ms vertikaler Y-Translate + Cross-Fade, direction-aware
+   Warum vertikal auf großen Monitoren besser ist: bewegt sich entlang der natürlichen
+   Lese-Achse (oben-unten), 16px bleiben auf jedem Monitor proportional sichtbar
+   (vs. Horizontal-Slide das auf wider Screens "verschwindet"), Content-Spalte bewegt
+   sich konsistent zur Spalten-Form, kein Drift-in-Leere-Gefühl.
+   translate3d + opacity = GPU-only, kein Text-Re-Rastern, smooth bei 30+ Trade-Cards.
+   Direction-aware: next = neue Page kommt von unten / alte Page geht nach oben weg,
+   prev = umgekehrt. Asymmetrische Distanzen (Entering 16px, Leaving 8px in Gegen-
+   richtung): die kommende Page bekommt die Hauptbewegung, die gehende "weicht subtler". */
 [data-layout="desktop"] .page.active-page {
   display: block;
-  animation: pageEnterDesktop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pageEnterDesktop 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
   z-index: 2;
 }
 [data-layout="desktop"] .page.active-page[data-direction="prev"]  { animation-name: pageEnterDesktopPrev; }
@@ -543,25 +553,25 @@ body::before {
 [data-layout="desktop"] .page.leaving {
   display: block;
   pointer-events: none;
-  animation: pageLeaveDesktop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pageLeaveDesktop 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
   z-index: 1;
 }
 [data-layout="desktop"] .page.leaving[data-direction="prev"] { animation-name: pageLeaveDesktopPrev; }
 @keyframes pageEnterDesktop {
-  from { opacity: 0; transform: translate3d(48px, 0, 0) scale(0.985); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes pageEnterDesktopPrev {
-  from { opacity: 0; transform: translate3d(-48px, 0, 0) scale(0.985); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  from { opacity: 0; transform: translate3d(0, -16px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes pageLeaveDesktop {
-  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to   { opacity: 0; transform: translate3d(-12px, 0, 0) scale(0.97); }
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to   { opacity: 0; transform: translate3d(0, -8px, 0); }
 }
 @keyframes pageLeaveDesktopPrev {
-  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to   { opacity: 0; transform: translate3d(12px, 0, 0) scale(0.97); }
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to   { opacity: 0; transform: translate3d(0, 8px, 0); }
 }
 /* Page-interne Scrollbar dezent (Mac-Style) */
 [data-layout="desktop"] .page::-webkit-scrollbar { width: 8px; }
