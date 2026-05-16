@@ -396,13 +396,23 @@ Frühere Intro-Phase (`showIntroScreen()` / `dismissIntroScreen()`, `<div class=
 - **Trade-Row Spalten-Alignment (Desktop):** vorher `grid-template-columns: 1fr auto auto` — PnL-Spalte schwamm je nach Ticker-Name. Jetzt `minmax(0, 1fr) 180px 96px` plus 16px column-gap. Zahlen stehen über mehrere Trades hinweg in derselben Pixel-Spalte, scanbar.
 - **Leg-Row-Werte (Desktop):** `.leg .row .v` bekommt `min-width: 90px` für visuelle Stabilität wenn Label-Längen unterschiedlich sind.
 
+**Dritter Polish-Pass (Mobile, gelandet)** — kleine Mobile-Verfeinerungen ohne UX-Logik anzufassen:
+
+- **Statusbar-Dots:** die `::before`-Unicode-`●`-Glyphen wurden durch echte gestylte 6px-CSS-Kreise mit weichen Halos (`box-shadow: 0 0 0 2px <farb-tint>`) ersetzt. Glyph-Größe war font-abhängig und nicht skalierbar; die neue Lösung ist visuell konsistent mit den `.ds-status-dot`-Indicators in der Desktop-Sidebar. State-Klassen (loading/ok/err/off) bleiben unverändert — nur das Pseudo-CSS dahinter ist anders.
+- **Page-Dots:** vorher 8×8px solide Kreise mit `transform: scale(1.3)` für active. Jetzt 6×6px (border-radius 3px) inactive, 14×6px Pill auf active, Farbwechsel von `var(--accent)` (im Midnight fast weiß) auf `var(--info)` (Blau) — klarere "Du bist hier"-Markierung. Width-Transition mit `cubic-bezier(0.4,0,0.2,1)` für sanfte Pill-Elongation.
+- **Card-Border-Radius 14→16px** für `.aggregate`, `.trade-card`, `.basket-card`, `.form-card`, `.empty`, `.empty-state`, `.portfolio-donut`. Konsistent mit dem Desktop-Bump. Marginal weicher, keine Auswirkung auf Funktionalität.
+- **Page-Title vertical breathing:** `.page-head` und `.page-title` haben jetzt `padding-bottom: 10px` statt 4px. Trennt den Title visuell klarer von der direkt folgenden Aggregate-Card.
+- **Toolbar Padding:** `.toolbar-wrap padding-bottom 4px → 8px`. Statusbar darunter klebt nicht mehr direkt unter den Buttons.
+
 **Was bewusst NICHT angefasst wurde** (würde Layout-Architektur tangieren oder ist ein Feature, kein Polish):
 - 220px Sidebar-Breite
 - 4-Page-Snap-Navigation
 - Sticky Page-Header beim Scrollen
 - Owl-Watermark-Lücke auf Desktop (deliberat per Design-Entscheidung, siehe oben)
 - CSS `zoom` für Font-Scale (funktional korrekt, nur stilistisch hackig)
-- Mobile-Layout (überhaupt)
+- Mobile Snap-Scroll-Mechanik (DNA des Mobile-Modus)
+- Mobile Form-Card-Inline-Expand (DNA)
+- 44px Touch-Target an Buttons (iOS-Standard)
 - Worker / Sync / Storage / Alarm-Logik
 - Sparklines, Heute-Delta, FX-Rate-Block (alles Feature-Erweiterungen)
 

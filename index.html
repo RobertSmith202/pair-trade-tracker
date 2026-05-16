@@ -16,7 +16,7 @@
 :root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #1f3a26; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #3a1f24; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
 :root[data-theme="midnight"] { color-scheme: dark; --bg: #07071a; --card: #11112a; --border: #232342; --text: #e8e8f5; --muted: #8e8eac; --pos: #6bc46e; --pos-bg: #143019; --pos-soft: #15301f; --neg: #ff6b7d; --neg-bg: #371218; --neg-soft: #3a1620; --accent: #d9d9ee; --warn: #ffc266; --info: #7fc0ee; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: calc(env(safe-area-inset-top) + 6px) 0 calc(env(safe-area-inset-bottom) + 50px) 0; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; overflow-x: hidden; }
-.aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 8px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 8px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .agg-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
 .agg-cell .value { font-size: 22px; font-weight: 700; line-height: 1.1; padding: 2px 6px; margin: -2px -6px; border-radius: 6px; transition: background-color 0.05s linear; }
 .agg-cell .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
@@ -27,17 +27,32 @@ button:active { transform: scale(0.98); }
 button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 button.danger { color: var(--neg); border-color: var(--neg-bg); }
 button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
-.toolbar-wrap { position: sticky; top: 0; z-index: 50; background: var(--bg); padding: 4px 14px 4px; }
+.toolbar-wrap { position: sticky; top: 0; z-index: 50; background: var(--bg); padding: 4px 14px 8px; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .toolbar button { flex: 1 1 auto; min-width: 0; }
 .toolbar .menu-btn { flex: 0 0 auto; padding: 8px 16px; min-height: 44px; min-width: 52px; font-size: 22px; line-height: 1; letter-spacing: 1px; }
-.statusbar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); padding: 4px 4px 8px; gap: 8px; flex-wrap: wrap; }
-.status.loading::before { content: "● "; color: #ff9800; animation: pulse 1s infinite; }
-.status.ok::before { content: "● "; color: var(--pos); }
-.status.err::before { content: "● "; color: var(--neg); }
-.status.off::before { content: "○ "; color: var(--muted); }
+.statusbar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); padding: 4px 4px 8px; gap: 10px; flex-wrap: wrap; }
+/* Status-Items mit echten CSS-Circles statt Unicode-"●"-Glyph davor.
+   Vorher: ::before { content: "● "; color: ... } — Glyph-Größe abhängig vom Font,
+   nicht konsistent skalierbar, und der "Ausgeschaltet"-Zustand war ein dünner Ring (○).
+   Jetzt: gestylte 6px-Kreise mit weichen Halos für aktive Stati, analog zu den
+   Status-Dots in der Desktop-Sidebar — visuell konsistent zwischen beiden Layouts. */
+.status { display: inline-flex; align-items: center; gap: 5px; }
+.status::before {
+  content: "";
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.status.loading::before { background: var(--warn); animation: pulse 1.2s infinite; }
+.status.ok::before  { background: var(--pos); box-shadow: 0 0 0 2px rgba(107,196,110,0.18); }
+.status.err::before { background: var(--neg); box-shadow: 0 0 0 2px rgba(255,107,125,0.18); }
+.status.off::before { background: var(--muted); opacity: 0.5; }
 @keyframes pulse { 50% { opacity: 0.3; } }
-.form-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 0 14px 14px; display: none; }
+.form-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 0 14px 14px; display: none; }
 .form-card.open { display: block; }
 .form-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
 .form-card .form-help { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 8px; margin-bottom: 12px; line-height: 1.4; }
@@ -69,9 +84,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .pages-container { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; width: 100%; scrollbar-width: none; align-items: flex-start; }
 .pages-container::-webkit-scrollbar { display: none; }
 .page { flex: 0 0 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; padding: 0 14px; }
-.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px 4px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px 10px; }
 .page-head .page-title { padding: 0; }
-.page-title { font-size: 30px; line-height: 1.05; font-weight: 800; color: var(--text); padding: 14px 2px 4px; letter-spacing: -0.5px; min-width: 0; flex: 1; }
+.page-title { font-size: 30px; line-height: 1.05; font-weight: 800; color: var(--text); padding: 14px 2px 10px; letter-spacing: -0.5px; min-width: 0; flex: 1; }
 .view-toggle { display: inline-flex; gap: 3px; padding: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 11px; flex-shrink: 0; align-self: center; }
 .vt-btn { padding: 10px 16px; min-height: 0; min-width: 0; font-size: 17px; line-height: 1; background: transparent; border: none; color: var(--muted); border-radius: 8px; cursor: pointer; font-weight: 600; touch-action: manipulation; }
 .vt-btn:active { transform: scale(0.95); }
@@ -96,11 +111,21 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .trade-row-actions button { padding: 6px 9px; min-height: 0; font-size: 11px; border-radius: 6px; }
 .trade-row.tappable { cursor: pointer; user-select: none; }
 .trade-row.tappable:hover .trade-row-name { opacity: 0.85; }
-.page-dots { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; padding: 12px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(to top, var(--bg) 60%, transparent); z-index: 40; pointer-events: none; }
-.page-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); cursor: pointer; transition: background-color 0.15s, transform 0.15s; pointer-events: auto; }
-.page-dot.active { background: var(--accent); transform: scale(1.3); }
+.page-dots { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 12px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(to top, var(--bg) 60%, transparent); z-index: 40; pointer-events: none; }
+/* iOS-modern: inaktive Dots 6×6px, aktive Page als Pill 14×6px in --info statt --accent.
+   Vorher 8×8 + scale(1.3) wirkte etwas klotzig; die Pill-Form gibt eine klarere visuelle
+   "Du bist hier"-Markierung. */
+.page-dot {
+  width: 6px; height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  cursor: pointer;
+  transition: background-color 0.18s, width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+}
+.page-dot.active { background: var(--info); width: 14px; }
 
-.trade-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.trade-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
 .trade-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .trade-name { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
 .trade-actions { display: flex; gap: 6px; flex-shrink: 0; }
@@ -138,9 +163,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 @keyframes flashDown { 0% { background-color: rgba(176, 0, 32, 0.40); } 25% { background-color: rgba(176, 0, 32, 0.35); } 100% { background-color: transparent; } }
 .flash-up { animation: flashUp 900ms ease-out; }
 .flash-down { animation: flashDown 900ms ease-out; }
-.empty { background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 50px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+.empty { background: var(--card); border: 1px dashed var(--border); border-radius: 16px; padding: 50px 20px; text-align: center; color: var(--muted); font-size: 14px; }
 /* Erweiterter Empty-State mit Owl-Symbol, Titel, Beschreibung, Primary-CTA */
-.empty-state { background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 44px 22px 36px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.empty-state { background: var(--card); border: 1px dashed var(--border); border-radius: 16px; padding: 44px 22px 36px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .empty-state-icon { width: 64px; height: 64px; opacity: 0.4; flex-shrink: 0; }
 .empty-state-icon svg { width: 100%; height: 100%; color: var(--muted); }
 .empty-state-title { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; }
@@ -186,7 +211,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .tabular { font-variant-numeric: tabular-nums; }
 
 .total-breakdown { display: flex; flex-direction: column; gap: 12px; padding-bottom: 14px; }
-.portfolio-donut { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+.portfolio-donut { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
 .portfolio-donut-title { font-size: 11px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
 .donut-grid { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
 .donut-svg { width: 130px; height: 130px; flex-shrink: 0; }
@@ -202,7 +227,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .donut-legend-amount { grid-column: 2 / -1; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: -2px; }
 .donut-help { font-size: 11px; color: var(--muted); margin-top: 12px; line-height: 1.4; }
 /* Basket-Karten auf Long/Short-Page */
-.basket-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; cursor: pointer; user-select: none; position: relative; transition: transform 0.05s, background-color 0.1s; }
+.basket-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; cursor: pointer; user-select: none; position: relative; transition: transform 0.05s, background-color 0.1s; }
 .basket-card:active { transform: scale(0.99); }
 .basket-card.long  { border-left: 4px solid var(--pos); }
 .basket-card.short { border-left: 4px solid var(--neg); }
