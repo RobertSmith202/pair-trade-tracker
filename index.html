@@ -13,8 +13,8 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 :root { color-scheme: light; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
-:root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #102315; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #220c10; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
-:root[data-theme="midnight"] { color-scheme: dark; --bg: #07071a; --card: #11112a; --border: #232342; --text: #e8e8f5; --muted: #8e8eac; --pos: #6bc46e; --pos-bg: #143019; --pos-soft: #0c1d12; --neg: #ff6b7d; --neg-bg: #371218; --neg-soft: #20090e; --accent: #d9d9ee; --warn: #ffc266; --info: #7fc0ee; }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #1f3a26; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #3a1f24; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
+:root[data-theme="midnight"] { color-scheme: dark; --bg: #07071a; --card: #11112a; --border: #232342; --text: #e8e8f5; --muted: #8e8eac; --pos: #6bc46e; --pos-bg: #143019; --pos-soft: #15301f; --neg: #ff6b7d; --neg-bg: #371218; --neg-soft: #3a1620; --accent: #d9d9ee; --warn: #ffc266; --info: #7fc0ee; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: calc(env(safe-area-inset-top) + 6px) 0 calc(env(safe-area-inset-bottom) + 50px) 0; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; overflow-x: hidden; }
 .aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 8px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .agg-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
@@ -367,12 +367,20 @@ body::before {
   box-shadow: 1px 0 0 var(--border);
 }
 [data-layout="desktop"] body { padding-left: 220px; max-width: none; overflow: hidden; padding-top: 0; padding-bottom: 0; }
-/* Mobile-Toolbar und Ebene-2-Tabs auf Ebene-3-Desktop ausblenden — Sidebar übernimmt */
+/* Mobile-Toolbar auf Desktop ausblenden — Sidebar übernimmt deren Funktion */
 [data-layout="desktop"] .toolbar-wrap { display: none; }
-[data-layout="desktop"] .desktop-tabs { display: none; }
-/* Brand-Block ganz oben */
-.ds-brand { display: flex; align-items: center; gap: 10px; padding: 2px 4px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
-.ds-brand-mark { font-size: 28px; line-height: 1; color: var(--info); flex-shrink: 0; }
+/* Brand-Block ganz oben — markanter, mit eigenem Card-Background hinter dem Logo
+   damit's nach Brand aussieht und nicht nach Sidebar-Item. */
+.ds-brand { display: flex; align-items: center; gap: 11px; padding: 4px 4px 16px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.ds-brand-mark {
+  font-size: 22px; line-height: 1; color: var(--info);
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
 .ds-brand-title { font-size: 14px; font-weight: 700; letter-spacing: 0.1px; line-height: 1.2; }
 /* Vertikale Navigation — aktive Page mit linkem Akzent-Balken via position:relative + ::before,
    damit der Aktiv-Zustand auf Blick erkennbar ist (vorher nur subtile Border, kaum sichtbar). */
@@ -451,13 +459,7 @@ body::before {
 .ds-status-value.off  { color: var(--muted); }
 .ds-footer { padding-top: 4px; }
 
-/* === Desktop-Tabs (Ebene 2) ============================================== */
-/* Tab-Bar wird nur im Desktop-Layout sichtbar; ersetzt die Snap-Page-Dots */
-.desktop-tabs { display: none; gap: 4px; padding: 8px 0 6px; border-top: 1px solid var(--border); margin-top: 6px; }
-.desktop-tabs .dt-btn { flex: 0 0 auto; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 9px 16px; min-height: 0; color: var(--muted); font-weight: 600; font-size: 14px; cursor: pointer; transition: background-color 0.12s, color 0.12s, border-color 0.12s; }
-.desktop-tabs .dt-btn:hover { color: var(--text); background: var(--card); }
-.desktop-tabs .dt-btn.active { background: var(--card); border-color: var(--border); color: var(--text); }
-[data-layout="desktop"] .desktop-tabs { display: flex; }
+/* Page-Dots nur im Mobile-Modus — auf Desktop übernimmt die Sidebar-Nav */
 [data-layout="desktop"] .page-dots { display: none; }
 /* Pages-Container: fixed-positioned auf Desktop, füllt verbleibenden Viewport-Bereich.
    Jede Page wird ein eigener Scroll-Container — Body-Höhe ändert sich nie → kein Scroll-Jitter beim Page-Wechsel. */
@@ -480,10 +482,13 @@ body::before {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-/* Inhalt einheitlich links-aligned, ~1100px Hard-Cap — Mittelweg zwischen schmaler 720-Spalte
-   und ausuferndem 1400. Reicht für komfortable Datenlesedichte ohne dass Pct ans rechte Ende fliegt. */
+/* Inhalt einheitlich links-aligned, 1280px Hard-Cap.
+   War vorher 1100 — auf 1440px+ Displays blieben dadurch ~140-700px tote Fläche rechts.
+   1280 gibt der Lesespalte mehr Luft ohne die Skim-Distanz für Zahlen zu sprengen
+   (Pct bleibt im Auge). Auf 1440px wird die Spalte effektiv vom verfügbaren
+   Viewport-Minus-Sidebar (1220px) begrenzt; auf 1920px gewinnt sie 180px. */
 [data-layout="desktop"] .page > * {
-  max-width: min(1100px, 100%) !important;
+  max-width: min(1280px, 100%) !important;
   margin-left: 0 !important;
   margin-right: auto !important;
   width: 100%;
@@ -533,9 +538,11 @@ body::before {
 [data-layout="desktop"] .page::-webkit-scrollbar-track { background: transparent; }
 
 /* === Desktop-Layout (Ebene 1: sanfter Polish) ============================== */
-/* WICHTIG: Body ist im Mobile-Modus hart auf max-width: 640px gekappt (siehe oben).
-   Im Desktop-Modus geben wir das frei, sonst können keine inner Constraints jemals greifen. */
-[data-layout="desktop"] body { max-width: 1280px; }
+/* Body-Sizing für Desktop ist oben in der Sidebar-Section (Zeile ~369) gesetzt:
+   padding-left: 220px; max-width: none; overflow: hidden. Die frühere konkurrierende
+   Regel `body { max-width: 1280px }` hier war ein Überbleibsel aus der Layout-Iteration
+   und hat die obere überschrieben — ergab im Effekt einen zentrierten 1280px-Body
+   statt full-bleed mit Sidebar. Entfernt. */
 [data-layout="desktop"] .toolbar-wrap { max-width: none; }
 [data-layout="desktop"] .pages-container { max-width: none; }
 [data-layout="desktop"] .page-dots { max-width: 1280px; left: 50%; right: auto; transform: translateX(-50%); }
@@ -562,10 +569,11 @@ body::before {
   background: rgba(0,0,0,0.45);
   z-index: 250; pointer-events: none;
 }
-/* Basket-Modal: bleibt Fullscreen-Overlay, aber Inhalt mittig auf 1100px */
+/* Basket-Modal: bleibt Fullscreen-Overlay, aber Inhalt mittig auf 1280px
+   (angeglichen an .page > * Cap nach dem zweiten Polish-Pass) */
 [data-layout="desktop"] .basket-modal-head,
 [data-layout="desktop"] .basket-modal-body {
-  max-width: 1100px; margin-left: auto; margin-right: auto; width: 100%;
+  max-width: 1280px; margin-left: auto; margin-right: auto; width: 100%;
 }
 /* Hover-Effekte aktivieren — auf Touch-Devices kontraproduktiv, daher nur Desktop.
    Subtile Border-Akzent-Färbung (var(--info) auf ~30% Opacity) gibt visuelles Affordance
@@ -593,6 +601,25 @@ body::before {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
+/* Trade-Row im Desktop-Mode: fixe Breiten für PnL- und Action-Spalten damit Zahlen
+   über mehrere Trades in derselben Pixel-Spalte stehen. Vorher `1fr auto auto`
+   → PnL-Spalte schwamm abhängig vom Ticker-Namen, nicht scanbar. */
+[data-layout="desktop"] .trade-row {
+  grid-template-columns: minmax(0, 1fr) 180px 96px;
+  column-gap: 16px;
+}
+[data-layout="desktop"] .trade-row-nums {
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+[data-layout="desktop"] .trade-row-actions {
+  justify-content: flex-end;
+}
+/* Leg-Detail-Zeilen (innerhalb der ausgeklappten Card im Pair-Trade): Label links, Wert
+   rechtsbündig in fester Position — ohne fixe min-width „springt" der Wert je nach
+   Label-Länge, was bei mehreren Tranchen unruhig aussieht. */
+[data-layout="desktop"] .leg .row { font-variant-numeric: tabular-nums; }
+[data-layout="desktop"] .leg .row .v { min-width: 90px; display: inline-block; }
 
 /* === Desktop-Header-Meta (Floating Live-Info top-right) ==================== */
 /* Permanent sichtbarer Block oben rechts mit Markt-Offen-Indikator + Uhrzeit.
@@ -830,12 +857,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="status" id="status" data-i18n="status_ready">Bereit</div>
     <div class="status" id="auto-status">⏱ …</div>
     <div class="status off" id="sync-status" data-i18n="status_sync_off">Sync aus</div>
-  </div>
-  <div class="desktop-tabs" id="desktop-tabs" role="tablist">
-    <button class="dt-btn" data-tab="pair"  role="tab" data-i18n="page_pairs">Paare</button>
-    <button class="dt-btn" data-tab="long"  role="tab" data-i18n="page_longs">Longs</button>
-    <button class="dt-btn" data-tab="short" role="tab" data-i18n="page_shorts">Shorts</button>
-    <button class="dt-btn" data-tab="total" role="tab" data-i18n="page_total">Gesamt</button>
   </div>
 </div>
 
@@ -3947,9 +3968,6 @@ function activateDesktopPage(pageKey, direction = "next") {
   void incoming.offsetWidth;
   incoming.classList.add("active-page");
 
-  document.querySelectorAll(".desktop-tabs .dt-btn").forEach(b => {
-    b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
-  });
   document.querySelectorAll(".desktop-sidebar .ds-nav-btn").forEach(b => {
     b.classList.toggle("active", b.getAttribute("data-tab") === pageKey);
   });
@@ -4101,14 +4119,6 @@ document.querySelectorAll(".scale-card[data-scale-choice]").forEach(card => {
   });
 });
 
-// Desktop-Tab-Click → Page-Switch (verwendet existierende scrollToPage-Branching-Logik)
-document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const tp = btn.getAttribute("data-tab");
-    if (!PAGES.includes(tp)) return;
-    scrollToPage(tp, false);
-  });
-});
 // === Ebene 3: Pfeiltasten-Navigation auf Desktop ==============================
 // Linkspfeil → Page zurück, Rechtspfeil → Page weiter.
 // Wheel-Scrolling im Desktop-Layout bleibt komplett der normalen Page-internen Scroll-Funktion

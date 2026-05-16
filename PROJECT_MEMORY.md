@@ -384,12 +384,25 @@ Frühere Intro-Phase (`showIntroScreen()` / `dismissIntroScreen()`, `<div class=
 - **Tabular-Nums hart erzwungen** auf allen Zahlen-Spalten unter Desktop (`.trade-row-pnl`, `.trade-row-pct`, `.trade-perf .pnl-abs/.pnl-pct`, `.agg-cell .value`, `.leg .v`, `.ds-status-value`) — Zahlen stehen über Cards hinweg in derselben Pixel-Spalte, scanbar.
 - **Brand-Mark** 26 → 28px, Brand-Title 13 → 14px, Layout etwas atmender.
 
-**Was bewusst NICHT angefasst wurde** (würde Layout-Architektur tangieren, gehört nicht in einen Polish-Pass):
+**Zweiter Polish-Pass (gelandet)** — reine Kosmetik + Bugs, keine neuen Features:
+
+- **CSS-Konflikt behoben:** zwei konkurrierende `[data-layout="desktop"] body { max-width: ... }`-Regeln (eine `none`, eine `1280px`) — die zweite hatte die erste überschrieben und ergab effektiv einen zentrierten 1280px-Body statt full-bleed mit Sidebar. Zweite Regel entfernt.
+- **Tab-Bar Ebene 2 entfernt:** `<div class="desktop-tabs">` HTML-Block, `.desktop-tabs`/`.dt-btn`-CSS, zugehörige JS-Click-Handler und Active-State-Sync — alles raus. Sidebar (Ebene 3) ist der einzige Page-Switch-Mechanismus auf Desktop. Mobile bleibt Snap-Scroll. Die drei nebeneinander koexistierenden Layout-Ebenen aus der iterativen Entwicklung sind damit auf zwei reduziert (Mobile + Sidebar-Desktop).
+- **Midnight + Dark Theme Soft-Backgrounds aufgehellt:** `--pos-soft` von `#0c1d12` → `#15301f` (Midnight) bzw. `#102315` → `#1f3a26` (Dark); `--neg-soft` analog. Vorher fast identisch zur Card-Background-Luminanz, der `.leg.long`/`.leg.short`-Färbung war praktisch wirkungslos.
+- **Brand-Block aufgewertet:** Logo `⌬` jetzt in einer 36×36px-Box mit eigenem Background + Border (statt nackt). Wirkt mehr nach Brand, weniger nach noch-ein-Sidebar-Item.
+- **Content-Cap 1100px → 1280px:** `.page > * max-width` plus Basket-Modal-Inhalt. Gewinnt 180px Lesespalte auf 1440px+ Displays. Auf 1440 mit 220px Sidebar bleibt der effektive Cap durch den Viewport gebunden (1220), auf 1920 wirkt's voll.
+- **Trade-Row Spalten-Alignment (Desktop):** vorher `grid-template-columns: 1fr auto auto` — PnL-Spalte schwamm je nach Ticker-Name. Jetzt `minmax(0, 1fr) 180px 96px` plus 16px column-gap. Zahlen stehen über mehrere Trades hinweg in derselben Pixel-Spalte, scanbar.
+- **Leg-Row-Werte (Desktop):** `.leg .row .v` bekommt `min-width: 90px` für visuelle Stabilität wenn Label-Längen unterschiedlich sind.
+
+**Was bewusst NICHT angefasst wurde** (würde Layout-Architektur tangieren oder ist ein Feature, kein Polish):
 - 220px Sidebar-Breite
-- 1100px Content-Cap auf `.page > *`
 - 4-Page-Snap-Navigation
+- Sticky Page-Header beim Scrollen
+- Owl-Watermark-Lücke auf Desktop (deliberat per Design-Entscheidung, siehe oben)
+- CSS `zoom` für Font-Scale (funktional korrekt, nur stilistisch hackig)
 - Mobile-Layout (überhaupt)
 - Worker / Sync / Storage / Alarm-Logik
+- Sparklines, Heute-Delta, FX-Rate-Block (alles Feature-Erweiterungen)
 
 ### Keyboard-Shortcut-Overlay
 
@@ -717,7 +730,7 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 
 22. **Page-Wechsel-Animation und Render-Pfad sind unterschiedlich pro Layout-Modus.** Mobile nutzt `scrollToPage` mit `container.scrollTo({left: idx*w})` für horizontalen Snap-Scroll. Desktop nutzt `activateDesktopPage(pageKey, direction)` mit Class-Toggle `.active-page` + `.leaving`. Beide Pfade dispatchen vom selben `scrollToPage(pageKey)`-Entry-Point auf Basis des `data-layout`-Attributes. Wer einen Pfad modifiziert, muss prüfen ob's auch im anderen Modus noch funktioniert.
 
-23. **Tab-Bar (Ebene 2) existiert noch im DOM aber wird im Desktop-Modus CSS-versteckt** (`[data-layout="desktop"] .desktop-tabs { display: none }`). Sie war eine Zwischenstufe vor der Sidebar (Ebene 3). Funktioniert aber bei vollständigen Mobile-Layout. Wenn man Ebene 2 wiederbeleben will: Sidebar verstecken, Tab-Bar zeigen, basket-Buttons in Toolbar zurückholen. Architektonisch sind alle drei Ebenen weiterhin nebeneinander präsent.
+23. ~~Tab-Bar (Ebene 2) existiert noch im DOM~~ — **im zweiten Polish-Pass entfernt.** Der HTML-Block, das CSS und die zugehörigen Click-Handler sind raus. Sidebar (Ebene 3) ist der einzige Desktop-Nav-Mechanismus. Wenn jemand die Tab-Bar wiederbeleben will, muss er sie aus der Git-History rekonstruieren.
 
 24. **CSS `zoom` ist non-standard aber breit unterstützt.** Chrome/Safari schon ewig, Firefox seit 126 (Mai 2024). Auf älteren Firefox-Versionen würde der Font-Scale-Setting visuell nichts tun. Robert verwendet Safari/Chrome — kein Problem in der Praxis.
 
@@ -773,8 +786,8 @@ Du bist jetzt informiert genug um Änderungen vorzunehmen. Empfohlenes Vorgehen:
 | Sidebar | `.desktop-sidebar` | versteckt (`display: none`) | sichtbar, fixed left, 220px |
 | Toolbar | `.toolbar-wrap` | sticky top | versteckt (`display: none`) |
 | Forms | `.form-card.open` | Inline-Expand unter Toolbar | Floating-Dialog mit Backdrop via `body:has(.form-card.open)::before` |
-| Content-Breite | `body { max-width: 640px; margin: 0 auto }` | aktiv | overridden zu `max-width: none; padding-left: 220px` |
-| Page-Child-Spalte | `.page > * { max-width: ... }` | nicht beschränkt | `max-width: min(1100px, 100%); margin-left: 0` (left-aligned) |
+| Content-Breite | `body { max-width: 640px; margin: 0 auto }` | aktiv | overridden zu `max-width: none; padding-left: 220px` (eine konkurrierende `body { max-width: 1280px }`-Regel wurde im 2. Polish-Pass entfernt) |
+| Page-Child-Spalte | `.page > * { max-width: ... }` | nicht beschränkt | `max-width: min(1280px, 100%); margin-left: 0` (left-aligned, war vorher 1100) |
 | Owl-Watermark | `body::before` mit Mask-SVG | sichtbar mit 5% Opacity | versteckt (`display: none !important`) |
 | Schriftgröße | `applyFontScale(v)` | wird in Mobile auf leer gesetzt (kein Zoom) | `document.documentElement.style.zoom = v/100` |
 | Boot ohne Lock | `appUnlocked = true` direkt | App startet sofort | App startet sofort |
