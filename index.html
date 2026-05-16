@@ -139,6 +139,15 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .flash-up { animation: flashUp 900ms ease-out; }
 .flash-down { animation: flashDown 900ms ease-out; }
 .empty { background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 50px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+/* Erweiterter Empty-State mit Owl-Symbol, Titel, Beschreibung, Primary-CTA */
+.empty-state { background: var(--card); border: 1px dashed var(--border); border-radius: 14px; padding: 44px 22px 36px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.empty-state-icon { width: 64px; height: 64px; opacity: 0.4; flex-shrink: 0; }
+.empty-state-icon svg { width: 100%; height: 100%; color: var(--muted); }
+.empty-state-title { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; }
+.empty-state-desc { font-size: 13px; color: var(--muted); max-width: 360px; line-height: 1.55; }
+.empty-state-desc kbd { font-size: 11px; }
+.empty-state-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.empty-state-actions .empty-state-cta { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; padding: 11px 18px; }
 .warn-box { font-size: 11px; color: var(--warn); margin-top: 8px; padding: 6px 10px; background: rgba(184,133,0,0.08); border-radius: 6px; }
 .info-box { font-size: 12px; color: var(--info); padding: 8px 12px; background: rgba(21,101,192,0.08); border-radius: 8px; margin-bottom: 10px; line-height: 1.45; }
 .tranche-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: rgba(21,101,192,0.18); color: var(--info); margin-left: 8px; vertical-align: middle; letter-spacing: 0.3px; }
@@ -306,7 +315,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   background-color: var(--text);
   pointer-events: none;
 }
-.lock-screen::before {
+.lock-screen::before, .intro-screen::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -320,8 +329,8 @@ body::before {
   opacity: 0.05;
   z-index: -1;
 }
-/* Owl-Mask-Styles auf beide ::before-Elemente anwenden */
-.lock-screen::before, body::before {
+/* Owl-Mask-Styles auf alle drei ::before-Elemente anwenden (Lock, Intro, Body-App) */
+.lock-screen::before, body::before, .intro-screen::before {
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 320'><path d='M 55 80 L 38 25 L 88 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 225 80 L 242 25 L 192 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 60 95 Q 75 70 100 85 Q 125 100 140 95 Q 155 100 180 85 Q 205 70 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round' stroke-linecap='round'/><path d='M 60 95 Q 45 120 50 145 Q 60 175 90 175 L 190 175 Q 220 175 230 145 Q 235 120 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><circle cx='95' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='95' cy='130' r='10' fill='white'/><circle cx='185' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='185' cy='130' r='10' fill='white'/><path d='M 130 155 L 140 172 L 150 155 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 50 175 Q 35 220 60 260 Q 90 285 140 285 Q 190 285 220 260 Q 245 220 230 175' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><path d='M 95 178 Q 105 235 140 255 Q 175 235 185 178' stroke='white' stroke-width='3.5' fill='none'/><line x1='115' y1='285' x2='115' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='130' y1='287' x2='130' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='150' y1='287' x2='150' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='165' y1='285' x2='165' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='225' y2='303' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='30' y2='293' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='30' y1='293' x2='14' y2='287' stroke='white' stroke-width='3' stroke-linecap='round'/><line x1='225' y1='303' x2='250' y2='313' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='250' y1='313' x2='266' y2='317' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>") center 52% / min(125vmin, 820px) auto no-repeat;
   mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 320'><path d='M 55 80 L 38 25 L 88 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 225 80 L 242 25 L 192 65 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 60 95 Q 75 70 100 85 Q 125 100 140 95 Q 155 100 180 85 Q 205 70 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round' stroke-linecap='round'/><path d='M 60 95 Q 45 120 50 145 Q 60 175 90 175 L 190 175 Q 220 175 230 145 Q 235 120 220 95' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><circle cx='95' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='95' cy='130' r='10' fill='white'/><circle cx='185' cy='130' r='24' stroke='white' stroke-width='5' fill='none'/><circle cx='185' cy='130' r='10' fill='white'/><path d='M 130 155 L 140 172 L 150 155 Z' stroke='white' stroke-width='3' fill='white' stroke-linejoin='round'/><path d='M 50 175 Q 35 220 60 260 Q 90 285 140 285 Q 190 285 220 260 Q 245 220 230 175' stroke='white' stroke-width='4' fill='none' stroke-linejoin='round'/><path d='M 95 178 Q 105 235 140 255 Q 175 235 185 178' stroke='white' stroke-width='3.5' fill='none'/><line x1='115' y1='285' x2='115' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='130' y1='287' x2='130' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='150' y1='287' x2='150' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='165' y1='285' x2='165' y2='298' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='225' y2='303' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='55' y1='303' x2='30' y2='293' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='30' y1='293' x2='14' y2='287' stroke='white' stroke-width='3' stroke-linecap='round'/><line x1='225' y1='303' x2='250' y2='313' stroke='white' stroke-width='3.5' stroke-linecap='round'/><line x1='250' y1='313' x2='266' y2='317' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>") center 52% / min(125vmin, 820px) auto no-repeat;
   background-color: var(--text);
@@ -529,6 +538,50 @@ body::before {
 }
 .lock-loader-overlay.open { display: flex; }
 .lock-loader-overlay.fade-out { opacity: 0; }
+
+/* === Intro/Welcome-Screen (ohne Lock-Sperre) =============================== */
+.intro-screen {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  z-index: 950;  /* unter dem Pentagon-Loader (1100), aber über Lock (1000) wäre kollidiert.
+                    Da hier KEIN Lock parallel offen ist, ist 950 unbedenklich.
+                    Loader bleibt höchste Priorität. */
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: calc(env(safe-area-inset-top) + 50px) 20px calc(env(safe-area-inset-bottom) + 60px);
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.35s cubic-bezier(0.32, 0.72, 0, 1), transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.intro-screen.open { display: flex; }
+.intro-screen.dismissing { opacity: 0; transform: translateY(-30px); pointer-events: none; }
+.intro-content { position: relative; z-index: 1; text-align: center; margin-top: clamp(40px, 12vh, 120px); }
+.intro-app-title { font-size: clamp(28px, 5vw, 42px); font-weight: 800; letter-spacing: -0.5px; color: var(--text); margin-bottom: 10px; line-height: 1.1; }
+.intro-tagline { font-size: 13px; color: var(--muted); font-weight: 500; letter-spacing: 0.3px; }
+.intro-cta { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; max-width: 280px; }
+.intro-hint { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; animation: introHintPulse 2.4s ease-in-out infinite; }
+@keyframes introHintPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+.intro-progress-bar { width: 100%; height: 2px; background: rgba(127,127,127,0.18); border-radius: 1px; overflow: hidden; }
+.intro-progress-fill { height: 100%; width: 0%; background: var(--text); border-radius: 1px; transition: width 0.1s linear; }
+/* Im Desktop-Modus: Intro-Screen sieht weniger „Tap"-mäßig aus, mehr „Klick / Enter" */
+[data-layout="desktop"] .intro-screen { cursor: default; }
+[data-layout="desktop"] .intro-cta { max-width: 360px; }
+
+/* === Keyboard-Shortcut-Overlay ============================================= */
+.shortcut-modal { max-width: 580px; }
+.shortcut-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.shortcut-head h1 { margin: 0; font-size: 19px; }
+.shortcut-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 540px) { .shortcut-grid { grid-template-columns: 1fr 1fr; } }
+.shortcut-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); font-weight: 700; margin: 0 0 10px; }
+.shortcut-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+.shortcut-keys { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; min-width: 90px; }
+.shortcut-desc { font-size: 13px; color: var(--text); flex: 1; min-width: 0; }
+kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 600; color: var(--text); box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+.shortcut-note { margin-top: 14px; padding: 10px 12px; background: rgba(127,127,127,0.08); border-radius: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.shortcut-note kbd { font-size: 10px; min-width: 18px; height: 18px; padding: 0 4px; }
 .lock-loader-svg { width: 140px; height: 140px; }
 /* Hexagon bleibt statisch — die "Schlange" wandert via stroke-dasharray drumherum.
    So bleibt die Hexagon-Form jederzeit klar erkennbar. */
@@ -633,6 +686,19 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <div class="lock-error" id="lock-recovery-error" style="display:none"></div>
       <button id="lock-recovery-submit" data-i18n="lock_forgot_submit">Sperre entfernen</button>
     </div>
+  </div>
+</div>
+
+<!-- Intro/Welcome-Screen: wird beim Boot gezeigt wenn keine Lock-Sperre aktiv ist.
+     Mit Owl-Wasserzeichen + App-Titel + Tap-to-Enter-Hinweis. Auto-Progress nach 2.5s. -->
+<div class="intro-screen" id="intro-screen" aria-hidden="true">
+  <div class="intro-content">
+    <div class="intro-app-title" data-i18n="app_title">Pair Trade Tracker</div>
+    <div class="intro-tagline" data-i18n="intro_tagline">Live-Performance · Tranchen · Alarme</div>
+  </div>
+  <div class="intro-cta">
+    <div class="intro-hint" id="intro-hint" data-i18n="intro_hint_mobile">Tippen zum Starten</div>
+    <div class="intro-progress-bar"><div class="intro-progress-fill" id="intro-progress-fill"></div></div>
   </div>
 </div>
 
@@ -1061,10 +1127,48 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   </div>
 </div>
 
+<!-- Keyboard-Shortcut-Overlay: öffnet sich mit "?" oder Cmd+/ — zeigt alle Tasten-Kürzel -->
+<div class="modal-overlay" id="shortcut-overlay">
+  <div class="modal shortcut-modal">
+    <div class="shortcut-head">
+      <h1 data-i18n="shortcut_title">Tastatur-Kürzel</h1>
+      <button class="icon" id="shortcut-close" aria-label="close">×</button>
+    </div>
+    <div class="shortcut-grid">
+      <section class="shortcut-section">
+        <h4 data-i18n="shortcut_nav_section">Navigation</h4>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>←</kbd><kbd>→</kbd></span><span class="shortcut-desc" data-i18n="shortcut_arrows">Page zurück / weiter</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>1</kbd></span><span class="shortcut-desc" data-i18n="page_pairs">Paare</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd></span><span class="shortcut-desc" data-i18n="page_longs">Longs</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>3</kbd></span><span class="shortcut-desc" data-i18n="page_shorts">Shorts</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>4</kbd></span><span class="shortcut-desc" data-i18n="page_total">Gesamt</span></div>
+      </section>
+      <section class="shortcut-section">
+        <h4 data-i18n="shortcut_general_section">Allgemein</h4>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>?</kbd></span><span class="shortcut-desc" data-i18n="shortcut_help">Diese Hilfe öffnen / schließen</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>Esc</kbd></span><span class="shortcut-desc" data-i18n="shortcut_esc">Modal / Form schließen</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>Enter</kbd></span><span class="shortcut-desc" data-i18n="shortcut_enter">Intro-Screen überspringen</span></div>
+      </section>
+    </div>
+    <div class="shortcut-note" data-i18n="shortcut_note">Auf Windows/Linux: <kbd>Ctrl</kbd> statt <kbd>⌘</kbd>. Pfeiltasten nur im Desktop-Layout aktiv.</div>
+  </div>
+</div>
+
 <script>
 const STRINGS = {
   de: {
     html_lang: "de", app_title: "Pair Trade Tracker",
+    intro_tagline: "Live-Performance · Tranchen · Alarme",
+    intro_hint_mobile: "Tippen zum Starten",
+    intro_hint_desktop: "Klicken oder Enter drücken",
+    shortcut_title: "Tastatur-Kürzel",
+    shortcut_nav_section: "Navigation",
+    shortcut_general_section: "Allgemein",
+    shortcut_arrows: "Page zurück / weiter",
+    shortcut_help: "Diese Hilfe öffnen / schließen",
+    shortcut_esc: "Modal / Form schließen",
+    shortcut_enter: "Intro-Screen überspringen",
+    shortcut_note: "Auf Windows/Linux: <kbd>Ctrl</kbd> statt <kbd>⌘</kbd>. Pfeiltasten nur im Desktop-Layout aktiv.",
     agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
     agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "Trade", agg_trade_plural: "Trades",
@@ -1211,6 +1315,17 @@ const STRINGS = {
     err_no_ticker: "Kein Ticker", err_no_data: "Keine Daten", err_no_price_feed: "Kein Preis im Feed",
     err_no_worker_url: "Keine Worker-URL (⋯ → Einstellungen)",
     empty_no_pairs: "Noch keine Pair-Trades.", empty_no_longs: "Noch keine Long-Trades.", empty_no_shorts: "Noch keine Short-Trades.",
+    empty_state_pair_title: "Noch keine Pair-Trades",
+    empty_state_pair_desc: "Lege dein erstes Long/Short-Paar an — Aktien gleichzeitig kaufen UND leerverkaufen, Performance wird als Spread getrackt.",
+    empty_state_long_title: "Noch keine Long-Trades",
+    empty_state_long_desc: "Tracke deine Long-Positionen einzeln oder in <strong>Körben</strong> für Strategie-Gruppen. Alarme via Telegram bei Verlust- oder Gewinn-Schwellen.",
+    empty_state_short_title: "Noch keine Short-Trades",
+    empty_state_short_desc: "Short-Positionen mit Performance, Squeeze-Risk-Monitoring (für US-Werte) und Alarmen. Gruppiere thematisch in Körben.",
+    empty_state_total_title: "Noch keine Trades",
+    empty_state_total_desc: "Wechsle auf eine der Pages (Paare, Longs, Shorts) und lege deinen ersten Trade an. Oder drücke <kbd>?</kbd> für alle Shortcuts.",
+    empty_state_cta_pair: "+ Ersten Pair-Trade anlegen",
+    empty_state_cta_long: "+ Ersten Long-Trade anlegen",
+    empty_state_cta_short: "+ Ersten Short-Trade anlegen",
     page_pairs: "Paare", page_longs: "Longs", page_shorts: "Shorts", page_total: "Gesamt",
     tranche_badge: "× {n}", tranche_panel_title: "Tranchen", tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
     tranche_delete_confirm: "Diese Tranche löschen? Es wird nur diese Tranche entfernt, der Rest des Trades bleibt bestehen.",
@@ -1221,6 +1336,17 @@ const STRINGS = {
   },
   en: {
     html_lang: "en", app_title: "Pair Trade Tracker",
+    intro_tagline: "Live performance · Tranches · Alerts",
+    intro_hint_mobile: "Tap to start",
+    intro_hint_desktop: "Click or press Enter",
+    shortcut_title: "Keyboard shortcuts",
+    shortcut_nav_section: "Navigation",
+    shortcut_general_section: "General",
+    shortcut_arrows: "Previous / next page",
+    shortcut_help: "Open / close this help",
+    shortcut_esc: "Close modal / form",
+    shortcut_enter: "Skip intro screen",
+    shortcut_note: "On Windows/Linux: <kbd>Ctrl</kbd> instead of <kbd>⌘</kbd>. Arrow keys only active in desktop layout.",
     agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
     agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trades",
@@ -1367,6 +1493,17 @@ const STRINGS = {
     err_no_ticker: "No ticker", err_no_data: "No data", err_no_price_feed: "No price in feed",
     err_no_worker_url: "No Worker URL (⋯ → Settings)",
     empty_no_pairs: "No pair trades yet.", empty_no_longs: "No long trades yet.", empty_no_shorts: "No short trades yet.",
+    empty_state_pair_title: "No pair trades yet",
+    empty_state_pair_desc: "Create your first long/short pair — go long and short on stocks simultaneously, performance is tracked as a spread.",
+    empty_state_long_title: "No long trades yet",
+    empty_state_long_desc: "Track long positions individually or grouped in <strong>baskets</strong>. Telegram alerts for loss and profit thresholds.",
+    empty_state_short_title: "No short trades yet",
+    empty_state_short_desc: "Short positions with performance tracking, squeeze-risk monitoring (US tickers) and alerts. Group by theme in baskets.",
+    empty_state_total_title: "No trades yet",
+    empty_state_total_desc: "Switch to one of the pages (Pairs, Longs, Shorts) and create your first trade. Or press <kbd>?</kbd> for all shortcuts.",
+    empty_state_cta_pair: "+ Create first pair trade",
+    empty_state_cta_long: "+ Create first long trade",
+    empty_state_cta_short: "+ Create first short trade",
     page_pairs: "Pairs", page_longs: "Longs", page_shorts: "Shorts", page_total: "Total",
     tranche_badge: "× {n}", tranche_panel_title: "Tranches", tranche_label_n: "Tr {n}", tranche_isolated_short: "Iso",
     tranche_delete_confirm: "Delete this tranche? Only this tranche is removed, the rest of the trade stays.",
@@ -1703,6 +1840,67 @@ async function applyLockChange() {
   result.textContent = t("lock_apply_set_ok");
   result.style.display = "block";
   updateLockUiState();
+}
+
+// === Intro-Screen (kein Lock-Setup): Welcome-View mit Owl + Auto-Progress ===
+const INTRO_AUTO_DISMISS_MS = 2500;
+let introState = { dismissed: false, progressTimer: null, keydownHandler: null, dismissTimer: null };
+
+function showIntroScreen() {
+  const intro = document.getElementById("intro-screen");
+  if (!intro) return;
+  appUnlocked = false; // gate analog zum Lock-Screen bis dismiss
+  introState.dismissed = false;
+  // Hint-Text je nach Layout: Tap (Mobile) vs. Klicken/Enter (Desktop)
+  const isDesktop = document.documentElement.getAttribute("data-layout") === "desktop";
+  const hintEl = document.getElementById("intro-hint");
+  if (hintEl) hintEl.textContent = t(isDesktop ? "intro_hint_desktop" : "intro_hint_mobile");
+  // Progress-Bar von 0 auf 100% über INTRO_AUTO_DISMISS_MS
+  const fillEl = document.getElementById("intro-progress-fill");
+  if (fillEl) {
+    fillEl.style.transition = "none";
+    fillEl.style.width = "0%";
+    // Doppelt-RAF damit die initiale Width gepaintet ist bevor die Transition startet
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      fillEl.style.transition = `width ${INTRO_AUTO_DISMISS_MS}ms linear`;
+      fillEl.style.width = "100%";
+    }));
+  }
+  intro.classList.add("open");
+  // Auto-dismiss nach 2.5s
+  introState.dismissTimer = setTimeout(() => dismissIntroScreen(), INTRO_AUTO_DISMISS_MS);
+  // Click/Tap dismissed sofort
+  intro.onclick = () => dismissIntroScreen();
+  // Keyboard: Enter / Space / Escape dismissed
+  introState.keydownHandler = (e) => {
+    if (introState.dismissed) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
+      e.preventDefault();
+      dismissIntroScreen();
+    }
+  };
+  window.addEventListener("keydown", introState.keydownHandler);
+}
+
+function dismissIntroScreen() {
+  const intro = document.getElementById("intro-screen");
+  if (!intro || introState.dismissed) return;
+  introState.dismissed = true;
+  // Timer + Keydown-Listener aufräumen
+  if (introState.dismissTimer) { clearTimeout(introState.dismissTimer); introState.dismissTimer = null; }
+  if (introState.keydownHandler) {
+    window.removeEventListener("keydown", introState.keydownHandler);
+    introState.keydownHandler = null;
+  }
+  // Slide-Out: opacity + translateY-Animation via .dismissing-Klasse
+  intro.classList.add("dismissing");
+  // Nach ~350ms (Slide-Out fertig): Intro entfernen + Pentagon-Loader anstoßen
+  setTimeout(() => {
+    intro.classList.remove("open");
+    intro.classList.remove("dismissing");
+    // unlockWithLoader teilen wir mit dem Lock-Pfad — kümmert sich um Loader + Sync + Refresh
+    unlockWithLoader();
+  }, 350);
 }
 
 function showLockScreen() {
@@ -2714,6 +2912,38 @@ function renderBasketCard(basket) {
   return card;
 }
 
+// Erweiterter Empty-State mit Owl-SVG, Titel, Beschreibung, CTA-Button.
+// Page-spezifische Texte über i18n. Klick auf CTA öffnet Trade-Form mit Type vorbefüllt.
+function renderEmptyState(pageKey) {
+  const titleKey = pageKey === "long" ? "empty_state_long_title"
+                 : pageKey === "short" ? "empty_state_short_title"
+                 : pageKey === "total" ? "empty_state_total_title"
+                 : "empty_state_pair_title";
+  const descKey = pageKey === "long" ? "empty_state_long_desc"
+                : pageKey === "short" ? "empty_state_short_desc"
+                : pageKey === "total" ? "empty_state_total_desc"
+                : "empty_state_pair_desc";
+  const ctaKey = pageKey === "long" ? "empty_state_cta_long"
+               : pageKey === "short" ? "empty_state_cta_short"
+               : "empty_state_cta_pair";
+  const owlSvg = `<svg viewBox="0 0 280 320" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M 55 80 L 38 25 L 88 65 Z" fill="currentColor"/>
+    <path d="M 225 80 L 242 25 L 192 65 Z" fill="currentColor"/>
+    <path d="M 60 95 Q 75 70 100 85 Q 125 100 140 95 Q 155 100 180 85 Q 205 70 220 95"/>
+    <path d="M 60 95 Q 45 120 50 145 Q 60 175 90 175 L 190 175 Q 220 175 230 145 Q 235 120 220 95"/>
+    <circle cx="95" cy="130" r="22"/><circle cx="95" cy="130" r="8" fill="currentColor"/>
+    <circle cx="185" cy="130" r="22"/><circle cx="185" cy="130" r="8" fill="currentColor"/>
+    <path d="M 130 155 L 140 172 L 150 155 Z" fill="currentColor"/>
+    <path d="M 50 175 Q 35 220 60 260 Q 90 285 140 285 Q 190 285 220 260 Q 245 220 230 175"/>
+  </svg>`;
+  return `<div class="empty-state">
+    <div class="empty-state-icon" aria-hidden="true">${owlSvg}</div>
+    <div class="empty-state-title">${t(titleKey)}</div>
+    <div class="empty-state-desc">${t(descKey)}</div>
+    ${pageKey !== "total" ? `<div class="empty-state-actions"><button class="empty-state-cta" data-empty-cta="${pageKey}">${t(ctaKey)}</button></div>` : ""}
+  </div>`;
+}
+
 function render() {
   for (const pageKey of ["pair", "long", "short"]) {
     const list = document.querySelector(`.trade-list[data-list="${pageKey}"]`); if (!list) continue;
@@ -2724,7 +2954,7 @@ function render() {
     const basketsHere = (pageKey === "long" || pageKey === "short") ? basketsByPageKey(pageKey) : [];
     const standaloneTrades = (pageKey === "long" || pageKey === "short") ? pageTrades.filter(tr => !tr.basketId) : pageTrades;
     if (pageTrades.length === 0 && basketsHere.length === 0) {
-      list.innerHTML = `<div class="empty">${emptyTextForPage(pageKey)}</div>`;
+      list.innerHTML = renderEmptyState(pageKey);
       updatePageAggregate(pageKey, []);
       continue;
     }
@@ -2746,6 +2976,18 @@ function render() {
   });
   document.querySelectorAll(".trade-head.tappable, .trade-row.tappable").forEach(head => {
     head.addEventListener("click", () => { const id = head.getAttribute("data-toggle-tranches"); const panel = document.getElementById("tranche-panel-" + id); if (panel) panel.classList.toggle("open"); });
+  });
+  // Empty-State-CTA: öffnet Trade-Form mit Type vorbefüllt aus dem data-Attribut
+  document.querySelectorAll(".empty-state-cta[data-empty-cta]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tp = btn.getAttribute("data-empty-cta");
+      // currentPage temporär auf den richtigen Page-Type setzen, damit openForm den richtigen Default nimmt
+      if (PAGES.includes(tp)) {
+        currentPage = tp;
+        scrollToPage(tp, false);
+      }
+      openForm(null);
+    });
   });
 }
 
@@ -3821,15 +4063,69 @@ document.querySelectorAll(".desktop-tabs .dt-btn[data-tab]").forEach(btn => {
     scrollToPage(PAGES[idx - 1], false);
   }
   window.addEventListener("keydown", (e) => {
+    // --- Globale Shortcuts (in allen Layouts, mit Modal-Guards) ---
+    // Esc: Shortcut-Overlay schließen, dann Modal/Form schließen
+    if (e.key === "Escape") {
+      const shortcutOv = document.getElementById("shortcut-overlay");
+      if (shortcutOv && shortcutOv.classList.contains("open")) {
+        e.preventDefault();
+        hideShortcutOverlay();
+        return;
+      }
+      // Fallthrough: erst Form, dann Basket-Modal, dann Settings (analog Reihenfolge im UI)
+      const formOpen = document.querySelector(".form-card.open");
+      if (formOpen) { e.preventDefault(); closeForm(); return; }
+      const basketForm = document.getElementById("basket-form");
+      if (basketForm && basketForm.classList.contains("open")) { e.preventDefault(); closeBasketForm(); return; }
+      const basketModal = document.querySelector(".basket-modal.open");
+      if (basketModal) { e.preventDefault(); closeBasketModal(); return; }
+      const settings = document.querySelector(".modal-overlay#settings-modal.open");
+      if (settings) { e.preventDefault(); closeSettings(); return; }
+      return;
+    }
+    // ? (Shift+/) → Shortcut-Overlay toggle. Funktioniert in allen Layouts.
+    if (e.key === "?" && !isTypingTarget(e.target)) {
+      e.preventDefault();
+      const ov = document.getElementById("shortcut-overlay");
+      if (ov && ov.classList.contains("open")) hideShortcutOverlay();
+      else showShortcutOverlay();
+      return;
+    }
+    // Cmd+Shift+1..4 → direkter Page-Sprung. In allen Layouts.
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !isTypingTarget(e.target)) {
+      const map = { "1": "pair", "2": "long", "3": "short", "4": "total", "!": "pair", "@": "long", "#": "short", "$": "total" };
+      const tp = map[e.key];
+      if (tp && !isAnyOverlayOpen()) {
+        e.preventDefault();
+        scrollToPage(tp, false);
+        return;
+      }
+    }
+    // --- Desktop-only: Pfeiltasten für Page-Navigation ---
     if (document.documentElement.getAttribute("data-layout") !== "desktop") return;
     if (isAnyOverlayOpen()) return;
     if (isTypingTarget(e.target)) return;
-    // Modifier-Kombos NICHT abfangen (Cmd+Shift+1..4 läuft separat, Browser-Shortcuts auch)
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "ArrowRight") { e.preventDefault(); nextPage(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); prevPage(); }
   });
 })();
+// === Keyboard-Shortcut-Overlay (öffnet mit "?" oder via Sidebar/Settings) =====
+function showShortcutOverlay() {
+  const ov = document.getElementById("shortcut-overlay");
+  if (!ov) return;
+  ov.classList.add("open");
+}
+function hideShortcutOverlay() {
+  const ov = document.getElementById("shortcut-overlay");
+  if (!ov) return;
+  ov.classList.remove("open");
+}
+// Click auf Backdrop oder Close-Button schließt
+document.getElementById("shortcut-close").addEventListener("click", hideShortcutOverlay);
+document.getElementById("shortcut-overlay").addEventListener("click", (e) => {
+  if (e.target.id === "shortcut-overlay") hideShortcutOverlay();
+});
 // === Ebene 3: Sidebar-Navigation + Actions ====================================
 document.querySelectorAll(".desktop-sidebar .ds-nav-btn[data-tab]").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -3913,8 +4209,12 @@ setLanguage(initialLang);
 // Boot-time lock check — show the lock screen BEFORE loadStorage/render so any
 // cached trades aren't visible behind the lock.
 lockSettings = loadLockSettings();
-if (lockSettings.enabled && lockSettings.hash) showLockScreen();
-else appUnlocked = true;
+if (lockSettings.enabled && lockSettings.hash) {
+  showLockScreen();
+} else {
+  // Kein Lock → Intro-Screen mit Owl + Auto-Progress → Pentagon-Loader → App
+  showIntroScreen();
+}
 loadStorage();
 render();
 if (syncSettings.enabled) setSyncStatus("ok", t("status_sync_active")); else setSyncStatus("off", t("status_sync_off"));
