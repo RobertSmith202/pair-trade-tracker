@@ -29,9 +29,12 @@ Kern-Features:
 - **Master-Key-Recovery** auf dem Lock-Screen: bei vergessenem Code per JSONBin Master-Key entsperren
 - Zwei Sprachen (DE, EN) — geräteabhängig
 - Drei Themes (Mitternacht / Hell / Dunkel) — geräteabhängig
+- **Zwei Layout-Modi (Handy / Desktop)** — geräteabhängig. Mobile = klassische iPhone-Optik (Snap-Scroll, einspaltig). Desktop = Bloomberg-Style mit linker Sidebar, Pfeiltasten-Navigation, iOS-Control-Center-Page-Transitions, Multi-Column-Grid-View und Floating-Form-Dialogen.
+- **Schriftgrößen-Skalierung** (100/110/120/130%) nur im Desktop-Modus via `zoom`-CSS auf `<html>` — geräteabhängig
 - Standard-Page in Settings konfigurierbar — pro Gerät
 - Grid/Liste-View-Toggle pro Page (touch-freundlich groß) — pro Gerät
-- Keyboard-Shortcuts Cmd/Ctrl+Shift+1..4 zum Wechseln der Pages (Desktop)
+- Keyboard-Shortcuts Cmd/Ctrl+Shift+1..4 zum direkten Page-Switch (alle Layouts)
+- **Pfeiltasten (← →)** zum sequenziellen Page-Durchblättern im Desktop-Modus
 - Auto-Refresh jede Minute wenn App im Foreground während Handelszeit (Mo-Fr, 09:00-23:00 Berlin)
 - Bloomberg-style Price-Flash-Animationen (grün/rot Hintergrund-Flash bei Kursänderung)
 
@@ -63,6 +66,8 @@ Alle App-Daten leben in `localStorage` und überleben Safari-Schließen / App-Sw
 | `pair_trade_price_v1` | Worker-URL + Home-Currency |
 | `pair_trade_lang_v1` | gewählte Sprache (DE/EN) |
 | `pair_trade_theme_v1` | gewähltes Theme (midnight/light/dark) |
+| `pair_trade_layout_v1` | Layout-Modus (mobile/desktop) — pro Gerät |
+| `pair_trade_font_scale_v1` | Schriftgröße in Prozent (100/110/120/130) — pro Gerät, nur Desktop-wirksam |
 | `pair_trade_view_v1` | Grid/Liste-Modus pro Page |
 | `pair_trade_start_page_v1` | Standard-Page beim App-Start |
 | `pair_trade_lock_v1` | App-Sperre-Settings: `{enabled, type, hash}` |
@@ -296,6 +301,61 @@ Für `type: "long"` werden `shortTicker`, `shortQty`, `shortEntry` als `null` / 
 
 `pages-container` ist ein horizontaler Flex-Container mit `scroll-snap-type: x mandatory`. Reihenfolge fix: `["pair", "long", "short", "total"]`. Settings „Standard-Page" bestimmt, welche beim App-Start aktiv ist.
 
+### Layout-Modus: Handy vs. Desktop (Ebene 3)
+
+Die App existiert in **zwei strukturell unterschiedlichen Layout-Modi**, umschaltbar in Settings → „Ansicht". Speicherung in `pair_trade_layout_v1`, **geräteabhängig** (nicht synct über JSONBin). Boot-Default ist `mobile`.
+
+Der Layout-Modus wird an `<html data-layout="mobile|desktop">` angeheftet. Alle Desktop-spezifischen CSS-Regeln sind unter `[data-layout="desktop"]` gescoped — der Mobile-Pfad bleibt pixelgenau unverändert.
+
+**Mobile-Modus** (Default, identisch zur ursprünglichen iPhone-PWA):
+- Body `max-width: 640px`, mittig zentriert
+- Horizontaler Snap-Scroll zwischen den 4 Pages über `pages-container` mit `overflow-x: auto; scroll-snap-type: x mandatory`
+- Page-Dots am unteren Bildschirmrand
+- Sticky-Toolbar oben mit `+ Neuer Trade`, `↻ Kurse`, Menü-Button
+- Forms (Trade-, Korb-Form) als Inline-Expand unter der Toolbar
+- Basket-Modal als Vollbild-Overlay
+- Page-Wechsel via Swipe (Touch), Klick auf Dots, oder Cmd+Shift+1..4
+
+**Desktop-Modus** (Ebene 3 — drei iterative Layout-Levels wurden gebaut, Ebene 3 ist der finale Stand):
+- Body `max-width: none; padding-left: 220px; overflow: hidden` — Body selbst scrollt nicht mehr
+- **Linke Sidebar** (`<aside class="desktop-sidebar">`, position-fixed, 220px breit) mit:
+  - Brand-Block (Logo + „Pair Trade Tracker")
+  - Vertikale Page-Nav (4 Buttons mit farbcodierten Glyphen ▲ ▼)
+  - Primary-Action `+ Neuer Trade`, neutraler `↻ Kurse`
+  - Status-Block (Status / Auto / Sync) als Key-Value-Zeilen — wird via MutationObserver aus den bestehenden `#status`, `#auto-status`, `#sync-status` Elementen gespiegelt
+  - Footer-Button `⚙ Einstellungen`
+- **Pages-Container `position: fixed`** mit `top: 0; right: 0; bottom: 0; left: 220px` — füllt den Viewport rechts neben der Sidebar
+- **Jede `.page` ist ein eigener Scroll-Container** (`position: absolute; inset: 0; overflow-y: auto`). Body-Höhe ändert sich nie beim Page-Wechsel → kein Scroll-Jitter
+- `scrollbar-gutter: stable` reserviert konstant Platz für die Scrollbar
+- **iOS-Control-Center-Style synchronisierte Slide-Transitions** beim Page-Wechsel:
+  - Vorwärts (next): alte Page `translateY(0 → -100%)`, neue Page `translateY(100% → 0)` — beide synchron, alte schiebt nach oben raus, neue kommt von unten rein
+  - Rückwärts (prev): alte slidet nach unten raus, neue von oben rein
+  - 280ms mit `cubic-bezier(0.16, 1, 0.3, 1)` (easeOutExpo)
+  - `translate3d` statt `translateY` für GPU-Compositing-Layer
+  - `.page.active-page` Klasse für die sichtbare Page, `.page.leaving` während der Übergangsphase
+  - JS koordiniert: `activateDesktopPage(pageKey, direction)` setzt `data-direction` attribut VOR der `active-page`-Klasse, damit CSS die richtige Keyframe-Sequence wählt; AnimationEnd-Listener räumt `.leaving` auf
+- **Pfeiltasten-Navigation:** ← / → triggert `scrollToPage(prev/next)`. Guards: nicht in Inputs/Textareas, nicht wenn ein Modal offen ist, keine Modifier-Kombos
+- **Trackpad-Wheel-Hijack wurde bewusst entfernt** — eine frühere Version hat Wheel-Events am Page-Boundary abgefangen und Page-Switches getriggert. Das hat aber legitimes Scrollen durch lange Trade-Listen blockiert (am Ende → automatischer Page-Wechsel). Ersetzt durch Pfeiltasten als bewusste Navigation
+- **`.page > *` Content-Constraint:** `max-width: min(1100px, 100%); margin-left: 0; margin-right: auto` — alle direkten Page-Children (Page-Head, Aggregate, Trade-Liste, Total-Breakdown, Donut, Basket-Cards) landen in derselben Spalte links-aligned, identische Breite. Verhindert Cmd+/- Zoom-Probleme und gibt eine konsistente Lesespalte
+- **Multi-Column Trade-Grid:** in Grid-View `display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr))` mit max-width 1080px → 3 Karten nebeneinander auf breiten Displays
+- **Forms als zentrierte Floating-Dialoge** statt Inline-Expand: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 600px`. Backdrop via `body:has(.form-card.open)::before`
+- **Owl-Watermark im Desktop-Modus ausgeblendet** (`body::before { display: none }`) — wirkt im breiteren Layout zu dominant. Lock-Screen behält den Owl
+- Toolbar im Desktop-Modus komplett verborgen (Sidebar übernimmt deren Funktionen)
+
+**Layout-Switch im laufenden Betrieb** (`applyLayout(v)`):
+- Setzt `data-layout`-Attribut auf `<html>`
+- Beim Switch zu Mobile: räumt alle `.active-page`-Klassen ab (sonst hängt Snap-Scroll an falscher Position)
+- Beim Switch zu Desktop: `scrollToPage(currentPage, false)` aktiviert die richtige Page mit `.active-page`
+- Ruft `applyFontScale()` neu auf — Zoom greift nur im Desktop-Modus
+
+### Schriftgrößen-Skalierung (Desktop)
+
+Eigener Settings-Block „Schriftgröße (Desktop)" mit 4 Card-Buttons: Klein/Mittel/Groß/XL = 100/110/120/130 Prozent. Persistiert in `pair_trade_font_scale_v1`, geräteabhängig.
+
+`applyFontScale(v)` setzt `document.documentElement.style.zoom = (parseInt(v) / 100)` — aber **nur wenn `data-layout === "desktop"`**. Im Mobile-Modus wird das Inline-Zoom auf leer gesetzt. Damit bleibt das iPhone-Layout in nativer Größe, während der Mac auf 110-130% skalieren kann.
+
+CSS `zoom` skaliert layout-uniform (Schrift + Padding + Sidebar-Breite + Spacing) — fühlt sich an wie Browser-Zoom, ist aber an die App gebunden. Browser-Kompatibilität: Chrome/Safari seit jeher, Firefox seit 126 (Mai 2024).
+
 ### Super-Trade / Tranchen-Modell — typ-isoliert
 
 Auto-Merge nur bei gleichem Ticker UND gleichem Typ. Ein Long-only AAPL und ein AAPL/MSFT-Pair zählen als unterschiedlich.
@@ -320,7 +380,21 @@ Körbe sind ordner-artige Gruppierungen von Trades **innerhalb** einer Long- ode
 3. **Gesamt-Page bleibt unangetastet.** Die Aggregat-Zahlen der Pages (Long, Short, Gesamt) zählen ALLE Trades, unabhängig davon ob sie in einem Korb sind oder nicht — Körbe sind nur eine Sicht-Gruppierung, kein Cashflow-Filter.
 4. **Worker-Alarme auf Korb-Aggregat** analog zu Single-Trade-Alarmen, plus pro Trade in Short-Körben optional Squeeze-Alarme (siehe unten).
 
-**Render-Reihenfolge auf Long/Short-Pages:** Körbe stehen oben, Standalone-Trades darunter. Körbe sehen aus wie spezielle Cards mit Aggregat-Performance, Trade-Count und Ordner-Icon. Tap öffnet das Modal.
+**Render-Reihenfolge auf Long/Short-Pages:** `+ Neuer Korb`-Button (gestrichelte volle-Breite-Box) zuerst, dann Körbe, dann Standalone-Trades. Körbe sehen aus wie spezielle Cards mit Aggregat-Performance, Trade-Count und Ordner-Icon. Tap öffnet das Modal.
+
+**Korb-Card-Layout (parallel zur Trade-Card für visuelle Konsistenz):**
+- Row 1 (Head): Korb-Icon + Name + Alarm-Pills (rechts via separater `<div class="basket-card-pills">`). Pills sitzen rechts, weil `.basket-card-name` `flex: 1` hat und alle Sibling-Elemente nach rechts drückt — gleicher Mechanismus wie bei `.trade-row-line1` mit Pills.
+- Row 2 (Werte): Count-Chip links, dann `<div class="basket-card-vals">` rechts mit PnL + Pct-Chip + Bearbeiten-Button + ×-Button + Pfeil-Arrow. Damit liegen Aktionen und Werte auf derselben Höhe wie bei Trade-Cards.
+- (Nur Grid-View) Row 3+ als `.basket-card-extra`: Notional + Typ-Meta, Alarm-Status-Zeilen, Top-3-Trades nach |Performance|. In List-View per CSS versteckt.
+- In **List-View** zusätzlich getönter Vertikal-Gradient als Background (`var(--pos-bg)` → `var(--pos-soft)` für Long, `var(--neg-bg)` → `var(--neg-soft)` für Short) + verstärkter Box-Shadow, damit Körbe sich elegant von Standalone-Trades absetzen.
+
+**Korb-Card Edit/Delete-Buttons** verwenden die Standard-`.icon`/`.icon.danger`-Klassen (`padding: 8px 12px; min-height: 0; font-size: 12px`) — pixelgenau identisch zu den Trade-Card-Buttons. JS-Selektoren laufen über `[data-basket-edit]`/`[data-basket-del]` data-attributes, nicht über die Klassen, damit Styling und Logik entkoppelt sind.
+
+**Geschichte des `+ Neuer Korb`-Buttons** (für Debugging-Kontext, falls Robert nochmal umentscheidet):
+1. Erste Iteration: Per-Page-Button (gestrichelte Box auf Long-/Short-Page, zwischen Aggregate und Trade-Liste). **AKTUELLE FORM.**
+2. Zweite Iteration: Toolbar-Button als `.primary` in der oberen Bar neben `+ Neuer Trade`, dynamisch ein-/ausgeblendet per Page → wieder verworfen.
+3. Dritte Iteration: Sidebar-Button (`.ds-action-primary`) im Desktop-Modus → ebenfalls verworfen.
+Die aktuelle Per-Page-Form gewann, weil sie die discoverable-ste und kontextuell sauberste ist (Korb-Action gehört zur Page).
 
 **Korb-Modal-Aufbau:**
 - Header: Name + Typ-Pill + Edit-/Schließen-Buttons
@@ -547,6 +621,16 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 
 20. **`baskets`-Array muss in allen vier Storage-Pfaden mitgeführt werden:** `loadStorage()`, `persistLocal()`, `syncPush()`, `syncPull()`. Wer einen davon vergisst, verliert Körbe entweder lokal oder beim Sync. Trades selbst überleben das, aber ihre `basketId` zeigt dann ins Leere und sie erscheinen als Standalones.
 
+21. **Body `max-width: 640px` ist der Default für Mobile.** Im Desktop-Modus wird `max-width: none; padding-left: 220px; overflow: hidden` gesetzt. Wer „warum sehe ich auf dem Mac alles in einer schmalen Spalte" debugged: das ist absichtlich für Mobile, und der Layout-Modus muss auf Desktop stehen. CSS-Cache kann nach Layout-Switch noch hartnäckig sein — Cmd+Shift+R für Hard-Reload.
+
+22. **Page-Wechsel-Animation und Render-Pfad sind unterschiedlich pro Layout-Modus.** Mobile nutzt `scrollToPage` mit `container.scrollTo({left: idx*w})` für horizontalen Snap-Scroll. Desktop nutzt `activateDesktopPage(pageKey, direction)` mit Class-Toggle `.active-page` + `.leaving`. Beide Pfade dispatchen vom selben `scrollToPage(pageKey)`-Entry-Point auf Basis des `data-layout`-Attributes. Wer einen Pfad modifiziert, muss prüfen ob's auch im anderen Modus noch funktioniert.
+
+23. **Tab-Bar (Ebene 2) existiert noch im DOM aber wird im Desktop-Modus CSS-versteckt** (`[data-layout="desktop"] .desktop-tabs { display: none }`). Sie war eine Zwischenstufe vor der Sidebar (Ebene 3). Funktioniert aber bei vollständigen Mobile-Layout. Wenn man Ebene 2 wiederbeleben will: Sidebar verstecken, Tab-Bar zeigen, basket-Buttons in Toolbar zurückholen. Architektonisch sind alle drei Ebenen weiterhin nebeneinander präsent.
+
+24. **CSS `zoom` ist non-standard aber breit unterstützt.** Chrome/Safari schon ewig, Firefox seit 126 (Mai 2024). Auf älteren Firefox-Versionen würde der Font-Scale-Setting visuell nichts tun. Robert verwendet Safari/Chrome — kein Problem in der Praxis.
+
+25. **`activateDesktopPage` setzt `data-direction` BEVOR `active-page`-Klasse.** Reihenfolge ist kritisch: wenn man `.active-page` zuerst setzt, läuft die CSS-Animation mit dem ALTEN `data-direction`-Wert. Plus ein `void incoming.offsetWidth` (force-Reflow) zwischen `classList.remove("active-page")` und `classList.add("active-page")` damit die Animation auch dann neu feuert, wenn man auf dieselbe Page erneut navigiert.
+
 ---
 
 ## Internationalisierung
@@ -575,8 +659,27 @@ Beim Hinzufügen neuer UI-Strings: in DE und EN einpflegen. DE als Fallback wenn
 
 Du bist jetzt informiert genug um Änderungen vorzunehmen. Empfohlenes Vorgehen:
 
-1. Den aktuellen Stand des Codes via WebFetch oder Upload anschauen
-2. Bei Architektur-Änderungen: prüfe ob bestehende Konventionen (State-Machine, Pfadunabhängigkeit, Tranche-Modell, Trade-Typ-Isolation, Pct/Preis-Mode, Lock-Boot-Reihenfolge) tangiert werden
+1. Den aktuellen Stand des Codes via WebFetch oder Upload anschauen (Robert lädt typischerweise `index.html`, `cloudflare-worker.js` und diese `PROJECT_MEMORY.md` hoch)
+2. Bei Architektur-Änderungen: prüfe ob bestehende Konventionen (State-Machine, Pfadunabhängigkeit, Tranche-Modell, Trade-Typ-Isolation, Pct/Preis-Mode, Lock-Boot-Reihenfolge, **Layout-Mode-Branching in scrollToPage, max-width-Constraint auf `.page > *`**) tangiert werden
 3. Bei API-Contract-Änderungen zwischen App und Worker: beide Seiten gleichzeitig anpassen, Worker zuerst deployen
 4. Bei neuen sensiblen Daten (z.B. weitere Credentials): überlege, ob sie an Worker/Bot exponiert sein dürfen. Lock-Settings und alles Lock-bezogene bleibt rein clientseitig.
 5. Diese Datei bei substanziellen Änderungen aktualisieren — sie ist Teil des Projekts, nicht Beiwerk.
+
+**Schnelle Architektur-Karte für Layout-relevante Änderungen:**
+
+| Was | Wo im Code | Mobile-Verhalten | Desktop-Verhalten |
+|---|---|---|---|
+| Page-Navigation | `scrollToPage(pageKey)` | `container.scrollTo({left: idx*w})` Snap-Scroll | `activateDesktopPage(pageKey, dir)` mit `.active-page`/`.leaving` Class-Toggle |
+| Page-Transition | (keine — Snap-Scroll IS die Animation) | — | iOS-Slide via CSS `@keyframes pageEnterFromBelow/Above + pageLeaveToAbove/Below`, 280ms easeOutExpo |
+| Page-Container | `display: flex; overflow-x: auto` | sichtbar als horizontale 4-Spalten-Reihe | `position: fixed; left: 220px; overflow: hidden`, Pages sind absolute Inset:0 |
+| Page-Scrollbarkeit | Body scrollt | Body hat overflow auto | Body `overflow: hidden`, jede `.page` scrollt intern |
+| Navigation-UI | Page-Dots unten | sichtbar | versteckt |
+| Sidebar | `.desktop-sidebar` | versteckt (`display: none`) | sichtbar, fixed left, 220px |
+| Toolbar | `.toolbar-wrap` | sticky top | versteckt (`display: none`) |
+| Forms | `.form-card.open` | Inline-Expand unter Toolbar | Floating-Dialog mit Backdrop via `body:has(.form-card.open)::before` |
+| Content-Breite | `body { max-width: 640px; margin: 0 auto }` | aktiv | overridden zu `max-width: none; padding-left: 220px` |
+| Page-Child-Spalte | `.page > * { max-width: ... }` | nicht beschränkt | `max-width: min(1100px, 100%); margin-left: 0` (left-aligned) |
+| Owl-Watermark | `body::before` mit Mask-SVG | sichtbar mit 5% Opacity | versteckt (`display: none !important`) |
+| Schriftgröße | `applyFontScale(v)` | wird in Mobile auf leer gesetzt (kein Zoom) | `document.documentElement.style.zoom = v/100` |
+
+**Robert's typischer Workflow:** Mac für Entwicklung + sitzendes Trading (Desktop-Layout), iPhone für unterwegs + Telegram-Alarme-Acknowledgement (Mobile-Layout). Beide Geräte syncen Trades über JSONBin, aber Layout-Modus, Theme, Sprache, Schriftgröße sind geräteabhängig (pro localStorage, nicht über JSONBin).
