@@ -604,7 +604,9 @@ Tägliche Überprüfung des Short-Interest auf Float für leerverkaufte Position
 - Trade-Typ `pair` → überwacht ebenfalls `shortTicker` (= der leerverkaufte Leg)
 - Trade-Typ `long` → **explizit ausgeschlossen.** Im Form ist die Squeeze-Sektion bei Long-only gar nicht sichtbar; selbst wenn ein Long-Trade ein `alertShortPct`-Feld hätte (z.B. nach Type-Wechsel), würde der Worker es überspringen.
 
-**Schwellen-Semantik:** `alertShortPct` ist eine positive Prozentzahl (z.B. `25` für 25 %). Im Save-Pfad wird `Math.abs(input)` gespeichert. Yahoo liefert `shortPercentOfFloat` als Dezimalbruch (0.25); der Worker multipliziert mit 100 und vergleicht direkt.
+**Schwellen-Semantik:** `alertShortPct` ist eine positive Prozentzahl (z.B. `25` für 25 %). Im Save-Pfad wird `Math.abs(input)` gespeichert.
+
+**Berechnung des Short-Interest seit Mai-2026 (BROS-Bug-Fix):** der Worker rechnet `shortPercentOfFloat` aus den **Roh-Inputs** `sharesShort / floatShares × 100` selbst aus, statt Yahoo's vorberechnetem Feld zu vertrauen. Hintergrund: Yahoo's API-Feld `shortPercentOfFloat` ist für manche Ticker (beobachtet bei BROS) **intern inkonsistent** mit den Roh-Daten in derselben Response — z.B. `shortPercentOfFloat=0.446` bei `sharesShort=18.07M` und `floatShares=126.46M` (mathematisch wären das 14.29 %, nicht 44.6 %). Stockanalysis.com und andere Aggregatoren bestätigen die Computation. Wir nutzen Yahoo's vorberechnetes Feld nur als Fallback wenn `sharesShort` oder `floatShares` fehlen. Die Rückgabe enthält `computedFrom: "raw"|"yahoo_precomputed"` für Debug-Transparenz, und `shortPercentOfFloatYahooRaw` zum Vergleichen. Bei Diskrepanz (>3 Prozentpunkte) ergänzt die Telegram-Nachricht eine Zeile „(Yahoo-Feld: X% — Diskrepanz, Worker nutzt Computation)".
 
 **Yahoo-Datenquelle und Non-US-Problem:**
 

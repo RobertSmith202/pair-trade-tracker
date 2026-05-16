@@ -282,11 +282,38 @@ async function fetchShortInterest(symbol) {
     const stats = data?.quoteSummary?.result?.[0]?.defaultKeyStatistics;
     if (!stats) return null;
     const raw = (x) => (x && typeof x === "object" && "raw" in x) ? x.raw : x;
-    const shortPctFloat = raw(stats.shortPercentOfFloat);
-    if (shortPctFloat == null || !isFinite(shortPctFloat)) return null;
+
+    const sharesShort   = raw(stats.sharesShort);
+    const floatShares   = raw(stats.floatShares);
+    const shortPctYahoo = raw(stats.shortPercentOfFloat);  // Yahoo's vorberechnete Quote, Dezimalbruch
+
+    // Yahoo's Feld `shortPercentOfFloat` ist gelegentlich inkonsistent mit den
+    // Roh-Inputs (sharesShort/floatShares) in derselben Datenstruktur.
+    // Konkret beobachtet bei BROS (Mai 2026): shortPctFloat=0.446 (= 44.6 %),
+    // sharesShort=18.07M / floatShares=126.46M = 14.29 %. Andere Aggregatoren
+    // (stockanalysis.com etc.) bestätigen die Computation, nicht das Yahoo-Feld.
+    // Daher: wir rechnen selbst sobald wir beide Roh-Werte haben und nutzen
+    // Yahoo's vorberechnetes Feld nur als Fallback wenn die Inputs fehlen.
+    let shortPercentOfFloat;
+    let computedFrom = "none";
+    if (sharesShort != null && floatShares != null
+        && floatShares > 0 && isFinite(sharesShort) && isFinite(floatShares)) {
+      shortPercentOfFloat = (sharesShort / floatShares) * 100;
+      computedFrom = "raw";
+    } else if (shortPctYahoo != null && isFinite(shortPctYahoo)) {
+      shortPercentOfFloat = shortPctYahoo * 100;
+      computedFrom = "yahoo_precomputed";
+    } else {
+      return null;
+    }
+
     return {
-      shortPercentOfFloat: shortPctFloat * 100,
-      sharesShort: raw(stats.sharesShort),
+      shortPercentOfFloat,
+      computedFrom,                                                                  // "raw" oder "yahoo_precomputed"
+      sharesShort,
+      floatShares,
+      shortPercentOfFloatYahooRaw: shortPctYahoo != null && isFinite(shortPctYahoo)  // Yahoo's eigene Zahl zur Transparenz
+        ? shortPctYahoo * 100 : null,
       sharesShortPriorMonth: raw(stats.sharesShortPriorMonth),
       shortRatio: raw(stats.shortRatio),
       dateShortInterest: raw(stats.dateShortInterest)
@@ -305,6 +332,14 @@ function buildSqueezeMessage(lang, trade, shortPct, threshold, shortInfo) {
     workerT(lang, "short_interest") + ": " + shortPct.toFixed(2) + "% (Float)",
     workerT(lang, "threshold") + ": ≥ " + threshold.toFixed(2) + "%"
   ];
+  // Transparenz: wenn Yahoo's vorberechnetes Feld deutlich (>3pp) vom selbstgerechneten
+  // Wert abweicht, beide zeigen. Beobachteter Fall war BROS Mai 2026: Yahoo 44.60 % vs.
+  // Computation 14.29 %. Andere Tickers würden den Hinweis gar nicht sehen wenn die Daten
+  // intern konsistent sind.
+  const yahooPct = shortInfo.shortPercentOfFloatYahooRaw;
+  if (yahooPct != null && isFinite(yahooPct) && Math.abs(yahooPct - shortPct) > 3) {
+    lines.push("(Yahoo-Feld: " + yahooPct.toFixed(2) + "% — Diskrepanz, Worker nutzt Computation)");
+  }
   if (shortInfo.shortRatio != null && isFinite(shortInfo.shortRatio)) {
     lines.push(workerT(lang, "days_to_cover") + ": " + shortInfo.shortRatio.toFixed(2));
   }
