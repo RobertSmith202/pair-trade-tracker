@@ -524,7 +524,7 @@ body::before {
 [data-layout="desktop"] .app-watermark,
 [data-layout="desktop"] .owl-watermark,
 [data-layout="desktop"] .watermark { display: none !important; }
-/* === Desktop Page-Transition: Bloomberg-Style Instant-Swap ================
+/* === Desktop Page-Transition: asymmetrische Cross-Fade ===================
    Iterations-Verlauf:
      1) 280ms iOS-Vollscreen-Vertikal-Slide — cinematic, bremste nach 20× Wechsel
      2) 120ms reiner Opacity-Fade — zu subtil, kein Richtungs-Cue
@@ -532,24 +532,34 @@ body::before {
         auf großen Monitoren = sichtbares Wackeln der Buchstaben-Kanten
      4) 220ms reiner Horizontal-Slide ohne Scale — Content-Spalte rutschte auf
         4K-Displays einsam in einer Whitespace-Wüste herum
-     5) 200ms vertikaler Y-Slide + Cross-Fade — solide, modern, aber nach allem
-        was wir versucht haben hat Robert gesagt: mach's wie Bloomberg
-     6) Jetzt: KEINE Animation. Instant Page-Swap.
-   Bloomberg-Philosophie: Speed = Elegance. Auf Trader-Monitoren ist jede Bewegung
-   peripheres Rauschen. Wenn der Wechsel so schnell passiert dass das Auge ihn gar
-   nicht als „Animation" registriert, fühlt sich das System schneller an als alles
-   was Animationen einsetzt. Stripe Dashboard, IBKR, Bloomberg Terminal: alle so.
-   .leaving-Klasse bleibt im DOM-Toggle-Pattern (JS unchanged) damit das Cleanup
-   per Safety-Net-setTimeout(500) trotzdem läuft — die Page sitzt aber z-index:1
-   unter der z-index:2 active-page, unsichtbar. */
+     5) 200ms vertikaler Y-Slide + Cross-Fade — solide, aber Robert wollte Bloomberg
+     6) Instant-Swap — fühlte sich zu hart an, nicht flüssig
+     7) Jetzt: asymmetrische pure Opacity-Cross-Fade
+   Trick: Entering fadet 200ms ein, Leaving fadet schon nach 120ms komplett raus.
+   Damit ist die alte Page weg bevor die neue auf 50 % Opacity ist — kein "muddy
+   middle" wo beide halb-transparent übereinander gleichzeitig zu sehen wären.
+   Das Auge folgt der enthüllenden Page sauber, ohne überlagernde Ghost-Effekte.
+   Reine Opacity = GPU-Compositing, kein Text-Re-Rastern, smooth auf jedem Monitor.
+   Material-Easing cubic-bezier(0.4, 0, 0.2, 1) = standard "decelerate". */
 [data-layout="desktop"] .page.active-page {
   display: block;
+  animation: pageEnterDesktop 0.2s cubic-bezier(0.4, 0, 0.2, 1) both;
   z-index: 2;
 }
+[data-layout="desktop"] .page.active-page[data-direction="none"] { animation: none; }
 [data-layout="desktop"] .page.leaving {
   display: block;
   pointer-events: none;
+  animation: pageLeaveDesktop 0.12s cubic-bezier(0.4, 0, 0.2, 1) both;
   z-index: 1;
+}
+@keyframes pageEnterDesktop {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pageLeaveDesktop {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 /* Page-interne Scrollbar dezent (Mac-Style) */
 [data-layout="desktop"] .page::-webkit-scrollbar { width: 8px; }
