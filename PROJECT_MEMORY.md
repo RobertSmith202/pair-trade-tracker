@@ -45,12 +45,14 @@ Kern-Features:
 
 | Komponente | Wo | Was sie macht |
 |---|---|---|
-| `index.html` | Netlify (deployed) + GitHub-Repo (source) | Single-File PWA, alles drin (HTML + CSS + JS) |
+| `index.html` | Cloudflare Pages (deployed) + GitHub-Repo (source) | Single-File PWA, alles drin (HTML + CSS + JS) |
 | `cloudflare-worker.js` | Cloudflare Worker (deployed) + GitHub-Repo (source) | Yahoo-Proxy, Cron-Alarm-Engine, Telegram-Webhook |
 | JSONBin.io | extern (Free Tier) | Cloud-Sync-Storage (Trades, AlertStates, Sprache) |
 | Telegram-Bot | extern | Empfängt Alarm-Nachrichten, sendet Ack |
 
-Deployment: GitHub → Netlify (auto-deploy für HTML), Cloudflare-Dashboard (manuelles Paste für Worker).
+Deployment: GitHub → Cloudflare Pages (auto-deploy für HTML, kein Build-Step da Single-File), Cloudflare-Worker-Dashboard (manuelles Paste für Worker). Beide Pieces leben jetzt in einer einzigen Cloudflare-Konsole, statt vorher verteilt auf Netlify + Cloudflare.
+
+Historische Notiz: vorher lief das HTML auf Netlify (`rs-pair-tracker.netlify.app`). Wurde Mai 2026 auf Cloudflare Pages migriert weil Netlify-Auto-Deploys wiederholt ausgesetzt hatten — Live-Site war monatelang Versionen hinter dem GitHub-Stand, ohne dass das im Netlify-Dashboard offensichtlich war. Cloudflare Pages zeigt im Dashboard sofort welcher Commit live ist; weniger Mystery.
 
 **Deployment-Reihenfolge bei Worker- und HTML-Änderungen gleichzeitig: immer Worker zuerst.** Der Worker ist rückwärts-kompatibel mit dem alten HTML-Datenformat (fehlende Felder defaulten auf alte Semantik). Das neue HTML hingegen schreibt Felder, die der alte Worker nicht kennt — z.B. `alertMinMode: "price"` mit `alertPctMin: null` würde vom alten Worker als „keine Schwelle gesetzt" interpretiert → Alarm stillschweigend tot.
 
@@ -690,7 +692,7 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 
 2. **iOS-Numerik-Keyboard hat kein Minus:** Negative Schwellen werden im UI als positive Zahl eingegeben, intern via `-Math.abs()` normalisiert.
 
-3. **Cache zwischen Netlify und Cloudflare:** Beim Deploy einer neuen HTML kann der Mac noch eine alte Version sehen. Workaround: Safari-Cache leeren und PWA aus Dock neu hinzufügen.
+3. **Cache zwischen Cloudflare Pages und Cloudflare Worker:** Beim Deploy einer neuen HTML kann der Mac noch eine alte Version sehen. Workaround: Safari-Cache leeren (Cmd+Option+E) und PWA aus Dock neu hinzufügen. Da seit der Migration alles auf Cloudflare läuft (HTML auf Pages, API auf Worker), kann auch CF-Edge-Caching reinspielen — falls's hartnäckig ist, im Pages-Dashboard „Purge cache" anstoßen.
 
 4. **CORS-Proxys sind tot:** corsproxy.io / allorigins.win nicht mehr verlässlich. Eigener Cloudflare-Worker ist die einzige stabile Lösung.
 
@@ -757,7 +759,7 @@ Beim Hinzufügen neuer UI-Strings: in DE und EN einpflegen. DE als Fallback wenn
 - Sehr ehrliches Feedback, kein Sugarcoating. Lieber Bug zugeben als rumeiern.
 - Mag pragmatische Code-Erklärungen mit Trade-offs.
 - Schreibt Deutsch, versteht aber EN-Begriffe in Code (Variablen, etc.).
-- Setup ist: iPhone als primäres Mobile-Gerät, Mac als Desktop. Beide nutzen die selbe Netlify-URL.
+- Setup ist: iPhone als primäres Mobile-Gerät, Mac als Desktop. Beide nutzen die selbe Cloudflare-Pages-URL.
 - Telegram-Alarms müssen zuverlässig sein — das ist der Hauptgrund für das ganze Setup, nicht nur die Live-Anzeige.
 - Robert pullt die fertigen Dateien aus dem `outputs`-Ordner und committed sie selbst auf GitHub. Manuelle GitHub-Bearbeitung außerhalb der Cowork-Sessions findet nicht statt.
 - Repo ist privat — wir können in Dokumentation und Code-Kommentaren transparent über Sicherheits-Grenzen sein, ohne diese einem Angreifer zu offenbaren.

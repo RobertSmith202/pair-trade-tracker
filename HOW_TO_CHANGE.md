@@ -21,7 +21,7 @@ Claude liest dann die Memory-Datei + den aktuellen Code und ist auf dem gleichen
 1. Claude schlägt geänderte `index.html` vor
 2. Du gehst in GitHub auf die Datei → Stift-Icon (Edit) → Änderungen einfügen oder die ganze Datei austauschen (Add file → Upload files → gleicher Name überschreibt)
 3. Commit
-4. Netlify deployed automatisch in 30-60 Sek
+4. Cloudflare Pages deployed automatisch in 30-60 Sek (im Pages-Dashboard sichtbar welcher Commit live ist)
 5. Auf iPhone/Mac PWA neu laden → fertig
 
 **Sonderfall localStorage:** Wenn du Datenstruktur änderst (z.B. neues Feld pro Trade), entweder Migration im Code einbauen oder bei dir lokal Settings zurücksetzen. Frag Claude explizit danach.
@@ -91,10 +91,9 @@ Drei Wege je nach Schwere:
 ## URLs zum Speichern
 
 - **Repo:** https://github.com/RobertSmith202/pair-trade-tracker
-- **App:** https://rs-pair-tracker.netlify.app
+- **App:** (Cloudflare Pages URL — nach Migration eintragen, z.B. `pair-trade-tracker.pages.dev`)
 - **Worker:** https://yahoo-finance-proxy.fabian-terhorst.workers.dev
-- **Netlify-Dashboard:** https://app.netlify.com
-- **Cloudflare-Dashboard:** https://dash.cloudflare.com
+- **Cloudflare-Dashboard:** https://dash.cloudflare.com  (Workers UND Pages liegen beide hier)
 - **Telegram BotFather:** https://t.me/BotFather
 - **JSONBin-Dashboard:** https://jsonbin.io
 
@@ -104,9 +103,9 @@ Drei Wege je nach Schwere:
 
 Cache. PWA hat eine eigene Cache-Schicht plus Browser-Cache plus Cloudflare-Edge-Cache. Auf iPhone die PWA-Karte komplett schließen und neu öffnen. Auf Mac in Safari Cmd+Option+R (Hard Reload). Wenn das nicht hilft: Settings in der App öffnen — falls dort die Änderung sichtbar ist, sind nur die Trades-Daten gecached, das löst sich beim nächsten Sync. Wenn Settings auch alt aussehen: PWA aus Dock/Homescreen löschen und neu hinzufügen.
 
-**Was wenn Netlify den Deploy nicht startet?**
+**Was wenn Cloudflare Pages den Deploy nicht startet?**
 
-Netlify-Dashboard → Site → Deploys → "Trigger deploy" → "Deploy site". Manuell anstoßen. Falls das auch nicht klappt: Build & Deploy Settings checken (Branch sollte auf `main` stehen, Publish-Directory leer oder `/`).
+Cloudflare-Dashboard → Pages → deine Site → "Deployments" → "Retry deployment" auf dem letzten fehlgeschlagenen Eintrag, oder über "Create deployment" einen manuellen Trigger. Falls dauerhaft nichts kommt: Settings → Build & deployments → prüfen ob „Production branch" auf `main` steht und das GitHub-Repo noch korrekt verbunden ist.
 
 **Was wenn der Telegram-Bot keine Nachrichten mehr schickt?**
 
