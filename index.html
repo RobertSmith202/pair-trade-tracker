@@ -2558,9 +2558,26 @@ async function fetchPrice(ticker, force = false) {
     const price = meta.regularMarketPrice;
     const currency = (meta.currency || "").toUpperCase();
     const name = meta.shortName || meta.longName || sym;
-    // Vortags-Schlusskurs für Heute-Delta-Berechnung (Apple-Stocks-Style "+1,23 +0,71%").
-    // Yahoo liefert das Feld in derselben Response — keine Extra-API-Calls nötig.
-    const previousClose = isFinite(meta.chartPreviousClose) ? meta.chartPreviousClose : null;
+    // Vortags-Schlusskurs für Heute-Delta-Berechnung. ACHTUNG: `meta.chartPreviousClose`
+    // ist NICHT „gestern" — semantisch ist das „Close vor dem Chart-Range-Start". Bei
+    // unserem `range=5d`-Aufruf ist das ~5 Handelstage zurück, nicht 1. Beobachtet bei
+    // URW.PA Mai 2026: chartPreviousClose lieferte 100,70 € (5 Tage alt), aber gestriger
+    // Close war 95,00 €. Daily % wurde dadurch um −5,7 Prozentpunkte falsch berechnet.
+    // Korrekte Quelle: zweitletzter Eintrag im Timeseries-Close-Array (= gestern, da
+    // der letzte Eintrag heute ist). Fallback auf chartPreviousClose nur wenn die
+    // Timeseries kürzer als 2 Einträge ist (z.B. neu gelistete IPO am ersten Tag).
+    const closes = result?.indicators?.quote?.[0]?.close;
+    let previousClose = null;
+    if (Array.isArray(closes) && closes.length >= 2) {
+      // Letzten gültigen "echten gestern"-Close finden: vom Ende rückwärts, ignoriere
+      // den letzten Eintrag (= heute) und null-Werte (Handelspausen / Feiertage).
+      for (let i = closes.length - 2; i >= 0; i--) {
+        if (isFinite(closes[i])) { previousClose = closes[i]; break; }
+      }
+    }
+    if (previousClose == null && isFinite(meta.chartPreviousClose)) {
+      previousClose = meta.chartPreviousClose;
+    }
     if (!isFinite(price)) { const v = { error: t("err_no_price_feed"), ts: now }; PRICE_CACHE.set(sym, v); return v; }
     const v = { price, previousClose, currency, name, ts: now };
     PRICE_CACHE.set(sym, v); return v;
