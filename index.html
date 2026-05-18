@@ -1440,7 +1440,7 @@ const STRINGS = {
     form_alarm_pct_help: "Beide Felder optional. Jeweils nur die positive Zahl eingeben. <strong>Verlust-Schwelle</strong>: Alarm bei Performance ≤ −X% — Telegram wiederholt alle 3 Min bis du quittierst. <strong>Gewinn-Schwelle</strong>: Alarm bei Performance ≥ +Y% — Telegram wiederholt alle 30 Min bis du quittierst. <em>Bei Long-/Short-Trades alternativ als absoluter Preis in der Notierungswährung des Tickers (Umschalter rechts).</em>",
     form_type_label: "Trade-Typ", form_type_pair: "Paar", form_type_long: "Nur Long", form_type_short: "Nur Short",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
-    card_today: "Heute",
+    card_today: "Heute", card_today_trade: "Kurs heute",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
     card_delete_confirm: "„{name}\" löschen?",
     form_squeeze_title: "⚡ Short-Squeeze-Alarm (nur Short-Leg, optional)",
@@ -1616,7 +1616,7 @@ const STRINGS = {
     form_alarm_pct_help: "Both fields optional. Enter positive numbers only. <strong>Loss threshold</strong>: alert when performance ≤ −X% — Telegram repeats every 3 min until you acknowledge. <strong>Profit threshold</strong>: alert when performance ≥ +Y% — Telegram repeats every 30 min until you acknowledge. <em>For long/short trades, you can switch to absolute price in the ticker's quoted currency (toggle on the right).</em>",
     form_type_label: "Trade type", form_type_pair: "Pair", form_type_long: "Long only", form_type_short: "Short only",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
-    card_today: "Today",
+    card_today: "Today", card_today_trade: "Stock today",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
     card_delete_confirm: "Delete \"{name}\"?",
     form_squeeze_title: "⚡ Short-squeeze alert (short leg only, optional)",
@@ -2709,11 +2709,16 @@ function computeTrade(tr, lp, sp) {
   let aggLongQty = 0, aggShortQty = 0;
   let aggLongPnlHome = null, aggShortPnlHome = null;
   let aggLongNotionalHome = null, aggShortNotionalHome = null;
-  // Heute-Aggregation auf Trade-Ebene: über alle Tranchen und (falls Pair) beide Legs gesummt.
-  // Wichtig: Short-Leg-Today wird mit umgekehrtem Vorzeichen gerechnet (Preis runter = Profit).
-  // Der Notional-Nenner ist der Wert von gestern, damit der %-Wert korrekt gewichtet ist statt
-  // arithmetisch gemittelt. FX-Konversion mit den heute geltenden Raten — gestern's Rate wäre
-  // theoretisch korrekter aber haben wir nicht, der Fehler ist bei kleinen FX-Bewegungen marginal.
+  // Heute-Aggregation = Kurs-Performance der Basiswerte (NICHT der Trade-PnL-Performance).
+  // Wichtig: Short-Legs werden WIE die Long-Legs gerechnet — Sign wird NICHT geflippt.
+  // Begründung: User will sehen wie sich die zugrunde liegenden Aktien-Kurse heute bewegt
+  // haben (analog Yahoo-Finance-Stock-Quote). Für eine Short-TSLA-Position wenn TSLA heute
+  // +2 % macht, zeigt die Zahl +2 % (das hat die Aktie gemacht), nicht −2 % (das hätte
+  // dein Short-Trade dadurch an PnL verloren). Trade-PnL-Performance ist eine andere
+  // Größe und steht in der Total-PnL + Total-%-Anzeige nebenan.
+  // Aggregation für Pair-Trades + Baskets: notional-gewichteter Durchschnitt der Basis-%s
+  // — sum-of-(curr-prev)·qty·fx ÷ sum-of-(prev·qty·fx). Bei Single-Leg-Trades reduziert
+  // sich das auf den reinen Stock-Daily-% wie Yahoo ihn zeigt.
   let todayDeltaHome = null, todayNotionalHome = null;
   for (const tranche of tranches) {
     let longLeg = null, shortLeg = null;
@@ -2742,19 +2747,21 @@ function computeTrade(tr, lp, sp) {
       if (shortLeg?.pnlInHome != null) aggShortPnlHome = (aggShortPnlHome ?? 0) + shortLeg.pnlInHome;
       if (shortLeg?.entryNotionalInHome != null) aggShortNotionalHome = (aggShortNotionalHome ?? 0) + shortLeg.entryNotionalInHome;
     }
-    // Heute-Delta für diese Tranche
+    // Heute-Delta = absolute Kurs-Bewegung des Basiswerts × qty × fx (KEIN Sign-Flip für Short).
+    // Bei Single-Leg-Trades ist das identisch mit dem Yahoo-Daily-%-Wert der Aktie.
+    // Bei Pair-Trades ergibt sich daraus ein notional-gewichteter Durchschnitt beider Legs.
     if (hasLong(tr) && longLeg && longPrev != null && lpx != null && longLeg.apiToEntryFx != null && longLeg.entryToHomeFx != null) {
       const fx = longLeg.apiToEntryFx * longLeg.entryToHomeFx;
-      const dPnl = (lpx - longPrev) * (tranche.longQty || 0) * fx;       // long: Preis hoch = Gewinn
-      const dNot = longPrev * (tranche.longQty || 0) * fx;
-      todayDeltaHome = (todayDeltaHome ?? 0) + dPnl;
+      const dPx = (lpx - longPrev) * (tranche.longQty || 0) * fx;     // Kurs-Bewegung (+ wenn Aktie heute hoch)
+      const dNot = longPrev * (tranche.longQty || 0) * fx;            // Gestern's Notional als Gewichts-Basis
+      todayDeltaHome = (todayDeltaHome ?? 0) + dPx;
       todayNotionalHome = (todayNotionalHome ?? 0) + dNot;
     }
     if (hasShort(tr) && shortLeg && shortPrev != null && spx != null && shortLeg.apiToEntryFx != null && shortLeg.entryToHomeFx != null) {
       const fx = shortLeg.apiToEntryFx * shortLeg.entryToHomeFx;
-      const dPnl = (shortPrev - spx) * (tranche.shortQty || 0) * fx;     // short: Preis runter = Gewinn
+      const dPx = (spx - shortPrev) * (tranche.shortQty || 0) * fx;   // Kurs-Bewegung der geshorteten Aktie — KEIN Flip
       const dNot = shortPrev * (tranche.shortQty || 0) * fx;
-      todayDeltaHome = (todayDeltaHome ?? 0) + dPnl;
+      todayDeltaHome = (todayDeltaHome ?? 0) + dPx;
       todayNotionalHome = (todayNotionalHome ?? 0) + dNot;
     }
   }
@@ -3053,15 +3060,20 @@ function renderOneTradeRow(tr, c) {
   return card;
 }
 
-// Rendert die kleine „heute +1,23 %"-Zeile unter dem Total-PnL im Watchlist-Layout.
-// Liefert leeren String wenn Trade-Heute nicht berechnet werden konnte (z.B. weil
-// Vortags-Schluss bei einem Ticker fehlt — passiert bei manchen OTC-Werten,
-// Wochenenden, oder ganz frischen IPO-Listings).
+// Rendert die kleine „Kurs heute +1,23 %"-Zeile unter dem Total-PnL im Watchlist-Layout.
+// Label „Kurs heute" weil die Zahl die Tages-Performance der zugrunde liegenden Aktien-Kurse
+// zeigt (analog Yahoo-Daily-%-Anzeige), NICHT die Trade-PnL-Performance. Für Single-Leg-Trades
+// ist das identisch zur Yahoo-Quote-Anzeige der Aktie. Für Pair-Trades und Baskets ist's der
+// notional-gewichtete Durchschnitt der zugrunde liegenden Kurs-%s. Kein Short-Sign-Flip:
+// wenn TSLA heute +2 % macht, zeigt ein Short-TSLA-Trade auch +2 % (das ist was die Aktie
+// gemacht hat) — die Trade-PnL-Implikation steht im Total-PnL- und Total-%-Anzeige nebenan.
+// Liefert leeren String wenn Vortags-Schluss bei einem Ticker fehlt (manche OTC-Werte,
+// Wochenenden, frische IPO-Listings).
 function renderTradeRowTodaySub(todayPct) {
   if (todayPct == null || !isFinite(todayPct)) return "";
   const cls = todayPct >= 0 ? "pos" : "neg";
   const sign = todayPct > 0 ? "+" : "";
-  return `<span class="trade-row-today ${cls}"><span class="trade-row-today-label">heute</span>${sign}${todayPct.toFixed(2)}%</span>`;
+  return `<span class="trade-row-today ${cls}"><span class="trade-row-today-label">${t("card_today_trade")}</span>${sign}${todayPct.toFixed(2)}%</span>`;
 }
 
 function renderOneTradeCard(tr, c) {
