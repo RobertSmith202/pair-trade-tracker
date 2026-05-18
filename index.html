@@ -111,12 +111,32 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   column-gap: 12px;
   align-items: center;
 }
+.trade-row-pnl-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 0;
+}
 .trade-row-pnl {
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
+}
+.trade-row-today {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.trade-row-today.pos { color: var(--pos); }
+.trade-row-today.neg { color: var(--neg); }
+.trade-row-today-label {
+  color: var(--muted);
+  font-weight: 500;
+  margin-right: 4px;
 }
 .trade-row-pct {
   font-size: 12px;
@@ -300,6 +320,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .basket-card-count { font-size: 11px; color: var(--muted); font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(127,127,127,0.12); flex-shrink: 0; }
 .basket-card-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .basket-card-vals { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.basket-card-pnl-col { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; min-width: 0; }
 .basket-card-pnl { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .basket-card-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .basket-card-arrow { color: var(--muted); font-size: 14px; flex-shrink: 0; }
@@ -2369,11 +2390,18 @@ function hasBasketLossThreshold(b) { return b && b.alertPctMin != null && b.aler
 function hasBasketProfitThreshold(b) { return b && b.alertPctMax != null && b.alertPctMax !== ""; }
 
 // Aggregat eines Korbs aus allen enthaltenen Trades. Returns {totalPnlHome,
-// totalNotionalHome, pct, tradeCount, type, name} — analog zu computeTrade.
+// totalNotionalHome, pct, todayDeltaHome, todayNotionalHome, todayPct, tradeCount,
+// type, name} — analog zu computeTrade.
+//
+// Heute-Aggregation: sum of Trade-Today-Deltas / sum of Trade-Today-Notionals = korrekt
+// gewichtete Korb-Heute-Performance. NICHT arithmetisches Mittel der Trade-%s — das wäre
+// mathematisch falsch (ein 1000€-Trade mit +2% und ein 10€-Trade mit -50% gemittelt = -24%
+// wäre Unsinn, der echte gewichtete Wert wäre +1.5%).
 function computeBasket(basket) {
   const inBasket = tradesInBasket(basket.id);
   let totalPnl = 0, totalNotional = 0;
-  let hasAnyValue = false;
+  let todayDelta = 0, todayNotional = 0;
+  let hasAnyValue = false, hasAnyToday = false;
   for (const tr of inBasket) {
     const lp = hasLong(tr)  ? PRICE_CACHE.get((tr.longTicker  || "").toUpperCase()) : null;
     const sp = hasShort(tr) ? PRICE_CACHE.get((tr.shortTicker || "").toUpperCase()) : null;
@@ -2383,12 +2411,21 @@ function computeBasket(basket) {
       totalNotional += c.totalNotionalHome;
       hasAnyValue = true;
     }
+    if (c.todayDeltaHome != null && c.todayNotionalHome != null) {
+      todayDelta += c.todayDeltaHome;
+      todayNotional += c.todayNotionalHome;
+      hasAnyToday = true;
+    }
   }
   const pct = (hasAnyValue && totalNotional > 0) ? (totalPnl / totalNotional) * 100 : null;
+  const todayPct = (hasAnyToday && todayNotional > 0) ? (todayDelta / todayNotional) * 100 : null;
   return {
     totalPnlHome: hasAnyValue ? totalPnl : null,
     totalNotionalHome: hasAnyValue ? totalNotional : null,
     pct,
+    todayDeltaHome: hasAnyToday ? todayDelta : null,
+    todayNotionalHome: hasAnyToday ? todayNotional : null,
+    todayPct,
     tradeCount: inBasket.length,
     type: basketType(basket),
     name: basket.name
@@ -2663,12 +2700,21 @@ function computeTrade(tr, lp, sp) {
   const spx = (hasShort(tr) && sp && !sp.error) ? sp.price : null;
   const longApiCcy = (lp?.currency || homeCurrency).toUpperCase();
   const shortApiCcy = (sp?.currency || homeCurrency).toUpperCase();
+  // Vortags-Schluss-Kurse für Heute-Delta-Berechnung (nur wenn Yahoo das Feld liefert)
+  const longPrev  = (hasLong(tr)  && lp && !lp.error && isFinite(lp.previousClose)) ? lp.previousClose : null;
+  const shortPrev = (hasShort(tr) && sp && !sp.error && isFinite(sp.previousClose)) ? sp.previousClose : null;
   const tranches = Array.isArray(tr.tranches) ? tr.tranches : [];
   const trancheResults = [];
   let totalPnlHome = null, totalNotionalHome = null;
   let aggLongQty = 0, aggShortQty = 0;
   let aggLongPnlHome = null, aggShortPnlHome = null;
   let aggLongNotionalHome = null, aggShortNotionalHome = null;
+  // Heute-Aggregation auf Trade-Ebene: über alle Tranchen und (falls Pair) beide Legs gesummt.
+  // Wichtig: Short-Leg-Today wird mit umgekehrtem Vorzeichen gerechnet (Preis runter = Profit).
+  // Der Notional-Nenner ist der Wert von gestern, damit der %-Wert korrekt gewichtet ist statt
+  // arithmetisch gemittelt. FX-Konversion mit den heute geltenden Raten — gestern's Rate wäre
+  // theoretisch korrekter aber haben wir nicht, der Fehler ist bei kleinen FX-Bewegungen marginal.
+  let todayDeltaHome = null, todayNotionalHome = null;
   for (const tranche of tranches) {
     let longLeg = null, shortLeg = null;
     if (hasLong(tr)) longLeg = computeLeg(tranche.longEntry, tranche.longQty, lpx, longApiCcy, !!tranche.longEntryNative, tranche.longEntryCcy, true);
@@ -2696,11 +2742,28 @@ function computeTrade(tr, lp, sp) {
       if (shortLeg?.pnlInHome != null) aggShortPnlHome = (aggShortPnlHome ?? 0) + shortLeg.pnlInHome;
       if (shortLeg?.entryNotionalInHome != null) aggShortNotionalHome = (aggShortNotionalHome ?? 0) + shortLeg.entryNotionalInHome;
     }
+    // Heute-Delta für diese Tranche
+    if (hasLong(tr) && longLeg && longPrev != null && lpx != null && longLeg.apiToEntryFx != null && longLeg.entryToHomeFx != null) {
+      const fx = longLeg.apiToEntryFx * longLeg.entryToHomeFx;
+      const dPnl = (lpx - longPrev) * (tranche.longQty || 0) * fx;       // long: Preis hoch = Gewinn
+      const dNot = longPrev * (tranche.longQty || 0) * fx;
+      todayDeltaHome = (todayDeltaHome ?? 0) + dPnl;
+      todayNotionalHome = (todayNotionalHome ?? 0) + dNot;
+    }
+    if (hasShort(tr) && shortLeg && shortPrev != null && spx != null && shortLeg.apiToEntryFx != null && shortLeg.entryToHomeFx != null) {
+      const fx = shortLeg.apiToEntryFx * shortLeg.entryToHomeFx;
+      const dPnl = (shortPrev - spx) * (tranche.shortQty || 0) * fx;     // short: Preis runter = Gewinn
+      const dNot = shortPrev * (tranche.shortQty || 0) * fx;
+      todayDeltaHome = (todayDeltaHome ?? 0) + dPnl;
+      todayNotionalHome = (todayNotionalHome ?? 0) + dNot;
+    }
   }
   let pct = null;
   if (totalPnlHome != null && totalNotionalHome != null && totalNotionalHome > 0) pct = (totalPnlHome / totalNotionalHome) * 100;
+  let todayPct = null;
+  if (todayDeltaHome != null && todayNotionalHome != null && todayNotionalHome > 0) todayPct = (todayDeltaHome / todayNotionalHome) * 100;
   const firstResult = trancheResults[0] || {};
-  return { type, tranches: trancheResults, long: firstResult.long || null, short: firstResult.short || null, totalNotionalHome, totalPnlHome, pct, aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome, aggLongNotionalHome, aggShortNotionalHome, longApiCcy, shortApiCcy, lpx, spx };
+  return { type, tranches: trancheResults, long: firstResult.long || null, short: firstResult.short || null, totalNotionalHome, totalPnlHome, pct, todayDeltaHome, todayNotionalHome, todayPct, aggLongQty, aggShortQty, aggLongPnlHome, aggShortPnlHome, aggLongNotionalHome, aggShortNotionalHome, longApiCcy, shortApiCcy, lpx, spx };
 }
 
 // Resettet die Alarm-State-Achsen deren Schwellen-Konfig sich beim Speichern geändert hat.
@@ -2961,13 +3024,19 @@ function renderOneTradeRow(tr, c) {
   const rowClass = isMulti ? "trade-row tappable" : "trade-row";
   const tappableAttr = isMulti ? ` data-toggle-tranches="${tr.id}"` : "";
   const panel = isMulti ? tranchePanelHtml(tr, c) : '';
-  // Watchlist-Layout: links die Schlüssel-Zahlen (PnL absolut + Performance-Pct),
+  // Heute-Delta-Sub-Zeile (gewichtet über beide Legs aggregiert). Wird nur gerendert
+  // wenn Vortags-Daten für ALLE relevanten Legs verfügbar sind. Format: "heute +1,23%".
+  const todaySub = renderTradeRowTodaySub(c.todayPct);
+  // Watchlist-Layout: links die Schlüssel-Zahlen (PnL absolut + Heute-Sub + Performance-Pct),
   // mitte die Trade-Identifikation (Name + alarm pills + Ticker-Sub-Zeile), rechts
   // Edit/Delete. Vertikale Pixel-Spalten-Konsistenz über mehrere Trades hinweg
   // (tabular-nums-Pflicht in CSS) macht die Liste scanbar wie ein Reuters-Quote.
   card.innerHTML = `
     <div class="${rowClass}"${tappableAttr}>
-      <span class="trade-row-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+      <div class="trade-row-pnl-col">
+        <span class="trade-row-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+        ${todaySub}
+      </div>
       <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
       <div class="trade-row-info">
         <div class="trade-row-info-line1">
@@ -2982,6 +3051,17 @@ function renderOneTradeRow(tr, c) {
     </div>
     ${panel}`;
   return card;
+}
+
+// Rendert die kleine „heute +1,23 %"-Zeile unter dem Total-PnL im Watchlist-Layout.
+// Liefert leeren String wenn Trade-Heute nicht berechnet werden konnte (z.B. weil
+// Vortags-Schluss bei einem Ticker fehlt — passiert bei manchen OTC-Werten,
+// Wochenenden, oder ganz frischen IPO-Listings).
+function renderTradeRowTodaySub(todayPct) {
+  if (todayPct == null || !isFinite(todayPct)) return "";
+  const cls = todayPct >= 0 ? "pos" : "neg";
+  const sign = todayPct > 0 ? "+" : "";
+  return `<span class="trade-row-today ${cls}"><span class="trade-row-today-label">heute</span>${sign}${todayPct.toFixed(2)}%</span>`;
 }
 
 function renderOneTradeCard(tr, c) {
@@ -3127,7 +3207,10 @@ function renderBasketCard(basket) {
     <div class="basket-card-row">
       <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
       <div class="basket-card-vals">
-        <span class="basket-card-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+        <div class="basket-card-pnl-col">
+          <span class="basket-card-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+          ${renderTradeRowTodaySub(c.todayPct)}
+        </div>
         <span class="basket-card-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
         <button class="icon" data-basket-edit="${basket.id}" aria-label="edit">${t("btn_edit")}</button>
         <button class="icon danger" data-basket-del="${basket.id}" aria-label="delete">×</button>

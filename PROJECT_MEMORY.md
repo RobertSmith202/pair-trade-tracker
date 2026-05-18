@@ -39,6 +39,7 @@ Kern-Features:
 - Auto-Refresh jede Minute wenn App im Foreground während Handelszeit (Mo-Fr, 09:00-23:00 Berlin)
 - Bloomberg-style Price-Flash-Animationen (grün/rot Hintergrund-Flash bei Kursänderung)
 - **Heute-Delta pro Leg (Apple-Stocks-Style):** unter dem aktuellen Preis erscheint eine Zeile „Heute: +1,23 $ (+0,71 %)", grün/rot je nach Tagesrichtung. Daten kommen aus `meta.chartPreviousClose` der bestehenden Yahoo-Response (kein Extra-API-Call). Angezeigt in der nativen Notierungs-Ccy des Tickers. Bei fehlenden Vortags-Daten (Wochenenden, IPO-Tage, manche OTC) wird die Zeile stillschweigend weggelassen.
+- **Heute-Delta auf Trade- und Basket-Ebene aggregiert (Listen-Ansicht):** unter dem Total-PnL erscheint eine kleinere Sub-Zeile „heute +1,23 %", grün/rot. Berechnung: über alle Legs/Tranchen summiert mit korrekter Sign-Convention (Short-Leg: Preis runter = Profit) und FX-konvertiert in Home-Ccy. Der %-Wert wird **gewichtet** ermittelt (sum-of-deltas ÷ sum-of-yesterday-notionals), nicht arithmetisch gemittelt — sonst würden Pair-Trades mit unterschiedlichen Leg-Größen oder Baskets mit gemischten Trade-Größen falsche Aggregate liefern. Felder im computeTrade/computeBasket-Return: `todayDeltaHome`, `todayNotionalHome`, `todayPct`.
 
 ---
 
