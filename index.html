@@ -100,14 +100,69 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
 .trade-list[data-view="list"] { gap: 6px; }
 .trade-list[data-view="list"] .trade-card { padding: 10px 12px; }
-.trade-row { display: grid; grid-template-columns: 1fr auto auto; column-gap: 10px; row-gap: 4px; align-items: center; }
-.trade-row-line1 { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.trade-row-name { font-weight: 700; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.trade-row-tickers { grid-column: 1; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trade-row-nums { grid-column: 2; display: flex; align-items: baseline; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
-.trade-row-pnl { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.trade-row-pct { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; font-variant-numeric: tabular-nums; }
-.trade-row-actions { grid-column: 3; display: flex; gap: 4px; flex-shrink: 0; }
+/* Listen-Ansicht-Zeile im Watchlist-Stil: Key-Metrics (PnL + %) ganz links wo
+   das Auge zuerst hinwandert, Trade-Identifikation in der Mitte, Actions rechts.
+   4-Spalten-Grid: [PnL] [%-Pill] [Name + Tickers] [Edit/Delete].
+   Numbers in den linken Spalten sind tabular-nums damit Werte über mehrere
+   Trades vertikal in derselben Pixel-Spalte stehen — Watchlist-Lesbarkeit. */
+.trade-row {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(58px, auto) minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: center;
+}
+.trade-row-pnl {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.trade-row-pct {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+.trade-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.trade-row-info-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.trade-row-name {
+  font-weight: 700;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.trade-row-tickers {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.trade-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
 .trade-row-actions button { padding: 6px 9px; min-height: 0; font-size: 11px; border-radius: 6px; }
 .trade-row.tappable { cursor: pointer; user-select: none; }
 .trade-row.tappable:hover .trade-row-name { opacity: 0.85; }
@@ -646,17 +701,15 @@ body::before {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
-/* Trade-Row im Desktop-Mode: fixe Breiten für PnL- und Action-Spalten damit Zahlen
-   über mehrere Trades in derselben Pixel-Spalte stehen. Vorher `1fr auto auto`
-   → PnL-Spalte schwamm abhängig vom Ticker-Namen, nicht scanbar. */
+/* Trade-Row im Desktop-Mode: Watchlist-Layout mit fixen breiteren PnL/%-Spalten
+   damit die Schlüssel-Zahlen über mehrere Trades vertikal in derselben Pixel-Spalte
+   stehen (scanbar wie eine echte Tabelle). PnL bekommt mehr Platz weil die Zahlen
+   länger werden können (z.B. "+12.345,67 €"). */
 [data-layout="desktop"] .trade-row {
-  grid-template-columns: minmax(0, 1fr) 180px 96px;
-  column-gap: 16px;
+  grid-template-columns: 120px 80px minmax(0, 1fr) auto;
+  column-gap: 18px;
 }
-[data-layout="desktop"] .trade-row-nums {
-  justify-content: flex-end;
-  font-variant-numeric: tabular-nums;
-}
+[data-layout="desktop"] .trade-row-pnl { font-size: 18px; }
 [data-layout="desktop"] .trade-row-actions {
   justify-content: flex-end;
 }
@@ -1366,6 +1419,7 @@ const STRINGS = {
     form_alarm_pct_help: "Beide Felder optional. Jeweils nur die positive Zahl eingeben. <strong>Verlust-Schwelle</strong>: Alarm bei Performance ≤ −X% — Telegram wiederholt alle 3 Min bis du quittierst. <strong>Gewinn-Schwelle</strong>: Alarm bei Performance ≥ +Y% — Telegram wiederholt alle 30 Min bis du quittierst. <em>Bei Long-/Short-Trades alternativ als absoluter Preis in der Notierungswährung des Tickers (Umschalter rechts).</em>",
     form_type_label: "Trade-Typ", form_type_pair: "Paar", form_type_long: "Nur Long", form_type_short: "Nur Short",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Anzahl × Einstand", card_current: "Aktuell",
+    card_today: "Heute",
     card_pnl: "PnL", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX-Rate nicht verfügbar", card_loading: "lädt...",
     card_delete_confirm: "„{name}\" löschen?",
     form_squeeze_title: "⚡ Short-Squeeze-Alarm (nur Short-Leg, optional)",
@@ -1541,6 +1595,7 @@ const STRINGS = {
     form_alarm_pct_help: "Both fields optional. Enter positive numbers only. <strong>Loss threshold</strong>: alert when performance ≤ −X% — Telegram repeats every 3 min until you acknowledge. <strong>Profit threshold</strong>: alert when performance ≥ +Y% — Telegram repeats every 30 min until you acknowledge. <em>For long/short trades, you can switch to absolute price in the ticker's quoted currency (toggle on the right).</em>",
     form_type_label: "Trade type", form_type_pair: "Pair", form_type_long: "Long only", form_type_short: "Short only",
     card_notional: "Notional ({ccy})", card_qty_x_entry: "Qty × Entry", card_current: "Current",
+    card_today: "Today",
     card_pnl: "P&L", card_pnl_in: "(in {ccy})", card_fx_unavailable: "FX rate unavailable", card_loading: "loading...",
     card_delete_confirm: "Delete \"{name}\"?",
     form_squeeze_title: "⚡ Short-squeeze alert (short leg only, optional)",
@@ -2466,8 +2521,11 @@ async function fetchPrice(ticker, force = false) {
     const price = meta.regularMarketPrice;
     const currency = (meta.currency || "").toUpperCase();
     const name = meta.shortName || meta.longName || sym;
+    // Vortags-Schlusskurs für Heute-Delta-Berechnung (Apple-Stocks-Style "+1,23 +0,71%").
+    // Yahoo liefert das Feld in derselben Response — keine Extra-API-Calls nötig.
+    const previousClose = isFinite(meta.chartPreviousClose) ? meta.chartPreviousClose : null;
     if (!isFinite(price)) { const v = { error: t("err_no_price_feed"), ts: now }; PRICE_CACHE.set(sym, v); return v; }
-    const v = { price, currency, name, ts: now };
+    const v = { price, previousClose, currency, name, ts: now };
     PRICE_CACHE.set(sym, v); return v;
   } catch (e) { const v = { error: (e.message || e), ts: now }; PRICE_CACHE.set(sym, v); return v; }
 }
@@ -2784,14 +2842,33 @@ function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
   const homeNote = (entryCcy !== homeCurrency) ? `<span class="fx-note">${t("card_pnl_in", { ccy: homeCurrency })}</span>` : '';
   const tickerUpper = ticker.toUpperCase();
   const sideLabel = isLong ? "Long" : "Short";
+  // Heute-Delta (Apple-Stocks-Style): aktueller Preis − Vortags-Schluss, dargestellt
+  // in der API-Notierungswährung des Tickers (= native ccy). Beide Werte (abs + Pct)
+  // stehen in derselben Color-Klasse damit's auf einen Blick lesbar ist.
+  const todayHtml = renderTodayDeltaRow(lp, apiCcy);
   return `
     <div class="leg ${side}">
       <div class="leg-head"><span class="side">${sideLabel}</span><div class="ticker">${escapeHtml(ticker)}${lp?.name && lp.name !== ticker ? ' <span class="muted" style="font-weight:400;font-size:11px;">' + escapeHtml(lp.name) + '</span>' : ''}<span class="ccy-tag">${entryCcy}</span></div></div>
       <div class="row"><span>${t("card_qty_x_entry")}</span><span class="v">${fmtNum(qty)} × ${fmtMoney(entry, entryCcy)}</span></div>
       <div class="row" data-flash-ticker="${tickerUpper}"><span>${t("card_current")} ${fxNote}</span><span class="v">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (leg.livePxInEntry != null ? fmtMoney(leg.livePxInEntry, entryCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
+      ${todayHtml}
       ${fxMissing && !lp?.error ? `<div class="row"><span class="neg">${t("card_fx_unavailable")}</span><span></span></div>` : ''}
       <div class="row pnl-line ${signClass(leg.pnlInHome)}"><span>${t("card_pnl")} ${homeNote}</span><span class="v">${leg.pnlInHome != null ? (leg.pnlInHome > 0 ? "+" : "") + fmtMoney(leg.pnlInHome, homeCurrency) : "—"}</span></div>
     </div>`;
+}
+
+// Apple-Stocks-Style Heute-Delta-Row: zeigt absolute Tagesveränderung + Prozent in
+// der nativen Notierungswährung des Tickers. Liefert leeren String wenn keine
+// Vortags-Daten verfügbar (z.B. bei Wochenenden, IPO-Tagen, manchen ETFs/OTC-Werten).
+function renderTodayDeltaRow(lp, apiCcy) {
+  if (!lp || lp.error || lp.price == null || lp.previousClose == null) return "";
+  const change = lp.price - lp.previousClose;
+  if (!isFinite(change) || lp.previousClose === 0) return "";
+  const pct = (change / lp.previousClose) * 100;
+  const cls = change >= 0 ? "pos" : "neg";
+  const sign = change > 0 ? "+" : "";
+  const pctSign = pct > 0 ? "+" : "";
+  return `<div class="row"><span>${t("card_today")}</span><span class="v ${cls}">${sign}${fmtMoney(change, apiCcy)} (${pctSign}${pct.toFixed(2)}%)</span></div>`;
 }
 
 function alarmPillHtml(tr) {
@@ -2834,12 +2911,15 @@ function legAggregateHtml(side, ticker, lp, c) {
   const aggNotional = isLong ? c.aggLongNotionalHome : c.aggShortNotionalHome;
   const tickerUpper = ticker.toUpperCase();
   const sideLabel = isLong ? "Long" : "Short";
+  // Heute-Delta-Row identisch zum Single-Tranche-Pfad — gleiche Render-Funktion.
+  const todayHtml = renderTodayDeltaRow(lp, apiCcy);
   return `
     <div class="leg ${side}">
       <div class="leg-head"><span class="side">${sideLabel}</span><div class="ticker">${escapeHtml(ticker)}${lp?.name && lp.name !== ticker ? ' <span class="muted" style="font-weight:400;font-size:11px;">' + escapeHtml(lp.name) + '</span>' : ''}<span class="ccy-tag">${apiCcy}</span></div></div>
       <div class="row"><span>${t("leg_sum_qty")}</span><span class="v">${fmtNum(aggQty)}</span></div>
       <div class="row"><span>${t("leg_sum_notional")}</span><span class="v">${aggNotional != null ? fmtMoney(aggNotional, homeCurrency) : "—"}</span></div>
       <div class="row" data-flash-ticker="${tickerUpper}"><span>${t("card_current")}</span><span class="v">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (livePx != null ? fmtMoney(livePx, apiCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
+      ${todayHtml}
       <div class="row pnl-line ${signClass(aggPnl)}"><span>${t("leg_sum_pnl")}</span><span class="v">${aggPnl != null ? (aggPnl > 0 ? "+" : "") + fmtMoney(aggPnl, homeCurrency) : "—"}</span></div>
     </div>`;
 }
@@ -2881,15 +2961,19 @@ function renderOneTradeRow(tr, c) {
   const rowClass = isMulti ? "trade-row tappable" : "trade-row";
   const tappableAttr = isMulti ? ` data-toggle-tranches="${tr.id}"` : "";
   const panel = isMulti ? tranchePanelHtml(tr, c) : '';
+  // Watchlist-Layout: links die Schlüssel-Zahlen (PnL absolut + Performance-Pct),
+  // mitte die Trade-Identifikation (Name + alarm pills + Ticker-Sub-Zeile), rechts
+  // Edit/Delete. Vertikale Pixel-Spalten-Konsistenz über mehrere Trades hinweg
+  // (tabular-nums-Pflicht in CSS) macht die Liste scanbar wie ein Reuters-Quote.
   card.innerHTML = `
     <div class="${rowClass}"${tappableAttr}>
-      <div class="trade-row-line1">
-        <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}${aPill}
-      </div>
-      <div class="trade-row-tickers">${tickers}</div>
-      <div class="trade-row-nums">
-        <span class="trade-row-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
-        <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
+      <span class="trade-row-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
+      <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
+      <div class="trade-row-info">
+        <div class="trade-row-info-line1">
+          <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}${aPill}
+        </div>
+        <div class="trade-row-tickers">${tickers}</div>
       </div>
       <div class="trade-row-actions">
         <button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button>

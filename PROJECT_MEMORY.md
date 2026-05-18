@@ -32,12 +32,13 @@ Kern-Features:
 - **Zwei Layout-Modi (Handy / Desktop)** — geräteabhängig. Mobile = klassische iPhone-Optik (Snap-Scroll, einspaltig). Desktop = Bloomberg-Style mit linker Sidebar, Pfeiltasten-Navigation, iOS-Control-Center-Page-Transitions, Multi-Column-Grid-View und Floating-Form-Dialogen.
 - **Schriftgrößen-Skalierung** (100/110/120/130%) nur im Desktop-Modus via `zoom`-CSS auf `<html>` — geräteabhängig
 - Standard-Page in Settings konfigurierbar — pro Gerät
-- Grid/Liste-View-Toggle pro Page (touch-freundlich groß) — pro Gerät
+- Grid/Liste-View-Toggle pro Page (touch-freundlich groß) — pro Gerät. **Listen-Ansicht im Watchlist-Stil (seit Mai 2026):** PnL absolut und Performance-Pct stehen ganz links in der Zeile (16-18px Schrift, tabular-nums, vertikal pixel-aligned), Trade-Name + Alarm-Pills + Ticker-Sub-Zeile in der Mitte, Edit/Delete rechts. 4-Spalten-Grid `[120px PnL] [80px Pct] [1fr Info] [auto Actions]` auf Desktop, `[84+] [58+] [1fr] [auto]` auf Mobile. Scanbar wie eine Reuters/Bloomberg-Quote-Liste — Auge landet zuerst auf den Schlüssel-Zahlen, Trade-Identifikation ist sekundär.
 - Keyboard-Shortcuts: **plain `1`/`2`/`3`/`4`** (ohne Modifier) für direkten Page-Switch in allen Layouts. Pfeiltasten **← →** für sequenzielles Page-Durchblättern (Desktop). `?` öffnet eine Shortcut-Übersicht, `Esc` schließt Modals/Forms hierarchisch.
 - **Boot ohne Lock-Sperre:** App startet direkt, ohne Welcome-Screen / Progress-Bar / Pentagon-Loader. Der Loader-Pfad lebt nur noch nach einer echten Code-Eingabe (Lock → Code → Pentagon-Loader → App). Ohne echten Auth-Schritt war das Lade-Theater Reibung ohne Funktion. Frühere Intro-Phase (Owl-Wasserzeichen + Tagline + 2.5s Auto-Progress-Bar) wurde entfernt.
 - **Empty-State-Illustration** mit Owl-SVG + page-spezifischem Titel + Beschreibung + Primary-CTA-Button auf leeren Pages.
 - Auto-Refresh jede Minute wenn App im Foreground während Handelszeit (Mo-Fr, 09:00-23:00 Berlin)
 - Bloomberg-style Price-Flash-Animationen (grün/rot Hintergrund-Flash bei Kursänderung)
+- **Heute-Delta pro Leg (Apple-Stocks-Style):** unter dem aktuellen Preis erscheint eine Zeile „Heute: +1,23 $ (+0,71 %)", grün/rot je nach Tagesrichtung. Daten kommen aus `meta.chartPreviousClose` der bestehenden Yahoo-Response (kein Extra-API-Call). Angezeigt in der nativen Notierungs-Ccy des Tickers. Bei fehlenden Vortags-Daten (Wochenenden, IPO-Tage, manche OTC) wird die Zeile stillschweigend weggelassen.
 
 ---
 
