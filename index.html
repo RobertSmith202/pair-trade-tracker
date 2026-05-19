@@ -107,8 +107,8 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
    Trades vertikal in derselben Pixel-Spalte stehen — Watchlist-Lesbarkeit. */
 .trade-row {
   display: grid;
-  grid-template-columns: minmax(84px, auto) minmax(58px, auto) minmax(0, 1fr) auto;
-  column-gap: 12px;
+  grid-template-columns: minmax(76px, auto) minmax(54px, auto) minmax(0, 1fr) auto;
+  column-gap: 10px;
   align-items: center;
 }
 .trade-row-pnl-col {
@@ -184,6 +184,13 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   flex-shrink: 0;
 }
 .trade-row-actions button { padding: 6px 9px; min-height: 0; font-size: 11px; border-radius: 6px; }
+/* Edit-Button-Schwellwert: auf Mobile zeigt nur das ✎-Icon (spart ~60px in der Zeile,
+   damit die Info-Spalte auf iPhone-Breite nicht zerquetscht wird). Auf Desktop wird
+   das Wort „Bearbeiten" gezeigt — da ist Platz und Discoverability wichtiger. */
+.btn-icon { display: inline; }
+.btn-label { display: none; }
+[data-layout="desktop"] .btn-icon { display: none; }
+[data-layout="desktop"] .btn-label { display: inline; }
 .trade-row.tappable { cursor: pointer; user-select: none; }
 .trade-row.tappable:hover .trade-row-name { opacity: 0.85; }
 .page-dots { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 12px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(to top, var(--bg) 60%, transparent); z-index: 40; pointer-events: none; }
@@ -3069,8 +3076,8 @@ function renderOneTradeRow(tr, c) {
         <div class="trade-row-tickers">${tickers}</div>
       </div>
       <div class="trade-row-actions">
-        <button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button>
-        <button class="icon danger" data-act="del" data-id="${tr.id}">×</button>
+        <button class="icon" data-act="edit" data-id="${tr.id}" aria-label="${t("btn_edit")}"><span class="btn-icon">✎</span><span class="btn-label">${t("btn_edit")}</span></button>
+        <button class="icon danger" data-act="del" data-id="${tr.id}" aria-label="löschen">×</button>
       </div>
     </div>
     ${panel}`;
@@ -3241,8 +3248,8 @@ function renderBasketCard(basket) {
           ${renderTradeRowTodaySub(c.todayPct)}
         </div>
         <span class="basket-card-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
-        <button class="icon" data-basket-edit="${basket.id}" aria-label="edit">${t("btn_edit")}</button>
-        <button class="icon danger" data-basket-del="${basket.id}" aria-label="delete">×</button>
+        <button class="icon" data-basket-edit="${basket.id}" aria-label="${t("btn_edit")}"><span class="btn-icon">✎</span><span class="btn-label">${t("btn_edit")}</span></button>
+        <button class="icon danger" data-basket-del="${basket.id}" aria-label="löschen">×</button>
         <span class="basket-card-arrow">›</span>
       </div>
     </div>
