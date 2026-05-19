@@ -433,7 +433,7 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  opacity: 0.05;
+  opacity: 0.06;
   z-index: -1;
 }
 /* Owl-Mask-Styles auf Lock und Body-App anwenden */
@@ -481,13 +481,19 @@ body::before {
    damit's nach Brand aussieht und nicht nach Sidebar-Item. */
 .ds-brand { display: flex; align-items: center; gap: 11px; padding: 4px 4px 16px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
 .ds-brand-mark {
-  font-size: 22px; line-height: 1; color: var(--info);
+  color: var(--info);
   flex-shrink: 0;
-  width: 36px; height: 36px;
+  width: 38px; height: 38px;
   display: flex; align-items: center; justify-content: center;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
+  padding: 5px;
+  box-sizing: border-box;
+}
+.ds-brand-mark svg {
+  width: 100%; height: 100%;
+  color: var(--info);
 }
 .ds-brand-title { font-size: 14px; font-weight: 700; letter-spacing: 0.1px; line-height: 1.2; }
 /* Vertikale Navigation — aktive Page mit linkem Akzent-Balken via position:relative + ::before,
@@ -602,22 +608,20 @@ body::before {
   width: 100%;
   box-sizing: border-box;
 }
-/* Owl-Watermark auf Desktop — tuned damit's Präsenz hat ohne dem Content
-   in die Quere zu kommen. Ursprünglich war's komplett ausgeblendet weil
-   "zu dominant" (Mobile-Settings 5 % Opacity + min(125vmin, 820px) Größe
-   füllten auf einem 1440er+ Display fast den ganzen Hintergrund mit Owl).
-   Jetzt: nur im Pages-Container-Bereich (left: 220px, also nicht hinter der
-   Sidebar), kleiner (~380px statt 820px), gleichbleibend 5 % Opacity, leicht
-   nach rechts versetzt damit der Owl in der Whitespace-Wüste rechts vom
-   Content-Spalten-Cap sitzt und nicht hinter den Trade-Cards. */
+/* Owl-Watermark auf Desktop — tuned damit's klare Präsenz hat ohne dem Content
+   in die Quere zu kommen. Iterations-Verlauf:
+   Iter 1: komplett ausgeblendet — Mobile-Settings (820px @ 5%) füllten Desktop zu sehr
+   Iter 2: scoped + 380px @ 5% rechts versetzt — präsent aber sehr dezent
+   Iter 3 (jetzt): 460px @ 7 % Opacity, weiterhin rechts versetzt — Owl wird zur
+   klaren Brand-Signatur statt nur Hintergrund-Atmosphäre */
 [data-layout="desktop"] body::before {
   display: block !important;
   left: 220px;
-  -webkit-mask-size: min(45vmin, 380px) auto;
-          mask-size: min(45vmin, 380px) auto;
-  -webkit-mask-position: 78% 50%;
-          mask-position: 78% 50%;
-  opacity: 0.05;
+  -webkit-mask-size: min(52vmin, 460px) auto;
+          mask-size: min(52vmin, 460px) auto;
+  -webkit-mask-position: 80% 50%;
+          mask-position: 80% 50%;
+  opacity: 0.07;
 }
 [data-layout="desktop"] .app-watermark,
 [data-layout="desktop"] .owl-watermark,
@@ -968,7 +972,26 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 
 <aside class="desktop-sidebar" id="desktop-sidebar" aria-label="Navigation">
   <div class="ds-brand">
-    <div class="ds-brand-mark" aria-hidden="true">⌬</div>
+    <div class="ds-brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 280 320" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M 55 80 L 38 25 L 88 65 Z" stroke-width="6" fill="currentColor"/>
+        <path d="M 225 80 L 242 25 L 192 65 Z" stroke-width="6" fill="currentColor"/>
+        <path d="M 60 95 Q 75 70 100 85 Q 125 100 140 95 Q 155 100 180 85 Q 205 70 220 95" stroke-width="8"/>
+        <path d="M 60 95 Q 45 120 50 145 Q 60 175 90 175 L 190 175 Q 220 175 230 145 Q 235 120 220 95" stroke-width="8"/>
+        <circle cx="95" cy="130" r="24" stroke-width="10"/>
+        <circle cx="95" cy="130" r="10" fill="currentColor"/>
+        <circle cx="185" cy="130" r="24" stroke-width="10"/>
+        <circle cx="185" cy="130" r="10" fill="currentColor"/>
+        <path d="M 130 155 L 140 172 L 150 155 Z" stroke-width="6" fill="currentColor"/>
+        <path d="M 50 175 Q 35 220 60 260 Q 90 285 140 285 Q 190 285 220 260 Q 245 220 230 175" stroke-width="8"/>
+        <path d="M 95 178 Q 105 235 140 255 Q 175 235 185 178" stroke-width="7"/>
+        <line x1="115" y1="285" x2="115" y2="298" stroke-width="10"/>
+        <line x1="130" y1="287" x2="130" y2="298" stroke-width="10"/>
+        <line x1="150" y1="287" x2="150" y2="298" stroke-width="10"/>
+        <line x1="165" y1="285" x2="165" y2="298" stroke-width="10"/>
+        <line x1="55" y1="303" x2="225" y2="303" stroke-width="10"/>
+      </svg>
+    </div>
     <div class="ds-brand-title" data-i18n="app_title">Pair Trade Tracker</div>
   </div>
   <!-- Status-Block direkt unter Brand statt unten versteckt: das ist Information,

@@ -346,7 +346,11 @@ Der Layout-Modus wird an `<html data-layout="mobile|desktop">` angeheftet. Alle 
 - **`.page > *` Content-Constraint:** `max-width: min(1100px, 100%); margin-left: 0; margin-right: auto` — alle direkten Page-Children (Page-Head, Aggregate, Trade-Liste, Total-Breakdown, Donut, Basket-Cards) landen in derselben Spalte links-aligned, identische Breite. Verhindert Cmd+/- Zoom-Probleme und gibt eine konsistente Lesespalte
 - **Multi-Column Trade-Grid:** in Grid-View `display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr))` mit max-width 1080px → 3 Karten nebeneinander auf breiten Displays
 - **Forms als zentrierte Floating-Dialoge** statt Inline-Expand: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 600px`. Backdrop via `body:has(.form-card.open)::before`
-- **Owl-Watermark im Desktop-Modus reaktiviert (Mai 2026)** — ursprünglich ausgeblendet weil mit Mobile-Settings (820px Größe, full viewport) zu dominant. Jetzt scoped auf den Pages-Container-Bereich (`left: 220px`, also nicht hinter der Sidebar), kleiner (`min(45vmin, 380px)`), rechts versetzt (`mask-position: 78% 50%`) damit der Owl in der Whitespace-Wüste rechts vom 1280px-Content-Cap sitzt und nicht hinter den Trade-Cards. 5 % Opacity wie auf Mobile. Lock-Screen-Owl unverändert
+- **Owl-Watermark + Brand-Identität (Mai 2026, 3. Iteration):**
+  - **Sidebar-Brand-Mark:** statt generischem `⌬`-Glyph jetzt **inline-SVG-Owl** in 38×38px-Box mit `currentColor`-Stroke (= `var(--info)` Blau). Erhöht Brand-Wiedererkennung deutlich, der Owl ist jetzt aktiv präsent statt nur Hintergrund-Atmosphäre. SVG verwendet die gleiche stilisierte Eule wie im Watermark-Mask + Empty-States (Konsistenz über die ganze App).
+  - **Desktop-Watermark:** scoped auf Pages-Bereich (`left: 220px`), Größe von 380px auf **460px** hochgezogen, Opacity von 5% auf **7%** (vorher zu zurückhaltend laut User-Feedback). Position bei `80% 50%` — sitzt in der Whitespace-Wüste rechts vom 1280px-Content-Cap.
+  - **Mobile-Watermark:** Opacity von 5% auf **6%** für konsistente Präsenz. Bleibt full-viewport mit `min(125vmin, 820px)` Größe.
+  - **Lock-Screen-Owl, Empty-State-Owl, Favicon "L|S":** unverändert. Empty-State zeigt schon eine vollwertige Owl-SVG.
 - Toolbar im Desktop-Modus komplett verborgen (Sidebar übernimmt deren Funktionen)
 
 **Layout-Switch im laufenden Betrieb** (`applyLayout(v)`):
