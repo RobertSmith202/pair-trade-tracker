@@ -30,7 +30,9 @@ const WORKER_STRINGS = {
     profit_ack_prompt:"→ Antworte mit beliebigem Text, um den Gewinn-Alarm zu bestätigen (Wiederholung alle 30 Min)",
     squeeze_ack_prompt:"→ Antworte mit beliebigem Text, um den Squeeze-Alarm zu quittieren (Wiederholung 1× pro Tag)",
     ack_received:"✅ Alarm bestätigt",
-    test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen."
+    test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen.",
+    fallback_warning_title:"⚠ JSONBin nicht erreichbar — Worker arbeitet aus KV-Cache",
+    fallback_warning_body:"Alarme für existierende Trades laufen weiter mit dem letzten bekannten Stand ({age} Min alt). Neue Trades oder geänderte Schwellen sind nicht sichtbar bis JSONBin wieder erreichbar ist. Fehler: {err}"
   },
   en: {
     alarm_title:"🚨 LOSS THRESHOLD BREACHED", profit_title:"🎯 PROFIT THRESHOLD REACHED",
@@ -45,10 +47,19 @@ const WORKER_STRINGS = {
     profit_ack_prompt:"→ Reply with any text to acknowledge the profit alert (repeats every 30 min)",
     squeeze_ack_prompt:"→ Reply with any text to acknowledge the squeeze alert (repeats 1× per day)",
     ack_received:"✅ Alert acknowledged",
-    test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge."
+    test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge.",
+    fallback_warning_title:"⚠ JSONBin unreachable — worker running from KV cache",
+    fallback_warning_body:"Alarms for existing trades continue with the last known snapshot ({age} min old). New trades or threshold changes are not visible until JSONBin is reachable again. Error: {err}"
   }
 };
-function workerT(lang, key) { const d = WORKER_STRINGS[lang] || WORKER_STRINGS.de; return d[key] || WORKER_STRINGS.de[key] || key; }
+function workerT(lang, key, params) {
+  const d = WORKER_STRINGS[lang] || WORKER_STRINGS.de;
+  let s = d[key] || WORKER_STRINGS.de[key] || key;
+  if (params && typeof s === "string") {
+    for (const k in params) s = s.split("{" + k + "}").join(String(params[k]));
+  }
+  return s;
+}
 
 const CORS_HEADERS = { "Access-Control-Allow-Origin":"*", "Access-Control-Allow-Methods":"GET, POST, OPTIONS", "Access-Control-Allow-Headers":"Content-Type" };
 function jsonResponse(o, s=200) { return new Response(JSON.stringify(o), { status: s, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }); }
@@ -78,6 +89,95 @@ async function jsonbinRead(env) {
 async function jsonbinWrite(env, rec) {
   const r = await fetch(`https://api.jsonbin.io/v3/b/${env.JSONBIN_BIN_ID}`, { method: "PUT", headers: { "X-Master-Key": env.JSONBIN_KEY, "Content-Type": "application/json" }, body: JSON.stringify(rec) });
   if (!r.ok) throw new Error("JSONBin write failed: " + r.status);
+}
+
+// === KV-Cache-Resilience-Layer ============================================
+// Worker wickelt JSONBin-Reads/Writes durch loadTradebook/saveTradebook ab.
+// Funktionsweise:
+//   • Read:  JSONBin zuerst probieren → bei Erfolg in KV spiegeln; bei Fehler
+//            (z.B. HTTP 403 Quota-exhausted, 500/520-Outage) auf KV-Cache zurückfallen.
+//   • Write: JSONBin zuerst probieren → bei Fehler in KV-only schreiben damit
+//            der nächste Cron-Tick zumindest den aktuellsten AlertState sieht.
+// Beim Fallback auf KV wird eine Telegram-Warnung an Robert geschickt, rate-limited
+// auf max. 1× pro Stunde (sonst spammt's bei einem Mehrtages-Outage). Worker-Cron
+// liefert die Alarme weiter mit dem letzten bekannten Trade-Stand — wichtig damit
+// Verlust-Schwellen auch bei JSONBin-Outage feuern.
+// KV-Binding-Name: TRADEBOOK_CACHE. Setup in Cloudflare-Dashboard → Worker →
+// Settings → Variables and Secrets → KV Namespace Bindings → "TRADEBOOK_CACHE".
+// Falls Binding nicht existiert, verhält sich der Worker wie vorher (kein Fallback).
+const TRADEBOOK_KV_KEY = "tradebook:latest";
+const FALLBACK_WARN_KV_KEY = "fallback_warn:last_ts";
+const FALLBACK_WARN_MIN_INTERVAL_MS = 60 * 60 * 1000;  // 1h zwischen Warnungen
+const KV_TTL_SECONDS = 7 * 24 * 3600;                  // 7 Tage Cache-Aufbewahrung
+
+async function loadTradebook(env) {
+  try {
+    const data = await jsonbinRead(env);
+    // Spiegeln in KV (best-effort, Fehler werden geschluckt)
+    if (env.TRADEBOOK_CACHE) {
+      try {
+        await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
+          JSON.stringify({ data, ts: Date.now() }),
+          { expirationTtl: KV_TTL_SECONDS });
+      } catch (e) { /* swallowed: KV-write-fail darf den Cron-Lauf nicht crashen */ }
+    }
+    return { data, source: "jsonbin" };
+  } catch (jbErr) {
+    if (!env.TRADEBOOK_CACHE) throw jbErr;  // Kein Binding → kein Fallback möglich
+    let cached;
+    try {
+      cached = await env.TRADEBOOK_CACHE.get(TRADEBOOK_KV_KEY, { type: "json" });
+    } catch (kvErr) {
+      throw new Error(`jsonbin failed (${jbErr.message}) and KV-read failed (${kvErr.message})`);
+    }
+    if (!cached || !cached.data) {
+      throw new Error(`jsonbin failed (${jbErr.message}) and no KV-cache yet — nothing to fall back to`);
+    }
+    const ageMin = Math.max(0, Math.round((Date.now() - (cached.ts || 0)) / 60000));
+    // Telegram-Warnung an User, aber rate-limited (1×/h)
+    await maybeSendFallbackWarning(env, cached.data, ageMin, jbErr.message);
+    return { data: cached.data, source: "kv_cache", ageMin };
+  }
+}
+
+async function saveTradebook(env, record) {
+  // Always update KV mirror with the new state — auch wenn JSONBin gleich klappt,
+  // damit der Cache nach jedem geschriebenen Update auf dem aktuellsten Stand ist.
+  if (env.TRADEBOOK_CACHE) {
+    try {
+      await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
+        JSON.stringify({ data: record, ts: Date.now() }),
+        { expirationTtl: KV_TTL_SECONDS });
+    } catch (e) { /* swallowed */ }
+  }
+  // JSONBin-Write versuchen
+  try {
+    await jsonbinWrite(env, record);
+    return { ok: true, source: "jsonbin" };
+  } catch (jbErr) {
+    // JSONBin-Write fehlgeschlagen — KV ist schon aktualisiert (siehe oben),
+    // also wird der nächste Cron-Tick (oder ein Frontend-Pull) mit JSONBin
+    // wieder die richtigen States haben sobald JSONBin wieder erreichbar ist.
+    // Limitation: bis JSONBin zurück ist, weiß das Frontend nichts vom State-Change.
+    console.warn("jsonbin write failed, kept in KV only:", jbErr.message);
+    return { ok: true, source: "kv_only", error: jbErr.message };
+  }
+}
+
+async function maybeSendFallbackWarning(env, record, ageMin, errMsg) {
+  if (!env.TRADEBOOK_CACHE) return;
+  try {
+    const lastRaw = await env.TRADEBOOK_CACHE.get(FALLBACK_WARN_KV_KEY);
+    const last = lastRaw ? parseInt(lastRaw, 10) : 0;
+    if (Date.now() - last < FALLBACK_WARN_MIN_INTERVAL_MS) return;  // rate-limited
+    const lang = (record && record.lang) || "de";
+    const shortErr = (errMsg || "").slice(0, 100);
+    const msg = workerT(lang, "fallback_warning_title") + "\n\n"
+              + workerT(lang, "fallback_warning_body", { age: String(ageMin), err: shortErr });
+    await sendTelegram(env, msg);
+    await env.TRADEBOOK_CACHE.put(FALLBACK_WARN_KV_KEY, String(Date.now()),
+      { expirationTtl: KV_TTL_SECONDS });
+  } catch (e) { /* swallowed — Warnung ist Best-Effort */ }
 }
 
 const FX_CACHE = new Map();
@@ -357,7 +457,7 @@ function buildSqueezeMessage(lang, trade, shortPct, threshold, shortInfo) {
 // → Short-Interest von Yahoo holen und gegen Schwelle prüfen. Identische
 // State-Maschine wie Loss/Profit (idle → triggered → acknowledged → idle).
 async function runShortSqueezeCheck(env) {
-  const record = await jsonbinRead(env);
+  const { data: record } = await loadTradebook(env);
   const trades = record.trades || [];
   const lang = record.lang || "de";
   const states = record.alertStates || {};
@@ -412,13 +512,13 @@ async function runShortSqueezeCheck(env) {
     if (stChanged) { states[id] = st; stateChanged = true; }
   }
 
-  if (stateChanged) await jsonbinWrite(env, { ...record, alertStates: states });
+  if (stateChanged) await saveTradebook(env, { ...record, alertStates: states });
   return { ok: true, results };
 }
 
 async function runAlarmCheck(env) {
   if (!isWithinTradingHours()) return { ok: true, skipped: "outside trading hours" };
-  const record = await jsonbinRead(env);
+  const { data: record } = await loadTradebook(env);
   const trades = record.trades || [];
   const lang = record.lang || "de";
   const states = record.alertStates || {};
@@ -572,7 +672,7 @@ async function runAlarmCheck(env) {
     if (stChanged) { states[bId] = st; stateChanged = true; }
   }
 
-  if (stateChanged) await jsonbinWrite(env, { ...record, alertStates: states });
+  if (stateChanged) await saveTradebook(env, { ...record, alertStates: states });
   return { ok: true, results };
 }
 
@@ -601,7 +701,7 @@ function buildBasketAlarmMessage(lang, basket, kind, aggPerfPct, aggPnl, aggNoti
 
 async function sendTestAlert(env) {
   let lang = "de";
-  try { lang = (await jsonbinRead(env)).lang || "de"; } catch {}
+  try { lang = (await loadTradebook(env)).data.lang || "de"; } catch {}
   const msg = [workerT(lang, "test_alert"), "", workerT(lang, "test_body"), "", workerT(lang, "ack_prompt")].join("\n");
   return (await sendTelegram(env, msg)) ? "test sent" : "test failed";
 }
@@ -611,7 +711,7 @@ async function handleTelegramWebhook(req, env) {
   const m = update.message;
   if (!m || !m.chat || String(m.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return textResponse("ignored");
   let record, lang = "de";
-  try { record = await jsonbinRead(env); lang = record.lang || "de"; } catch { await sendTelegram(env, workerT(lang, "ack_received")); return textResponse("ok (no record)"); }
+  try { const r = await loadTradebook(env); record = r.data; lang = record.lang || "de"; } catch { await sendTelegram(env, workerT(lang, "ack_received")); return textResponse("ok (no record)"); }
   const states = record.alertStates || {}; let changed = false;
   const ackTs = Date.now();
   for (const id of Object.keys(states)) {
@@ -631,7 +731,7 @@ async function handleTelegramWebhook(req, env) {
     }
     if (touched) { states[id] = st; changed = true; }
   }
-  if (changed) { try { await jsonbinWrite(env, { ...record, alertStates: states }); } catch {} }
+  if (changed) { try { await saveTradebook(env, { ...record, alertStates: states }); } catch {} }
   await sendTelegram(env, workerT(lang, "ack_received"));
   return textResponse("ok");
 }

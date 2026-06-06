@@ -55,6 +55,28 @@ Hat nichts mit Code zu tun. In Telegram an **@BotFather** schreiben → `/mybots
 
 Cloudflare-Dashboard → Worker → "Settings" → "Variables and Secrets" → entsprechendes Secret editieren oder neu anlegen → Save. Worker muss nicht neu deployed werden, Secrets sind sofort wirksam.
 
+### E) KV-Namespace für Worker-Resilience anlegen (einmalig, seit Mai 2026)
+
+**Wozu:** der Worker fängt JSONBin-Outages und Quota-Exhaustions mit einem KV-Cache-Fallback ab. Ohne diesen Namespace verhält sich der Worker wie vorher (keine Telegram-Alarme wenn JSONBin gerade nicht erreichbar ist). Mit Namespace: Alarme laufen weiter mit dem letzten bekannten Trade-Stand, plus du kriegst eine Telegram-Warnung wenn der Fallback aktiv wird.
+
+**Setup-Schritte (einmalig, ~5 Min):**
+
+1. Cloudflare-Dashboard → **Storage & Databases** → **KV** → **„Create namespace"** → Name: `pair-trade-tracker-cache` (oder beliebig anders) → Create
+2. Zurück zum **Worker** (yahoo-finance-proxy) → **Settings** → **Variables and Secrets**
+3. Im Block **„KV Namespace Bindings"** → **„Add binding"**
+4. **Variable name:** `TRADEBOOK_CACHE` (genau so, casesensitiv — der Worker-Code referenziert diesen Namen)
+5. **KV namespace:** den in Schritt 1 erstellten Namespace auswählen
+6. **Save**
+
+Kein Worker-Redeploy nötig nach Setup — Bindings sind sofort aktiv. Beim nächsten Cron-Tick (max. 3 Min Wartezeit) sollte der Worker den KV-Cache schon nutzen.
+
+**Verifizieren dass es funktioniert:**
+
+- Browser auf `https://yahoo-finance-proxy.fabian-terhorst.workers.dev/check` aufrufen. Wenn die Response durchgeht, ist alles normal (`source: "jsonbin"` im Cache wenn du im Worker-Log nachschaust).
+- Bei einem JSONBin-Outage: du bekommst eine Telegram-Nachricht „⚠ JSONBin nicht erreichbar — Worker arbeitet aus KV-Cache". Das ist der Trigger dass alles richtig läuft.
+
+**Free-Tier-Limits (Cloudflare KV):** 100k Reads/Tag, 1k Writes/Tag — für diesen Use-Case völlig ausreichend (Worker schreibt nur bei JSONBin-Read-Success in den Cache, also wenige Schreibvorgänge pro Tag).
+
 ## Schritt 3 — Verifizieren dass alles läuft
 
 Nach jeder Änderung:

@@ -32,7 +32,7 @@ Kern-Features:
 - **Zwei Layout-Modi (Handy / Desktop)** — geräteabhängig. Mobile = klassische iPhone-Optik (Snap-Scroll, einspaltig). Desktop = Bloomberg-Style mit linker Sidebar, Pfeiltasten-Navigation, iOS-Control-Center-Page-Transitions, Multi-Column-Grid-View und Floating-Form-Dialogen.
 - **Schriftgrößen-Skalierung** (100/110/120/130%) nur im Desktop-Modus via `zoom`-CSS auf `<html>` — geräteabhängig
 - Standard-Page in Settings konfigurierbar — pro Gerät
-- Grid/Liste-View-Toggle pro Page (touch-freundlich groß) — pro Gerät. **Listen-Ansicht im Watchlist-Stil (seit Mai 2026):** PnL absolut und Performance-Pct stehen ganz links in der Zeile (16-18px Schrift, tabular-nums, vertikal pixel-aligned), Trade-Name + Alarm-Pills + Ticker-Sub-Zeile in der Mitte, Edit/Delete rechts. 4-Spalten-Grid `[120px PnL] [80px Pct] [1fr Info] [auto Actions]` auf Desktop, `[76+] [54+] [1fr] [auto]` auf Mobile. **Mobile-Optimierung:** Edit-Button zeigt auf Mobile nur das ✎-Icon (statt „Bearbeiten") damit die Info-Spalte auf iPhone-Breite nicht zerquetscht wird; Desktop behält den vollen Text für bessere Discoverability. Mechanismus: zwei verschachtelte spans `.btn-icon` und `.btn-label` im Button-HTML, default `.btn-icon { display: inline }` und `.btn-label { display: none }`, Desktop-Override umgekehrt. Scanbar wie eine Reuters/Bloomberg-Quote-Liste — Auge landet zuerst auf den Schlüssel-Zahlen, Trade-Identifikation ist sekundär.
+- Grid/Liste-View-Toggle pro Page (touch-freundlich groß) — pro Gerät. **Listen-Ansicht im Watchlist-Stil (seit Mai 2026):** PnL absolut und Performance-Pct stehen ganz links in der Zeile (16-18px Schrift, tabular-nums, vertikal pixel-aligned), Trade-Name in der Mitte (Info-Spalte mit drei gestackten Zeilen: Name → Alarm-Pills → Ticker-Sub), Edit/Delete rechts. 4-Spalten-Grid `[120px PnL] [80px Pct] [1fr Info] [auto Actions]` auf Desktop, `[76+] [54+] [1fr] [auto]` auf Mobile. **Mobile-Optimierungen:** (1) Edit-Button zeigt auf Mobile nur das ✎-Icon (statt „Bearbeiten") — Mechanismus über `.btn-icon` / `.btn-label`-spans mit Desktop-CSS-Override. (2) Alarm-Pills in eigener `.trade-row-info-alarms`-Zeile (zwischen Name und Ticker-Sub), kompakter getuned (font 9px, padding 1×5) — vorher wrappten sie ungeordnet im selben Flex-Container wie der Name und zerrissen die Zeile in 4 Sub-Linien. Jetzt klare 3-Zeilen-Struktur Name/Pills/Tickers. (3) List-View-Card-Padding 10→8px für gedrungenere Gesamthöhe. Scanbar wie eine Reuters/Bloomberg-Quote-Liste — Auge landet zuerst auf den Schlüssel-Zahlen, Trade-Identifikation ist sekundär.
 - Keyboard-Shortcuts: **plain `1`/`2`/`3`/`4`** (ohne Modifier) für direkten Page-Switch in allen Layouts. Pfeiltasten **← →** für sequenzielles Page-Durchblättern (Desktop). `?` öffnet eine Shortcut-Übersicht, `Esc` schließt Modals/Forms hierarchisch.
 - **Boot ohne Lock-Sperre:** App startet direkt, ohne Welcome-Screen / Progress-Bar / Pentagon-Loader. Der Loader-Pfad lebt nur noch nach einer echten Code-Eingabe (Lock → Code → Pentagon-Loader → App). Ohne echten Auth-Schritt war das Lade-Theater Reibung ohne Funktion. Frühere Intro-Phase (Owl-Wasserzeichen + Tagline + 2.5s Auto-Progress-Bar) wurde entfernt.
 - **Empty-State-Illustration** mit Owl-SVG + page-spezifischem Titel + Beschreibung + Primary-CTA-Button auf leeren Pages.
@@ -658,6 +658,44 @@ Yahoo's `defaultKeyStatistics` füllt `shortPercentOfFloat` zuverlässig nur fü
 **Pill in der App:** ⚡-Icon, orange/gelbe Färbung (über `--warn`), pulsiert bei `triggered`. Klar abgegrenzt von der grünen Profit- und roten Loss-Pill.
 
 **Worker-Endpoint zum manuellen Testen:** `GET /check-squeeze` (analog zu `/check`).
+
+### Worker-Resilience: KV-Cache-Fallback (seit Mai 2026)
+
+Der Worker geht nicht mehr direkt durch `jsonbinRead`/`jsonbinWrite` für die Alarm-Cron-Logik, sondern durch die Wrapper `loadTradebook(env)` / `saveTradebook(env, record)`. Hintergrund: JSONBin-Outages (HTTP 520) und Quota-Exhaustions (HTTP 403 Free-Tier 10k/Monat) führten dazu dass der Worker-Cron die Trades nicht mehr lesen konnte → keine Telegram-Alarme wurden gesendet, der User merkte es nicht. **Konkreter Vorfall:** Mai 2026, Robert legte einen Trade mit Verlust-Schwelle an, gestrige Handelstag bis 23:00, Schwelle wurde verletzt, kein Alarm — JSONBin-Quota war erschöpft, Worker konnte nicht lesen.
+
+**Wie der Fallback funktioniert:**
+
+```
+loadTradebook(env):
+  try JSONBin-Read
+    on success → mirror data to KV (TTL 7 Tage)
+    return { data, source: "jsonbin" }
+  on failure → try KV-Read
+    on success → send Telegram-Warning (rate-limited 1×/h)
+    return { data: cached.data, source: "kv_cache", ageMin }
+    on no-cache or KV-fail → re-throw
+
+saveTradebook(env, record):
+  always update KV mirror first (defensive)
+  try JSONBin-Write
+    on success → return { ok: true, source: "jsonbin" }
+    on failure → log + return { ok: true, source: "kv_only" }
+```
+
+**Was im Cache landet:** Trades (Tickers, Qty, Einstandspreise, Schwellen, Tranchen), Baskets, AlertStates, lang. **Was NICHT im Cache landet:** Yahoo-Live-Preise — die holt der Worker bei jedem Cron-Tick frisch direkt von Yahoo. Damit altert die Cache-Daten zwar (bei mehrtägigem Outage könnte ein Schwellen-Edit nicht durchkommen), aber die Preis-Bewegungs-Berechnung selber ist immer live.
+
+**Telegram-Warnung beim Fallback:** Wenn der Worker auf den KV-Cache zurückfällt, schickt er einmalig eine Nachricht „⚠ JSONBin nicht erreichbar — Worker arbeitet aus KV-Cache (Stand: X Min alt)". Rate-limited via KV-Key `fallback_warn:last_ts` auf max. 1×/Stunde damit ein 3-Tages-Outage nicht 60 Nachrichten produziert. Beim nächsten erfolgreichen JSONBin-Read würde theoretisch eine „all-clear"-Nachricht sinnvoll sein — ist aber aktuell nicht implementiert (würde zusätzliche State-Tracking erfordern).
+
+**Cloudflare-Setup-Voraussetzung:** KV-Namespace `TRADEBOOK_CACHE` muss in Cloudflare-Dashboard → Workers → Settings → Variables and Secrets → KV Namespace Bindings angelegt und an den Worker gebunden sein. Falls Binding fehlt, verhält sich der Worker exakt wie vorher (kein Fallback) — die Funktionen detektieren das `env.TRADEBOOK_CACHE === undefined` und gehen direkt durch zu JSONBin. Kein Crash, nur kein Resilience-Gewinn.
+
+**KV-Keys die der Worker verwendet:**
+- `tradebook:latest` → JSON-Snapshot der letzten erfolgreich gelesenen JSONBin-Daten + Timestamp
+- `fallback_warn:last_ts` → Unix-Millis des letzten Fallback-Warnings (für Rate-Limiting)
+
+**Limitierungen die der Cache NICHT mitigiert:**
+1. **Neue Trades während Outage:** Frontend kann während JSONBin-Outage nicht pushen, Worker kennt den neuen Trade nicht.
+2. **Schwellen-Edits während Outage:** Analog — Worker rechnet weiter mit alter Schwelle bis JSONBin wieder erreichbar.
+3. **Telegram-Acks während Outage:** Webhook schreibt mit `saveTradebook` was auf KV-only fallback'n kann; beim nächsten erfolgreichen JSONBin-Write wird's gepusht. Risiko: bis dahin könnte derselbe Alarm erneut feuern.
 
 ### Handelszeit-Fenster
 
