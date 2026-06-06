@@ -122,6 +122,12 @@ const KV_TTL_SECONDS = 7 * 24 * 3600;                  // 7 Tage Cache-Aufbewahr
 // JSONBin ist nur noch Cold-Start-Fallback falls KV leer ist UND JSONBin-Secrets noch
 // gesetzt sind — dieser Pfad existiert für die Migration von alten Bins. Nach erfolgreicher
 // Migration kann der JSONBin-Read-Block komplett raus, plus die Secrets im CF-Dashboard.
+//
+// Wichtig: „KV leer + JSONBin nicht verfügbar" ist KEIN Fehler, sondern ein gültiger
+// Bootstrap-Zustand. Wir geben ein leeres Tradebook zurück — das Frontend behandelt
+// es korrekt (sieht remote = leer, lokal hat Daten → Push triggert → KV wird gefüllt).
+// Wenn wir hier throwen würden, blockt der Pull den ganzen Sync-Flow und KV bleibt
+// für immer leer. Beobachtet bei Roberts Erst-Migration Mai 2026.
 async function loadTradebook(env) {
   // 1. KV zuerst — das ist der reguläre Pfad
   if (env.TRADEBOOK_CACHE) {
@@ -135,24 +141,26 @@ async function loadTradebook(env) {
       // weiter zu JSONBin-Fallback
     }
   }
-  // 2. JSONBin-Fallback nur für Cold-Start / Migration
-  if (!env.JSONBIN_BIN_ID || !env.JSONBIN_KEY) {
-    throw new Error("KV empty and no JSONBin credentials for cold-start fallback");
-  }
-  try {
-    const data = await jsonbinRead(env);
-    // Erfolgreich von JSONBin gelesen → in KV spiegeln damit der nächste Read direkt aus KV kommt
-    if (env.TRADEBOOK_CACHE) {
-      try {
-        await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
-          JSON.stringify({ data, ts: Date.now() }),
-          { expirationTtl: KV_TTL_SECONDS });
-      } catch (e) { /* swallowed */ }
+  // 2. JSONBin-Cold-Start-Bootstrap — nur best-effort, Fehler werden geschluckt
+  if (env.JSONBIN_BIN_ID && env.JSONBIN_KEY) {
+    try {
+      const data = await jsonbinRead(env);
+      // Erfolgreich von JSONBin gelesen → in KV spiegeln damit der nächste Read direkt aus KV kommt
+      if (env.TRADEBOOK_CACHE) {
+        try {
+          await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
+            JSON.stringify({ data, ts: Date.now() }),
+            { expirationTtl: KV_TTL_SECONDS });
+        } catch (e) { /* swallowed */ }
+      }
+      return { data, source: "jsonbin_bootstrap" };
+    } catch (jbErr) {
+      console.warn("jsonbin cold-start fallback failed (ok during migration):", jbErr.message);
+      // Fall-through zu „leeres Tradebook" — kein Throw
     }
-    return { data, source: "jsonbin_bootstrap" };
-  } catch (jbErr) {
-    throw new Error(`KV empty and JSONBin-fallback failed: ${jbErr.message}`);
   }
+  // 3. Leeres Tradebook als gültiger Bootstrap-Zustand
+  return { data: {}, source: "empty", ts: 0 };
 }
 
 // saveTradebook: KV ist der primäre Persistenz-Layer. JSONBin-Mirror wird nur dann
