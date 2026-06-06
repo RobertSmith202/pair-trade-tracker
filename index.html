@@ -364,6 +364,46 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .sector-net-row .sector-net-val { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
 .sector-net-row .sector-net-val.pos { color: var(--pos); }
 .sector-net-row .sector-net-val.neg { color: var(--neg); }
+
+/* Beta-Override-Feld im Trade-Form: kleiner, dezenter — soll signalisieren
+   "wenn leer, holt der Tracker den Wert automatisch von Yahoo" */
+.beta-override-field { margin-top: 8px; }
+.beta-override-field label { font-size: 10px; opacity: 0.7; }
+.beta-override-field input { font-size: 13px; opacity: 0.85; }
+.beta-override-field input:focus { opacity: 1; }
+
+/* Markt-Exposure-Karte (Beta) auf der Gesamt-Page */
+.beta-exposure { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+.beta-exposure-title { font-size: 11px; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+.beta-hero { padding: 4px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.beta-hero-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.beta-hero-val { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+.beta-hero-val.pos { color: var(--pos); }
+.beta-hero-val.neg { color: var(--neg); }
+.beta-hero-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.beta-sub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+.beta-sub-cell { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.beta-sub-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.beta-sub-val { font-size: 16px; font-weight: 700; color: var(--text); }
+.beta-sub-val.muted { color: var(--muted); font-weight: 600; font-size: 13px; }
+.beta-contributors { margin-bottom: 12px; }
+.beta-contributors-head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; font-weight: 700; }
+.beta-contributors-list { display: flex; flex-direction: column; gap: 0; }
+.beta-contrib-row { display: grid; grid-template-columns: auto 1fr auto auto; column-gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(127,127,127,0.08); font-size: 12px; }
+.beta-contrib-row:last-child { border-bottom: none; }
+.beta-contrib-arrow { font-size: 11px; width: 14px; text-align: center; }
+.beta-contrib-arrow.pos { color: var(--pos); }
+.beta-contrib-arrow.neg { color: var(--neg); }
+.beta-contrib-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.beta-contrib-name .side { font-size: 10px; color: var(--muted); margin-left: 6px; padding: 1px 5px; border-radius: 3px; background: rgba(127,127,127,0.12); }
+.beta-contrib-name .override { font-size: 9px; color: var(--info); margin-left: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.beta-contrib-formula { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
+.beta-contrib-val { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 80px; text-align: right; }
+.beta-contrib-val.pos { color: var(--pos); }
+.beta-contrib-val.neg { color: var(--neg); }
+.beta-disclaimer { font-size: 11px; color: var(--muted); line-height: 1.4; padding-top: 8px; border-top: 1px solid var(--border); }
+[data-layout="desktop"] .beta-hero-val { font-size: 36px; }
+[data-layout="desktop"] .beta-sub-val { font-size: 18px; }
 /* Basket-Karten auf Long/Short-Page */
 .basket-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; cursor: pointer; user-select: none; position: relative; transition: transform 0.05s, background-color 0.1s; }
 .basket-card:active { transform: scale(0.99); }
@@ -1295,6 +1335,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <input type="checkbox" id="f-long-native">
       <label for="f-long-native" id="f-long-native-label"></label>
     </div>
+    <div class="field beta-override-field"><label data-i18n="form_beta_override">Beta-Override (optional, leer = Yahoo)</label><input id="f-long-beta" type="text" inputmode="decimal" autocomplete="off" placeholder=""></div>
   </div>
   <div class="form-section short" id="form-short-section">
     <h4 data-i18n="form_short_position">Short-Position</h4>
@@ -1307,6 +1348,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       <input type="checkbox" id="f-short-native">
       <label for="f-short-native" id="f-short-native-label"></label>
     </div>
+    <div class="field beta-override-field"><label data-i18n="form_beta_override">Beta-Override (optional, leer = Yahoo)</label><input id="f-short-beta" type="text" inputmode="decimal" autocomplete="off" placeholder=""></div>
   </div>
   <div class="form-section alarm" id="form-loss-section">
     <h4 data-i18n="form_alarm_loss_title">🚨 Verlust-Alarm (optional)</h4>
@@ -1549,6 +1591,32 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         </div>
         <div class="sector-net-rows" id="sector-net-rows"></div>
       </div>
+    </div>
+    <!-- Markt-Exposure (Beta) — Long/Short-gewichtete Summe von Yahoo's 5Y monthly Beta gegen S&P 500.
+         Aktuelles Notional als Basis (livePx × qty × FX), nicht Einstand.
+         Beta-Dollar = Σ N_L·β_L − Σ N_S·β_S. Variante 1 (Coverage-Anzeige) ist default. -->
+    <div class="beta-exposure" id="beta-exposure" style="display:none">
+      <h4 class="beta-exposure-title" data-i18n="beta_title">Markt-Exposure (Beta)</h4>
+      <div class="beta-hero">
+        <div class="beta-hero-label" data-i18n="beta_dollar_label">Beta-adjustiertes Netto-Exposure</div>
+        <div class="beta-hero-val tabular" id="beta-dollar-val">—</div>
+        <div class="beta-hero-sub" id="beta-dollar-hint">—</div>
+      </div>
+      <div class="beta-sub-grid">
+        <div class="beta-sub-cell">
+          <div class="beta-sub-label" data-i18n="beta_per_net">β je Netto-€</div>
+          <div class="beta-sub-val tabular" id="beta-per-net">—</div>
+        </div>
+        <div class="beta-sub-cell">
+          <div class="beta-sub-label" data-i18n="beta_coverage">Coverage</div>
+          <div class="beta-sub-val tabular" id="beta-coverage">—</div>
+        </div>
+      </div>
+      <div class="beta-contributors">
+        <div class="beta-contributors-head" data-i18n="beta_top_contributors">Top-Beiträge zum Portfolio-Beta</div>
+        <div class="beta-contributors-list" id="beta-contributors-list"></div>
+      </div>
+      <div class="beta-disclaimer" data-i18n="beta_disclaimer">Basis: Yahoo 5-Jahres-Beta, monatlich gemessen, gegen S&P 500. Manuelle Override im Trade-Form möglich.</div>
     </div>
   </section>
 </div>
@@ -1841,6 +1909,20 @@ const STRINGS = {
     sector_net_table_hint: "Long − Short, positiv = netto long, negativ = netto short",
     sector_unknown: "Unbekannt",
     sector_loading: "Branchen werden geladen…",
+    beta_title: "Markt-Exposure (Beta)",
+    beta_dollar_label: "Beta-adjustiertes Netto-Exposure",
+    beta_dollar_hint: "Bei +1 % Markt-Bewegung bewegt sich dein Portfolio ungefähr um {amt}",
+    beta_per_gross: "β je Brutto-€",
+    beta_per_net: "β je Netto-€",
+    beta_per_net_na: "n/a",
+    beta_coverage: "Coverage",
+    beta_coverage_hint: "{pct} % deines Brutto-Notionals haben Beta-Daten",
+    beta_top_contributors: "Top-Beiträge zum Portfolio-Beta",
+    beta_disclaimer: "Basis: Yahoo 5-Jahres-Beta, monatlich gemessen, gegen S&P 500. Bei EU-Aktien zum US-Markt — kann gegen lokale Indizes abweichen. Manuelle Override im Trade-Form möglich.",
+    beta_long_side: "Long",
+    beta_short_side: "Short",
+    beta_override_marker: "Override",
+    beta_no_data: "keine Beta-Daten verfügbar",
     btn_new_basket: "+ Neuer Korb",
     basket_default_name: "Korb",
     basket_count_n: "× {n} Trades",
@@ -1921,6 +2003,8 @@ const STRINGS = {
     err_short_invalid: "Short: Anzahl und Einstand müssen > 0 sein.",
     err_long_ticker_required: "Bitte Long-Ticker eingeben.", err_short_ticker_required: "Bitte Short-Ticker eingeben.",
     err_alarm_invalid: "Alarm-Schwelle: ungültige Zahl. Beispiel: -30",
+    err_beta_invalid: "Beta-Override: ungültige Zahl. Beispiel: 1,2",
+    form_beta_override: "Beta-Override (optional, leer = Yahoo)",
     save_warn_intro: "⚠ Folgende Schwellen würden beim aktuellen Kurs sofort auslösen:",
     save_warn_line_min_pct: "• Verlust-Schwelle {thr} (Performance jetzt: {cur})",
     save_warn_line_max_pct: "• Gewinn-Schwelle {thr} (Performance jetzt: {cur})",
@@ -2029,6 +2113,20 @@ const STRINGS = {
     sector_net_table_hint: "Long − short, positive = net long, negative = net short",
     sector_unknown: "Unknown",
     sector_loading: "Loading sectors…",
+    beta_title: "Market exposure (beta)",
+    beta_dollar_label: "Beta-adjusted net exposure",
+    beta_dollar_hint: "On a +1 % market move, your book moves about {amt}",
+    beta_per_gross: "β per gross €",
+    beta_per_net: "β per net €",
+    beta_per_net_na: "n/a",
+    beta_coverage: "Coverage",
+    beta_coverage_hint: "{pct} % of your gross notional has beta data",
+    beta_top_contributors: "Top contributors to portfolio beta",
+    beta_disclaimer: "Source: Yahoo 5-year beta, monthly, vs S&P 500. For EU stocks measured against the US market — may differ vs local indices. Override available in trade form.",
+    beta_long_side: "Long",
+    beta_short_side: "Short",
+    beta_override_marker: "override",
+    beta_no_data: "no beta data available",
     btn_new_basket: "+ New basket",
     basket_default_name: "Basket",
     basket_count_n: "× {n} trades",
@@ -2109,6 +2207,8 @@ const STRINGS = {
     err_short_invalid: "Short: quantity and entry must be > 0.",
     err_long_ticker_required: "Please enter the long ticker.", err_short_ticker_required: "Please enter the short ticker.",
     err_alarm_invalid: "Alarm threshold: invalid number. Example: -30",
+    err_beta_invalid: "Beta override: invalid number. Example: 1.2",
+    form_beta_override: "Beta override (optional, blank = Yahoo)",
     save_warn_intro: "⚠ The following thresholds would trigger immediately at current prices:",
     save_warn_line_min_pct: "• Loss threshold {thr} (performance now: {cur})",
     save_warn_line_max_pct: "• Profit threshold {thr} (performance now: {cur})",
@@ -2173,10 +2273,11 @@ const PRICE_CACHE = new Map();
 const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
 const PREVIOUS_PRICES = new Map();
-// Sektor-Klassifizierung pro Ticker — kommt vom Worker (Yahoo assetProfile), wird in localStorage gecached.
-// Map<TICKER, { sector: string|null, industry: string|null, fetchedAt: number }>
+// Profile pro Ticker — kommt vom Worker (Yahoo assetProfile + defaultKeyStatistics),
+// wird in localStorage gecached. v2 enthält jetzt auch beta (5Y monthly gegen S&P).
+// Map<TICKER, { sector, industry, beta, beta3y, fetchedAt }>
 const SECTOR_CACHE = new Map();
-const SECTOR_CACHE_KEY = "pair_trade_sector_cache_v1";
+const SECTOR_CACHE_KEY = "pair_trade_sector_cache_v1"; // Key bleibt, Schema erweitert (alte Einträge ohne beta werden invalidiert)
 const SECTOR_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 Tage
 const SECTOR_INFLIGHT = new Map(); // Vermeide doppelte Worker-Calls für denselben Ticker
 function loadSectorCache() {
@@ -2187,7 +2288,11 @@ function loadSectorCache() {
     const now = Date.now();
     Object.keys(obj || {}).forEach(k => {
       const v = obj[k];
-      if (v && v.fetchedAt && (now - v.fetchedAt) < SECTOR_CACHE_TTL) SECTOR_CACHE.set(k, v);
+      if (!v || !v.fetchedAt || (now - v.fetchedAt) >= SECTOR_CACHE_TTL) return;
+      // Migration: alte Einträge ohne beta-Feld werden ausgesondert,
+      // damit der nächste Render das Beta nachzieht.
+      if (!Object.prototype.hasOwnProperty.call(v, "beta")) return;
+      SECTOR_CACHE.set(k, v);
     });
   } catch (e) { console.warn("sector cache load failed:", e); }
 }
@@ -2210,7 +2315,13 @@ async function fetchSector(ticker) {
       const r = await fetch(url, { method: "GET", mode: "cors" });
       if (!r.ok) return null;
       const j = await r.json();
-      const entry = { sector: j.sector || null, industry: j.industry || null, fetchedAt: Date.now() };
+      const entry = {
+        sector: j.sector || null,
+        industry: j.industry || null,
+        beta: (typeof j.beta === "number" && isFinite(j.beta)) ? j.beta : null,
+        beta3y: (typeof j.beta3y === "number" && isFinite(j.beta3y)) ? j.beta3y : null,
+        fetchedAt: Date.now()
+      };
       SECTOR_CACHE.set(sym, entry);
       saveSectorCache();
       return entry;
@@ -4055,9 +4166,9 @@ function updateSectorDonuts(totalRows) {
   const wrap = document.getElementById("sector-donuts");
   if (!wrap) return;
   // Bei null Trades: ausblenden
-  if (!totalRows || totalRows.length === 0) { wrap.style.display = "none"; return; }
+  if (!totalRows || totalRows.length === 0) { wrap.style.display = "none"; renderBetaExposure(totalRows); return; }
   // Wenn kein Worker konfiguriert ist: ausblenden (sonst sieht man nur "Unbekannt")
-  if (!priceSettings.workerUrl) { wrap.style.display = "none"; return; }
+  if (!priceSettings.workerUrl) { wrap.style.display = "none"; renderBetaExposure(totalRows); return; }
   wrap.style.display = "block";
   // Erste Render-Phase: aus Cache, was wir haben
   const expo = computeSectorExposure(totalRows);
@@ -4068,7 +4179,9 @@ function updateSectorDonuts(totalRows) {
   if (shortCard) renderSectorDonut(shortCard, expo.short);
   if (grossCard) renderSectorDonut(grossCard, expo.gross);
   renderSectorNetTable(expo.net, expo.long, expo.short);
-  // Async-Phase: fehlende Sektoren nachladen, dann neu rendern
+  // Beta nutzt denselben Cache — gleich mitrendern
+  renderBetaExposure(totalRows);
+  // Async-Phase: fehlende Sektoren/Beta nachladen, dann beide neu rendern
   const tickers = allUsedTickers();
   const missing = tickers.filter(t => !SECTOR_CACHE.has(t));
   if (missing.length === 0) return;
@@ -4080,7 +4193,154 @@ function updateSectorDonuts(totalRows) {
     if (shortCard) renderSectorDonut(shortCard, expo2.short);
     if (grossCard) renderSectorDonut(grossCard, expo2.gross);
     renderSectorNetTable(expo2.net, expo2.long, expo2.short);
+    renderBetaExposure(totalRows);
   });
+}
+
+// === Markt-Exposure (Beta) =============================================
+// Beta-adjustiertes Netto-Exposure: Σ N_L·β_L − Σ N_S·β_S, in Home-Currency.
+// Basis: AKTUELLES Notional pro Leg (livePx × qty × FX), nicht Einstand.
+// Beta-Quelle: Override aus Trade-Form (wenn gesetzt), sonst Yahoo-Cache.
+// Coverage-Anzeige (Variante 1): zeigt offen welcher Anteil des Brutto-Notionals
+// Beta-Daten hat. Fehlende Positionen kommen nicht in die Aggregat-Zahl.
+function legCurrentNotionalHome(leg, qty) {
+  if (!leg || !isFinite(qty) || qty <= 0) return null;
+  // Aktuelles Notional = Live-Preis (in Entry-Ccy) × qty × FX(EntryCcy→Home)
+  if (leg.livePxInEntry != null && leg.entryToHomeFx != null) {
+    const n = leg.livePxInEntry * qty * leg.entryToHomeFx;
+    if (isFinite(n) && n > 0) return n;
+  }
+  // Fallback: Einstands-Notional, falls Live-Preis fehlt (Worker down etc)
+  if (leg.entryNotionalInHome != null && isFinite(leg.entryNotionalInHome) && leg.entryNotionalInHome > 0) return leg.entryNotionalInHome;
+  return null;
+}
+
+// Liefert das anzuwendende Beta für eine Position: Override hat Priorität,
+// sonst Yahoo's gecachter Wert. Returns null wenn keins verfügbar.
+function resolveBeta(tr, side) {
+  const override = (side === "long") ? tr.longBetaOverride : tr.shortBetaOverride;
+  if (override != null && isFinite(override)) return { value: override, source: "override" };
+  const ticker = String((side === "long") ? tr.longTicker : tr.shortTicker || "").toUpperCase();
+  const cached = SECTOR_CACHE.get(ticker);
+  if (cached && cached.beta != null && isFinite(cached.beta)) return { value: cached.beta, source: "yahoo" };
+  return null;
+}
+
+// Aggregiert alle Positionen zu Portfolio-Beta-Metriken
+function computePortfolioBeta(totalRows) {
+  const contributors = [];
+  let longNotionalAll = 0, shortNotionalAll = 0;
+  let longNotionalWithBeta = 0, shortNotionalWithBeta = 0;
+  let betaDollar = 0;
+  for (const row of totalRows) {
+    const tr = row.trade, c = row.c;
+    const tranches = c.tranches || [];
+    if (hasLong(tr)) {
+      let totalLongNotional = 0;
+      for (const tres of tranches) {
+        const qty = tres.tranche?.longQty || 0;
+        const n = legCurrentNotionalHome(tres.long, qty);
+        if (n != null) totalLongNotional += n;
+      }
+      if (totalLongNotional > 0) {
+        longNotionalAll += totalLongNotional;
+        const betaRes = resolveBeta(tr, "long");
+        const dispName = tr.name || tr.longTicker || "—";
+        if (betaRes) {
+          longNotionalWithBeta += totalLongNotional;
+          const contrib = totalLongNotional * betaRes.value;
+          betaDollar += contrib;
+          contributors.push({ name: dispName, side: "long", ticker: tr.longTicker, beta: betaRes.value, betaSource: betaRes.source, notional: totalLongNotional, contribution: contrib, hasData: true });
+        } else {
+          contributors.push({ name: dispName, side: "long", ticker: tr.longTicker, notional: totalLongNotional, hasData: false });
+        }
+      }
+    }
+    if (hasShort(tr)) {
+      let totalShortNotional = 0;
+      for (const tres of tranches) {
+        const qty = tres.tranche?.shortQty || 0;
+        const n = legCurrentNotionalHome(tres.short, qty);
+        if (n != null) totalShortNotional += n;
+      }
+      if (totalShortNotional > 0) {
+        shortNotionalAll += totalShortNotional;
+        const betaRes = resolveBeta(tr, "short");
+        const dispName = tr.name || tr.shortTicker || "—";
+        if (betaRes) {
+          shortNotionalWithBeta += totalShortNotional;
+          // Short-Beitrag: NEGATIV gewichtet, weil Position gegen Markt läuft
+          const contrib = -1 * totalShortNotional * betaRes.value;
+          betaDollar += contrib;
+          contributors.push({ name: dispName, side: "short", ticker: tr.shortTicker, beta: betaRes.value, betaSource: betaRes.source, notional: totalShortNotional, contribution: contrib, hasData: true });
+        } else {
+          contributors.push({ name: dispName, side: "short", ticker: tr.shortTicker, notional: totalShortNotional, hasData: false });
+        }
+      }
+    }
+  }
+  const grossAll       = longNotionalAll + shortNotionalAll;
+  const netAll         = longNotionalAll - shortNotionalAll;
+  const grossWithBeta  = longNotionalWithBeta + shortNotionalWithBeta;
+  const betaPerGross   = grossWithBeta > 0 ? betaDollar / grossWithBeta : null;
+  // β/Netto nur sinnvoll wenn |Netto| > 5% des Brutto — sonst market-neutral → Division durch ~0 explodiert
+  const betaPerNet     = (grossAll > 0 && Math.abs(netAll) > 0.05 * grossAll) ? betaDollar / netAll : null;
+  const coverage       = grossAll > 0 ? grossWithBeta / grossAll : 0;
+  return { contributors, betaDollar, betaPerGross, betaPerNet, coverage, longNotionalAll, shortNotionalAll, grossAll, netAll };
+}
+
+function renderBetaExposure(totalRows) {
+  const wrap = document.getElementById("beta-exposure");
+  if (!wrap) return;
+  if (!totalRows || totalRows.length === 0) { wrap.style.display = "none"; return; }
+  if (!priceSettings.workerUrl) { wrap.style.display = "none"; return; }
+  const b = computePortfolioBeta(totalRows);
+  if (b.grossAll <= 0) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  // Hero-Zahl
+  const dollarEl = document.getElementById("beta-dollar-val");
+  const hintEl   = document.getElementById("beta-dollar-hint");
+  if (dollarEl) {
+    dollarEl.textContent = (b.betaDollar > 0 ? "+" : "") + fmtMoney(b.betaDollar, homeCurrency);
+    dollarEl.className = "beta-hero-val tabular " + (b.betaDollar > 0 ? "pos" : b.betaDollar < 0 ? "neg" : "");
+  }
+  if (hintEl) {
+    const onePct = b.betaDollar * 0.01;
+    const sign = onePct > 0 ? "+" : (onePct < 0 ? "" : "");
+    hintEl.textContent = t("beta_dollar_hint", { amt: sign + fmtMoney(onePct, homeCurrency) });
+  }
+  // Sub-Zahlen (Brutto-Beta wurde bewusst weggelassen: bei stark long-orientierten Büchern
+  // verwässert die Brutto-Sicht das effektive Markt-Exposure und ist wenig aussagekräftig)
+  const nE = document.getElementById("beta-per-net");
+  if (nE) {
+    if (b.betaPerNet == null) { nE.textContent = t("beta_per_net_na"); nE.className = "beta-sub-val tabular muted"; }
+    else                      { nE.textContent = b.betaPerNet.toFixed(3);  nE.className = "beta-sub-val tabular"; }
+  }
+  const cE = document.getElementById("beta-coverage");
+  if (cE) { cE.textContent = (b.coverage * 100).toFixed(0) + " %"; cE.className = "beta-sub-val tabular " + (b.coverage < 0.8 ? "muted" : ""); }
+  // Top-Contributors: nach |contribution| sortiert, mit-Daten zuerst, max 8 anzeigen
+  const sorted = b.contributors.slice().sort((a, c) => {
+    if (a.hasData && !c.hasData) return -1;
+    if (!a.hasData && c.hasData) return 1;
+    if (!a.hasData) return c.notional - a.notional;
+    return Math.abs(c.contribution) - Math.abs(a.contribution);
+  });
+  const listEl = document.getElementById("beta-contributors-list");
+  if (listEl) {
+    listEl.innerHTML = sorted.slice(0, 8).map(c => {
+      const sideLabel = t("beta_" + c.side + "_side");
+      if (!c.hasData) {
+        return `<div class="beta-contrib-row"><span class="beta-contrib-arrow">·</span><span class="beta-contrib-name">${escapeHtml(c.name)} <span class="side">${escapeHtml(sideLabel)}</span></span><span class="beta-contrib-formula">${escapeHtml(t("beta_no_data"))}</span><span class="beta-contrib-val muted">—</span></div>`;
+      }
+      const cls = c.contribution >= 0 ? "pos" : "neg";
+      const arrow = c.contribution >= 0 ? "▲" : "▼";
+      const sign = c.contribution > 0 ? "+" : "";
+      const overrideMarker = (c.betaSource === "override") ? `<span class="override">${escapeHtml(t("beta_override_marker"))}</span>` : "";
+      const betaSigned = c.side === "short" ? (-c.beta) : c.beta;
+      const formulaStr = `β ${betaSigned >= 0 ? "" : "−"}${Math.abs(c.beta).toFixed(2)} × ${fmtMoney(c.notional, homeCurrency)}`;
+      return `<div class="beta-contrib-row"><span class="beta-contrib-arrow ${cls}">${arrow}</span><span class="beta-contrib-name">${escapeHtml(c.name)} <span class="side">${escapeHtml(sideLabel)}</span>${overrideMarker}</span><span class="beta-contrib-formula">${escapeHtml(formulaStr)}</span><span class="beta-contrib-val ${cls}">${sign}${fmtMoney(c.contribution, homeCurrency)}</span></div>`;
+    }).join("");
+  }
 }
 
 function applyPriceFlashes() {
@@ -4292,6 +4552,9 @@ function openForm(id = null) {
     document.getElementById("f-short-qty").value = formatForInput(firstT.shortQty);
     document.getElementById("f-short-entry").value = formatForInput(firstT.shortEntry);
     document.getElementById("f-short-native").checked = !!firstT.shortEntryNative;
+    // Beta-Override-Felder: leer wenn nichts gespeichert (User nutzt Yahoo-Default)
+    document.getElementById("f-long-beta").value  = (tr.longBetaOverride  != null) ? formatForInput(tr.longBetaOverride)  : "";
+    document.getElementById("f-short-beta").value = (tr.shortBetaOverride != null) ? formatForInput(tr.shortBetaOverride) : "";
     // Populate threshold inputs based on each threshold's stored mode
     if (minMode === "price") {
       document.getElementById("f-alert-pct").value = (tr.alertPriceMin != null) ? formatForInput(Math.abs(tr.alertPriceMin)) : "";
@@ -4326,7 +4589,7 @@ function openForm(id = null) {
     applyFormTypeUI(initialType);
     // Typ-Wahl im Form ausblenden wenn Basket-Kontext: Trade muss zum Korb-Typ passen
     typeSection.style.display = (tradeFormBasketContext || currentPage !== "total") ? "none" : "block";
-    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max","f-alert-squeeze"].forEach(i => document.getElementById(i).value = "");
+    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max","f-alert-squeeze","f-long-beta","f-short-beta"].forEach(i => document.getElementById(i).value = "");
     document.getElementById("f-long-native").checked = false;
     document.getElementById("f-short-native").checked = false;
     setMulti(false);
@@ -4578,6 +4841,12 @@ function saveForm() {
   const alertPctRaw = document.getElementById("f-alert-pct").value.trim();
   const alertMaxRaw = document.getElementById("f-alert-max").value.trim();
   const alertSqzRaw = document.getElementById("f-alert-squeeze").value.trim();
+  // Beta-Override: leer = null (User nutzt Yahoo-Default), sonst geparste Zahl
+  const longBetaRaw  = document.getElementById("f-long-beta").value.trim();
+  const shortBetaRaw = document.getElementById("f-short-beta").value.trim();
+  let longBetaOverride = null, shortBetaOverride = null;
+  if (longBetaRaw)  { const p = parseDecimal(longBetaRaw);  if (!isFinite(p)) { alert(t("err_beta_invalid")); return; } longBetaOverride = p; }
+  if (shortBetaRaw) { const p = parseDecimal(shortBetaRaw); if (!isFinite(p)) { alert(t("err_beta_invalid")); return; } shortBetaOverride = p; }
   const type = formType;
   // For pair-trades, force pct mode (price thresholds make no sense on a spread).
   const minMode = (type === "long" || type === "short") ? formAlertMinMode : "pct";
@@ -4641,6 +4910,9 @@ function saveForm() {
     existing.alertMinMode = minMode; existing.alertMaxMode = maxMode;
     // Squeeze nur für short/pair speichern, sonst null (kein Alarm für Long-only)
     existing.alertShortPct = (eType === "short" || eType === "pair") ? alertShortPct : null;
+    // Beta-Override: Side-spezifisch persistieren, nur für Sides die tatsächlich vorhanden sind
+    existing.longBetaOverride  = (eType === "pair" || eType === "long")  ? longBetaOverride  : null;
+    existing.shortBetaOverride = (eType === "pair" || eType === "short") ? shortBetaOverride : null;
     existing.updated = Date.now();
     // Wenn sich Alarm-Schwellen geändert haben: zugehörige State-Achse(n) auf idle zurück.
     // Sonst hängen "acknowledged"/"triggered"-States von alter Config weiter und blockieren
@@ -4731,7 +5003,7 @@ function saveForm() {
   const newAlertShortPct = (type === "short" || type === "pair") ? alertShortPct : null;
   // Wenn aus Basket-Kontext heraus angelegt: Trade an den Korb binden
   const basketIdForNew = (tradeFormBasketContext && (type === "long" || type === "short")) ? tradeFormBasketContext : null;
-  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, basketId: basketIdForNew, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, alertShortPct: newAlertShortPct, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
+  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, basketId: basketIdForNew, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, longBetaOverride: (type === "pair" || type === "long") ? longBetaOverride : null, shortBetaOverride: (type === "pair" || type === "short") ? shortBetaOverride : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, alertShortPct: newAlertShortPct, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
   markLocalChange(); closeForm(); refreshAll(true);
 }
 

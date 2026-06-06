@@ -173,46 +173,71 @@ async function getYahooCrumb(env, forceRefresh = false) {
   return fresh;
 }
 
+// Extrahiert Number aus Yahoo's "{ raw: 1.23 }"-Wrappern oder direkten Werten
+function ynum(v) {
+  if (v == null) return null;
+  if (typeof v === "number" && isFinite(v)) return v;
+  if (typeof v === "object" && v && typeof v.raw === "number" && isFinite(v.raw)) return v.raw;
+  return null;
+}
+
 async function handleProfile(symbol, env) {
   const sym = String(symbol).toUpperCase().trim();
   if (!sym) return jsonResponse({ error: "missing symbol" }, 400);
-  // KV-Cache prüfen (pro Ticker)
+  // KV-Cache prüfen (pro Ticker). Schema v2: jetzt mit beta. Alte Einträge ohne beta-Feld
+  // werden nicht akzeptiert → re-fetch zwingen, damit das Beta nachgeholt wird.
   if (env.TRADEBOOK_CACHE) {
     try {
       const cached = await env.TRADEBOOK_CACHE.get(PROFILE_KV_PREFIX + sym, { type: "json" });
-      if (cached && cached.sector) {
-        return jsonResponse({ symbol: sym, sector: cached.sector, industry: cached.industry || null, source: "cache" });
+      if (cached && cached.sector && Object.prototype.hasOwnProperty.call(cached, "beta")) {
+        return jsonResponse({
+          symbol: sym,
+          sector: cached.sector,
+          industry: cached.industry || null,
+          beta: cached.beta ?? null,
+          beta3y: cached.beta3y ?? null,
+          source: "cache"
+        });
       }
     } catch (e) { console.warn("profile KV read failed for", sym, e.message); }
   }
-  // Yahoo abrufen, mit Crumb-Retry-Loop: erster Versuch mit gecachtem Crumb,
-  // bei 401/403 noch ein Versuch mit frischem Crumb (Cookie/Crumb abgelaufen)
+  // Yahoo abrufen, mit Crumb-Retry-Loop
   let lastError = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     let crumbData;
     try { crumbData = await getYahooCrumb(env, attempt > 0); }
     catch (e) { lastError = "crumb: " + e.message; break; }
-    const u = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=assetProfile&crumb=${encodeURIComponent(crumbData.crumb)}`;
+    // Ein Call holt mehrere Module gleichzeitig → kein extra API-Roundtrip
+    const u = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=assetProfile,defaultKeyStatistics,summaryDetail&crumb=${encodeURIComponent(crumbData.crumb)}`;
     try {
       const r = await fetch(u, {
         method: "GET",
         headers: { "User-Agent": YH_UA, "Accept": "application/json,text/plain,*/*", "Cookie": crumbData.cookie }
       });
-      if (r.status === 401 || r.status === 403) { lastError = "yahoo " + r.status; continue; /* retry mit forceRefresh */ }
+      if (r.status === 401 || r.status === 403) { lastError = "yahoo " + r.status; continue; }
       if (!r.ok) { lastError = "yahoo http " + r.status; break; }
       const j = await r.json();
-      const profile = j?.quoteSummary?.result?.[0]?.assetProfile || null;
+      const res = j?.quoteSummary?.result?.[0] || null;
+      const profile = res?.assetProfile || null;
+      const dks = res?.defaultKeyStatistics || null;
+      const sd  = res?.summaryDetail || null;
       const sector = (profile?.sector || "").trim() || null;
       const industry = (profile?.industry || "").trim() || null;
+      // Yahoo's "beta" = 5Y monthly gegen S&P 500 (für Stocks).
+      // Für ETFs liegt's manchmal in beta3Year statt beta.
+      // Priorität: defaultKeyStatistics.beta → summaryDetail.beta → defaultKeyStatistics.beta3Year.
+      const betaStock = ynum(dks?.beta) ?? ynum(sd?.beta);
+      const beta3y    = ynum(dks?.beta3Year);
+      const beta      = betaStock != null ? betaStock : (beta3y != null ? beta3y : null);
       if (env.TRADEBOOK_CACHE && sector) {
         try {
-          await env.TRADEBOOK_CACHE.put(PROFILE_KV_PREFIX + sym, JSON.stringify({ sector, industry, ts: Date.now() }), { expirationTtl: PROFILE_TTL_SECONDS });
+          await env.TRADEBOOK_CACHE.put(PROFILE_KV_PREFIX + sym, JSON.stringify({ sector, industry, beta, beta3y, ts: Date.now() }), { expirationTtl: PROFILE_TTL_SECONDS });
         } catch (e) { console.warn("profile KV write failed for", sym, e.message); }
       }
-      return jsonResponse({ symbol: sym, sector, industry, source: sector ? "yahoo" : "unknown" });
+      return jsonResponse({ symbol: sym, sector, industry, beta, beta3y, source: sector ? "yahoo" : "unknown" });
     } catch (e) { lastError = "fetch: " + e.message; break; }
   }
-  return jsonResponse({ symbol: sym, sector: null, industry: null, source: "unknown", error: lastError || "unknown" });
+  return jsonResponse({ symbol: sym, sector: null, industry: null, beta: null, beta3y: null, source: "unknown", error: lastError || "unknown" });
 }
 
 async function yahooProxy(symbol) {
