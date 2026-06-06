@@ -324,6 +324,46 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .donut-legend-pct { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
 .donut-legend-amount { grid-column: 2 / -1; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: -2px; }
 .donut-help { font-size: 11px; color: var(--muted); margin-top: 12px; line-height: 1.4; }
+
+/* Branchen-Donuts (Long / Short / Brutto) + Netto-Tabelle auf Gesamt-Page */
+.sector-donuts { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+.sector-donuts-title { font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+.sector-donuts-sub { font-size: 11px; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
+.sector-donut-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+[data-layout="desktop"] .sector-donut-grid { grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.sector-donut-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.sector-donut-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sector-donut-label { font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.4px; }
+.sector-donut-total { font-size: 13px; font-weight: 700; color: var(--text); }
+.sector-donut-vis { display: flex; align-items: center; justify-content: center; padding: 4px 0; }
+.sector-donut-vis svg { width: 150px; height: 150px; max-width: 100%; }
+.sector-donut-vis svg circle.seg { transition: stroke-dasharray 0.4s ease-out; cursor: default; }
+.sector-donut-vis svg circle.seg:hover { opacity: 0.85; }
+.sector-donut-center-num { font-size: 18px; font-weight: 700; fill: var(--text); font-variant-numeric: tabular-nums; }
+.sector-donut-center-lbl { font-size: 9px; fill: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.sector-donut-legend { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.sector-legend-row { display: grid; grid-template-columns: 10px 1fr auto; column-gap: 8px; align-items: center; font-size: 12px; padding: 3px 0; }
+.sector-legend-color { width: 10px; height: 10px; border-radius: 3px; }
+.sector-legend-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sector-legend-pct { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11px; }
+.sector-donut-empty { padding: 18px; text-align: center; font-size: 12px; color: var(--muted); }
+.sector-net-table { margin-top: 16px; }
+.sector-net-table-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.sector-net-table-head > div:first-child { font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.4px; }
+.sector-net-table-hint { font-size: 10px; color: var(--muted); }
+.sector-net-rows { display: flex; flex-direction: column; }
+.sector-net-row { display: grid; grid-template-columns: 12px 1fr auto auto; column-gap: 10px; align-items: center; padding: 7px 4px; font-size: 12px; border-bottom: 1px solid rgba(127,127,127,0.08); }
+.sector-net-row:last-child { border-bottom: none; }
+.sector-net-row .sector-net-color { width: 10px; height: 10px; border-radius: 3px; }
+.sector-net-row .sector-net-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sector-net-row .sector-net-bar { width: 80px; height: 4px; background: rgba(127,127,127,0.12); border-radius: 2px; position: relative; overflow: hidden; }
+[data-layout="desktop"] .sector-net-row .sector-net-bar { width: 160px; }
+.sector-net-row .sector-net-bar-fill { position: absolute; top: 0; bottom: 0; }
+.sector-net-row .sector-net-bar-fill.pos { background: var(--pos); left: 50%; }
+.sector-net-row .sector-net-bar-fill.neg { background: var(--neg); right: 50%; }
+.sector-net-row .sector-net-val { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
+.sector-net-row .sector-net-val.pos { color: var(--pos); }
+.sector-net-row .sector-net-val.neg { color: var(--neg); }
 /* Basket-Karten auf Long/Short-Page */
 .basket-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; cursor: pointer; user-select: none; position: relative; transition: transform 0.05s, background-color 0.1s; }
 .basket-card:active { transform: scale(0.99); }
@@ -1449,6 +1489,67 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
       </div>
       <div class="donut-help" data-i18n="donut_help"></div>
     </div>
+    <!-- Branchen-Exposure: 3 Donuts (Long / Short / Brutto) + Netto-Tabelle.
+         Basis: Einstands-Notional pro Leg, in Home-Currency. Sektoren kommen
+         vom Worker (/profile?symbol=, Yahoo assetProfile, 30d KV-cached). -->
+    <div class="sector-donuts" id="sector-donuts" style="display:none">
+      <h4 class="sector-donuts-title" data-i18n="sector_title">Exposure nach Branche</h4>
+      <div class="sector-donuts-sub" data-i18n="sector_sub">Einstands-Notional je Sektor — in Home-Currency. Pair-Trades werden gesplittet (Long-Leg im Long-Donut, Short-Leg im Short-Donut).</div>
+      <div class="sector-donut-grid">
+        <div class="sector-donut-card" data-side="long">
+          <div class="sector-donut-head">
+            <span class="sector-donut-label" data-i18n="sector_long">Long-Exposure</span>
+            <span class="sector-donut-total tabular" data-side-total>—</span>
+          </div>
+          <div class="sector-donut-vis">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
+              <circle cx="100" cy="100" r="80" stroke="rgba(127,127,127,0.12)" stroke-width="28" fill="none"/>
+              <g transform="rotate(-90 100 100)" data-segments></g>
+              <text x="100" y="96" text-anchor="middle" class="sector-donut-center-num tabular" data-center-num></text>
+              <text x="100" y="116" text-anchor="middle" class="sector-donut-center-lbl" data-center-lbl></text>
+            </svg>
+          </div>
+          <div class="sector-donut-legend" data-legend></div>
+        </div>
+        <div class="sector-donut-card" data-side="short">
+          <div class="sector-donut-head">
+            <span class="sector-donut-label" data-i18n="sector_short">Short-Exposure</span>
+            <span class="sector-donut-total tabular" data-side-total>—</span>
+          </div>
+          <div class="sector-donut-vis">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
+              <circle cx="100" cy="100" r="80" stroke="rgba(127,127,127,0.12)" stroke-width="28" fill="none"/>
+              <g transform="rotate(-90 100 100)" data-segments></g>
+              <text x="100" y="96" text-anchor="middle" class="sector-donut-center-num tabular" data-center-num></text>
+              <text x="100" y="116" text-anchor="middle" class="sector-donut-center-lbl" data-center-lbl></text>
+            </svg>
+          </div>
+          <div class="sector-donut-legend" data-legend></div>
+        </div>
+        <div class="sector-donut-card" data-side="gross">
+          <div class="sector-donut-head">
+            <span class="sector-donut-label" data-i18n="sector_gross">Brutto-Exposure</span>
+            <span class="sector-donut-total tabular" data-side-total>—</span>
+          </div>
+          <div class="sector-donut-vis">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
+              <circle cx="100" cy="100" r="80" stroke="rgba(127,127,127,0.12)" stroke-width="28" fill="none"/>
+              <g transform="rotate(-90 100 100)" data-segments></g>
+              <text x="100" y="96" text-anchor="middle" class="sector-donut-center-num tabular" data-center-num></text>
+              <text x="100" y="116" text-anchor="middle" class="sector-donut-center-lbl" data-center-lbl></text>
+            </svg>
+          </div>
+          <div class="sector-donut-legend" data-legend></div>
+        </div>
+      </div>
+      <div class="sector-net-table">
+        <div class="sector-net-table-head">
+          <div data-i18n="sector_net_table_title">Netto-Exposure je Branche</div>
+          <div class="sector-net-table-hint" data-i18n="sector_net_table_hint">Long − Short, positiv = netto long, negativ = netto short</div>
+        </div>
+        <div class="sector-net-rows" id="sector-net-rows"></div>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -1731,6 +1832,15 @@ const STRINGS = {
     lock_wrong: "Zugriff verweigert", lock_loading: "Authentifizierung",
     donut_title: "Portfolio-Verteilung nach Notional",
     donut_help: "Anteile der drei Trade-Typen am gesamten Kapitaleinsatz (Long-Notional + Short-Notional). FX-konvertiert in deiner Heimat-Währung.",
+    sector_title: "Exposure nach Branche",
+    sector_sub: "Einstands-Notional je Sektor — in Home-Currency. Pair-Trades werden gesplittet: Long-Leg im Long-Donut, Short-Leg im Short-Donut, beide im Brutto-Donut.",
+    sector_long: "Long-Exposure",
+    sector_short: "Short-Exposure",
+    sector_gross: "Brutto-Exposure",
+    sector_net_table_title: "Netto-Exposure je Branche",
+    sector_net_table_hint: "Long − Short, positiv = netto long, negativ = netto short",
+    sector_unknown: "Unbekannt",
+    sector_loading: "Branchen werden geladen…",
     btn_new_basket: "+ Neuer Korb",
     basket_default_name: "Korb",
     basket_count_n: "× {n} Trades",
@@ -1910,6 +2020,15 @@ const STRINGS = {
     lock_wrong: "Access denied", lock_loading: "Authenticating",
     donut_title: "Portfolio split by notional",
     donut_help: "Share of the three trade types in total capital deployed (long notional + short notional). FX-converted into your home currency.",
+    sector_title: "Exposure by sector",
+    sector_sub: "Entry notional per sector — in home currency. Pair trades are split: long leg in the long donut, short leg in the short donut, both in the gross donut.",
+    sector_long: "Long exposure",
+    sector_short: "Short exposure",
+    sector_gross: "Gross exposure",
+    sector_net_table_title: "Net exposure by sector",
+    sector_net_table_hint: "Long − short, positive = net long, negative = net short",
+    sector_unknown: "Unknown",
+    sector_loading: "Loading sectors…",
     btn_new_basket: "+ New basket",
     basket_default_name: "Basket",
     basket_count_n: "× {n} trades",
@@ -2054,6 +2173,59 @@ const PRICE_CACHE = new Map();
 const FX_CACHE = new Map();
 const FX_CACHE_TTL = 300000;
 const PREVIOUS_PRICES = new Map();
+// Sektor-Klassifizierung pro Ticker — kommt vom Worker (Yahoo assetProfile), wird in localStorage gecached.
+// Map<TICKER, { sector: string|null, industry: string|null, fetchedAt: number }>
+const SECTOR_CACHE = new Map();
+const SECTOR_CACHE_KEY = "pair_trade_sector_cache_v1";
+const SECTOR_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 Tage
+const SECTOR_INFLIGHT = new Map(); // Vermeide doppelte Worker-Calls für denselben Ticker
+function loadSectorCache() {
+  try {
+    const raw = localStorage.getItem(SECTOR_CACHE_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    const now = Date.now();
+    Object.keys(obj || {}).forEach(k => {
+      const v = obj[k];
+      if (v && v.fetchedAt && (now - v.fetchedAt) < SECTOR_CACHE_TTL) SECTOR_CACHE.set(k, v);
+    });
+  } catch (e) { console.warn("sector cache load failed:", e); }
+}
+function saveSectorCache() {
+  try {
+    const obj = {};
+    SECTOR_CACHE.forEach((v, k) => { obj[k] = v; });
+    localStorage.setItem(SECTOR_CACHE_KEY, JSON.stringify(obj));
+  } catch (e) { console.warn("sector cache save failed:", e); }
+}
+async function fetchSector(ticker) {
+  const sym = String(ticker || "").toUpperCase().trim();
+  if (!sym) return null;
+  if (SECTOR_CACHE.has(sym)) return SECTOR_CACHE.get(sym);
+  if (SECTOR_INFLIGHT.has(sym)) return SECTOR_INFLIGHT.get(sym);
+  if (!priceSettings.workerUrl) return null;
+  const url = workerBase() + "/profile?symbol=" + encodeURIComponent(sym);
+  const p = (async () => {
+    try {
+      const r = await fetch(url, { method: "GET", mode: "cors" });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const entry = { sector: j.sector || null, industry: j.industry || null, fetchedAt: Date.now() };
+      SECTOR_CACHE.set(sym, entry);
+      saveSectorCache();
+      return entry;
+    } catch (e) { return null; }
+    finally { SECTOR_INFLIGHT.delete(sym); }
+  })();
+  SECTOR_INFLIGHT.set(sym, p);
+  return p;
+}
+// Holt alle Sektoren parallel für eine Liste von Tickern, returnt wenn alle entweder gecached oder geladen sind
+async function ensureSectorsForTickers(tickers) {
+  const unique = Array.from(new Set(tickers.map(t => String(t || "").toUpperCase().trim()).filter(Boolean)));
+  await Promise.all(unique.map(t => fetchSector(t)));
+}
+loadSectorCache();
 const THEMES = ["midnight", "light", "dark"];
 const LAYOUT_KEY = "pair_trade_layout_v1";
 const LAYOUTS = ["mobile", "desktop"];
@@ -3631,6 +3803,7 @@ function render() {
   updatePageAggregate("total", totalRows);
   updateTotalBreakdown();
   updatePortfolioDonut(totalRows);
+  updateSectorDonuts(totalRows);
   document.querySelectorAll("button[data-act]").forEach(btn => {
     btn.addEventListener("click", (e) => { e.stopPropagation(); const act = btn.getAttribute("data-act"); if (act === "edit") openForm(btn.getAttribute("data-id")); else if (act === "del") deleteTrade(btn.getAttribute("data-id")); else if (act === "del-tranche") deleteTranche(btn.getAttribute("data-trade"), btn.getAttribute("data-tranche")); });
   });
@@ -3748,6 +3921,166 @@ function updatePortfolioDonut(totalRows) {
       `<div class="donut-legend-item"><span class="donut-legend-color long"></span><span class="donut-legend-label">${t("page_longs")}</span><span class="donut-legend-pct">${pctLong.toFixed(1)} %</span><span class="donut-legend-amount">${fmtMoney(sums.long, homeCurrency)}</span></div>` +
       `<div class="donut-legend-item"><span class="donut-legend-color short"></span><span class="donut-legend-label">${t("page_shorts")}</span><span class="donut-legend-pct">${pctShort.toFixed(1)} %</span><span class="donut-legend-amount">${fmtMoney(sums.short, homeCurrency)}</span></div>`;
   }
+}
+
+// === Branchen-Donuts ====================================================
+// 11 stabile Farben für die Yahoo-Sektoren. Inspiriert von Material-Palette,
+// auf beiden Themes (light/dark/midnight) lesbar.
+const SECTOR_COLORS = {
+  "Technology":             "#4F8EF7",
+  "Financial Services":     "#22C55E",
+  "Healthcare":             "#EC4899",
+  "Consumer Cyclical":      "#F97316",
+  "Consumer Defensive":     "#84CC16",
+  "Industrials":            "#A78BFA",
+  "Energy":                 "#EAB308",
+  "Real Estate":            "#14B8A6",
+  "Communication Services": "#06B6D4",
+  "Basic Materials":        "#F43F5E",
+  "Utilities":              "#8B5CF6",
+  "Unknown":                "#9CA3AF"
+};
+function sectorColor(sec) { return SECTOR_COLORS[sec] || "#9CA3AF"; }
+function sectorLabel(sec) { return (!sec || sec === "Unknown") ? t("sector_unknown") : sec; }
+
+// Sammle alle Ticker die auf der Gesamt-Page gerade in Trades vorkommen
+function allUsedTickers() {
+  const set = new Set();
+  for (const tr of trades) {
+    if (hasLong(tr)  && tr.longTicker)  set.add(String(tr.longTicker).toUpperCase());
+    if (hasShort(tr) && tr.shortTicker) set.add(String(tr.shortTicker).toUpperCase());
+  }
+  return Array.from(set);
+}
+
+// Aggregiere Einstands-Notional je Sektor: gibt long/short/gross/net Maps zurück
+function computeSectorExposure(totalRows) {
+  const long = new Map(), short = new Map();
+  for (const row of totalRows) {
+    const tr = row.trade, c = row.c;
+    if (hasLong(tr) && c.aggLongNotionalHome != null && c.aggLongNotionalHome > 0) {
+      const sym = String(tr.longTicker || "").toUpperCase();
+      const sec = (SECTOR_CACHE.get(sym)?.sector) || "Unknown";
+      long.set(sec, (long.get(sec) || 0) + c.aggLongNotionalHome);
+    }
+    if (hasShort(tr) && c.aggShortNotionalHome != null && c.aggShortNotionalHome > 0) {
+      const sym = String(tr.shortTicker || "").toUpperCase();
+      const sec = (SECTOR_CACHE.get(sym)?.sector) || "Unknown";
+      short.set(sec, (short.get(sec) || 0) + c.aggShortNotionalHome);
+    }
+  }
+  const gross = new Map(), net = new Map();
+  const allSecs = new Set([...long.keys(), ...short.keys()]);
+  for (const sec of allSecs) {
+    const l = long.get(sec) || 0, s = short.get(sec) || 0;
+    gross.set(sec, l + s);
+    net.set(sec, l - s);
+  }
+  return { long, short, gross, net };
+}
+
+// Malt einen einzelnen Donut: Segmente proportional zur Summe der Map-Values.
+// Reihenfolge: nach Wert absteigend, damit größtes Segment oben rechts startet.
+function renderSectorDonut(card, dataMap, totalLabel) {
+  const segGroup = card.querySelector("[data-segments]");
+  const legend = card.querySelector("[data-legend]");
+  const totalEl = card.querySelector("[data-side-total]");
+  const centerNum = card.querySelector("[data-center-num]");
+  const centerLbl = card.querySelector("[data-center-lbl]");
+  let total = 0; dataMap.forEach(v => total += v);
+  // Reset
+  if (segGroup) segGroup.innerHTML = "";
+  if (legend) legend.innerHTML = "";
+  if (totalEl) totalEl.textContent = total > 0 ? fmtMoney(total, homeCurrency) : "—";
+  if (centerNum) centerNum.textContent = "";
+  if (centerLbl) centerLbl.textContent = "";
+  if (total <= 0) {
+    if (legend) legend.innerHTML = `<div class="sector-donut-empty">—</div>`;
+    return;
+  }
+  // Sortiert nach Wert absteigend
+  const entries = Array.from(dataMap.entries()).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const C = 2 * Math.PI * 80;
+  let offset = 0;
+  const segHtml = [];
+  for (const [sec, amount] of entries) {
+    const length = (amount / total) * C;
+    const color = sectorColor(sec);
+    segHtml.push(
+      `<circle class="seg" cx="100" cy="100" r="80" stroke="${color}" stroke-width="28" fill="none" stroke-dasharray="${length} ${C}" stroke-dashoffset="${-offset}" stroke-linecap="butt"><title>${escapeAttr(sectorLabel(sec))}: ${fmtMoney(amount, homeCurrency)} (${(amount/total*100).toFixed(1)} %)</title></circle>`
+    );
+    offset += length;
+  }
+  if (segGroup) segGroup.innerHTML = segHtml.join("");
+  // Center: Top-Sektor in %
+  const topSec = entries[0];
+  if (centerNum) centerNum.textContent = ((topSec[1] / total) * 100).toFixed(0) + "%";
+  if (centerLbl) centerLbl.textContent = sectorLabel(topSec[0]);
+  // Legende
+  if (legend) {
+    legend.innerHTML = entries.map(([sec, amount]) => {
+      const pct = (amount / total * 100).toFixed(1);
+      return `<div class="sector-legend-row" title="${escapeAttr(fmtMoney(amount, homeCurrency))}"><span class="sector-legend-color" style="background:${sectorColor(sec)}"></span><span class="sector-legend-name">${escapeHtml(sectorLabel(sec))}</span><span class="sector-legend-pct">${pct}%</span></div>`;
+    }).join("");
+  }
+}
+
+function renderSectorNetTable(netMap, longMap, shortMap) {
+  const root = document.getElementById("sector-net-rows");
+  if (!root) return;
+  // Sortierung: nach |netto| absteigend, damit die markantesten Bias oben stehen
+  const entries = Array.from(netMap.entries()).filter(([sec]) => (longMap.get(sec) || 0) + (shortMap.get(sec) || 0) > 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  if (entries.length === 0) { root.innerHTML = `<div class="sector-donut-empty">—</div>`; return; }
+  // Skala für Balken: größter abs(net) = 100%
+  const maxAbs = entries.reduce((m, [, v]) => Math.max(m, Math.abs(v)), 0) || 1;
+  root.innerHTML = entries.map(([sec, val]) => {
+    const cls = val >= 0 ? "pos" : "neg";
+    const pctBar = Math.min(50, Math.abs(val) / maxAbs * 50);
+    const sign = val > 0 ? "+" : "";
+    const barFill = val >= 0
+      ? `<div class="sector-net-bar-fill pos" style="width:${pctBar}%"></div>`
+      : `<div class="sector-net-bar-fill neg" style="width:${pctBar}%"></div>`;
+    return `<div class="sector-net-row"><span class="sector-net-color" style="background:${sectorColor(sec)}"></span><span class="sector-net-name">${escapeHtml(sectorLabel(sec))}</span><span class="sector-net-bar">${barFill}</span><span class="sector-net-val ${cls}">${sign}${fmtMoney(val, homeCurrency)}</span></div>`;
+  }).join("");
+}
+
+// Helpers für sichere HTML/Attribut-Einfügung
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;" }[c])); }
+function escapeAttr(s) { return escapeHtml(s); }
+
+// Master-Funktion: triggert async Sektor-Fetch und rendert die Donuts.
+// Wird nach updatePortfolioDonut aufgerufen.
+let sectorRenderToken = 0;
+function updateSectorDonuts(totalRows) {
+  const wrap = document.getElementById("sector-donuts");
+  if (!wrap) return;
+  // Bei null Trades: ausblenden
+  if (!totalRows || totalRows.length === 0) { wrap.style.display = "none"; return; }
+  // Wenn kein Worker konfiguriert ist: ausblenden (sonst sieht man nur "Unbekannt")
+  if (!priceSettings.workerUrl) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  // Erste Render-Phase: aus Cache, was wir haben
+  const expo = computeSectorExposure(totalRows);
+  const longCard  = wrap.querySelector(".sector-donut-card[data-side='long']");
+  const shortCard = wrap.querySelector(".sector-donut-card[data-side='short']");
+  const grossCard = wrap.querySelector(".sector-donut-card[data-side='gross']");
+  if (longCard)  renderSectorDonut(longCard,  expo.long);
+  if (shortCard) renderSectorDonut(shortCard, expo.short);
+  if (grossCard) renderSectorDonut(grossCard, expo.gross);
+  renderSectorNetTable(expo.net, expo.long, expo.short);
+  // Async-Phase: fehlende Sektoren nachladen, dann neu rendern
+  const tickers = allUsedTickers();
+  const missing = tickers.filter(t => !SECTOR_CACHE.has(t));
+  if (missing.length === 0) return;
+  const myToken = ++sectorRenderToken;
+  ensureSectorsForTickers(missing).then(() => {
+    if (myToken !== sectorRenderToken) return; // Race-Schutz: neue Render-Anfrage hat überholt
+    const expo2 = computeSectorExposure(totalRows);
+    if (longCard)  renderSectorDonut(longCard,  expo2.long);
+    if (shortCard) renderSectorDonut(shortCard, expo2.short);
+    if (grossCard) renderSectorDonut(grossCard, expo2.gross);
+    renderSectorNetTable(expo2.net, expo2.long, expo2.short);
+  });
 }
 
 function applyPriceFlashes() {

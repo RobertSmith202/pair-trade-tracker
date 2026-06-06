@@ -79,6 +79,44 @@ function isWithinTradingHours() {
   const h = n.getHours(); return h >= TRADING_START_HOUR && h < TRADING_END_HOUR;
 }
 
+// Sector/Industry-Lookup für Branchen-Donut. Cached aggressiv in KV (30 Tage),
+// weil sich Yahoo's Klassifizierung praktisch nie ändert.
+// Returns { sector, industry, source: "cache"|"yahoo"|"unknown" }.
+const PROFILE_KV_PREFIX = "profile:";
+const PROFILE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 Tage
+async function handleProfile(symbol, env) {
+  const sym = String(symbol).toUpperCase().trim();
+  if (!sym) return jsonResponse({ error: "missing symbol" }, 400);
+  // KV-Cache prüfen
+  if (env.TRADEBOOK_CACHE) {
+    try {
+      const cached = await env.TRADEBOOK_CACHE.get(PROFILE_KV_PREFIX + sym, { type: "json" });
+      if (cached && cached.sector) {
+        return jsonResponse({ symbol: sym, sector: cached.sector, industry: cached.industry || null, source: "cache" });
+      }
+    } catch (e) { console.warn("profile KV read failed for", sym, e.message); }
+  }
+  // Yahoo abrufen
+  const u = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=assetProfile`;
+  try {
+    const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" } });
+    if (!r.ok) return jsonResponse({ symbol: sym, sector: null, industry: null, source: "unknown", error: "yahoo http " + r.status });
+    const j = await r.json();
+    const profile = j?.quoteSummary?.result?.[0]?.assetProfile || null;
+    const sector = (profile?.sector || "").trim() || null;
+    const industry = (profile?.industry || "").trim() || null;
+    // In KV cachen (nur wenn wir was gefunden haben — sonst Yahoo nochmal probieren beim nächsten Aufruf)
+    if (env.TRADEBOOK_CACHE && sector) {
+      try {
+        await env.TRADEBOOK_CACHE.put(PROFILE_KV_PREFIX + sym, JSON.stringify({ sector, industry, ts: Date.now() }), { expirationTtl: PROFILE_TTL_SECONDS });
+      } catch (e) { console.warn("profile KV write failed for", sym, e.message); }
+    }
+    return jsonResponse({ symbol: sym, sector, industry, source: sector ? "yahoo" : "unknown" });
+  } catch (e) {
+    return jsonResponse({ symbol: sym, sector: null, industry: null, source: "unknown", error: "fetch failed: " + e.message });
+  }
+}
+
 async function yahooProxy(symbol) {
   if (!symbol) return jsonResponse({ error: "missing symbol" }, 400);
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
@@ -854,7 +892,12 @@ export default {
     if (url.pathname === "/" || url.pathname === "") {
       const s = url.searchParams.get("symbol");
       if (s) return yahooProxy(s);
-      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST)");
+      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /profile?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST)");
+    }
+    if (url.pathname === "/profile") {
+      const s = url.searchParams.get("symbol");
+      if (!s) return jsonResponse({ error: "missing symbol" }, 400);
+      return handleProfile(s, env);
     }
     if (url.pathname === "/check") { try { return jsonResponse(await runAlarmCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/check-squeeze") { try { return jsonResponse(await runShortSqueezeCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
