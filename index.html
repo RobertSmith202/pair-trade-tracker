@@ -915,6 +915,195 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 .test-result { padding: 8px 12px; border-radius: 8px; font-size: 13px; }
 .test-result.ok { background: var(--pos-bg); color: var(--pos); }
 .test-result.err { background: var(--neg-bg); color: var(--neg); }
+
+/* Settings-Modal — Mobile Default: nav hidden, sections flow naturally */
+#settings-modal .settings-header { display: contents; }
+#settings-modal .settings-nav { display: none; }
+#settings-modal .settings-body { display: contents; }
+#settings-modal section { display: contents; }
+#settings-modal .settings-danger-row { margin-top: 8px; }
+#settings-modal .settings-danger-row .danger { width: 100%; }
+
+/* Settings-Modal — Desktop: Sidebar-Nav-Layout, Inline-Rows, Sticky Footer */
+[data-layout="desktop"] .modal-overlay#settings-modal { padding: 40px; }
+[data-layout="desktop"] .modal-overlay#settings-modal .modal {
+  max-width: 880px;
+  width: 100%;
+  height: min(82vh, 760px);
+  max-height: none;
+  padding: 0;
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  grid-template-rows: auto 1fr auto;
+  gap: 0;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.32), 0 4px 16px rgba(0,0,0,0.18);
+}
+[data-layout="desktop"] #settings-modal .settings-header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  grid-column: 1 / -1;
+  padding: 18px 26px 16px;
+  border-bottom: 1px solid var(--border);
+}
+[data-layout="desktop"] #settings-modal .settings-header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+  color: var(--muted);
+}
+[data-layout="desktop"] #settings-modal .settings-header .modal-sub {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+[data-layout="desktop"] #settings-modal .settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--border);
+  background: rgba(0,0,0,0.12);
+  overflow-y: auto;
+}
+[data-layout="dark"] #settings-modal .settings-nav,
+[data-theme="light"] #settings-modal .settings-nav { background: rgba(0,0,0,0.03); }
+[data-layout="desktop"] #settings-modal .settings-nav-item {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  padding: 7px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  letter-spacing: -0.005em;
+  line-height: 1.4;
+}
+[data-layout="desktop"] #settings-modal .settings-nav-item:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+[data-theme="light"] #settings-modal .settings-nav-item:hover { background: rgba(0,0,0,0.04); }
+[data-layout="desktop"] #settings-modal .settings-nav-item.active {
+  background: rgba(21,101,192,0.18);
+  color: var(--info);
+  font-weight: 600;
+}
+[data-theme="light"] #settings-modal .settings-nav-item.active { background: rgba(21,101,192,0.10); }
+[data-layout="desktop"] #settings-modal .settings-body {
+  display: block;
+  overflow-y: auto;
+  padding: 22px 28px 28px;
+  scroll-behavior: smooth;
+}
+[data-layout="desktop"] #settings-modal section {
+  display: block;
+  scroll-margin-top: 12px;
+  padding-bottom: 28px;
+}
+[data-layout="desktop"] #settings-modal section + section {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+[data-layout="desktop"] #settings-modal h4.section-h {
+  font-size: 17px;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+  color: var(--text);
+  border-top: none;
+  padding-top: 0;
+  margin: 0 0 6px;
+}
+[data-layout="desktop"] #settings-modal .info-box {
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+[data-layout="desktop"] #settings-modal .field {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 0;
+  margin: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+[data-theme="light"] #settings-modal .field { border-top-color: rgba(0,0,0,0.06); }
+[data-layout="desktop"] #settings-modal .field:first-of-type { border-top: none; padding-top: 4px; }
+[data-layout="desktop"] #settings-modal .field label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+[data-layout="desktop"] #settings-modal .field input,
+[data-layout="desktop"] #settings-modal .field select {
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  width: 100%;
+}
+[data-layout="desktop"] #settings-modal .field input:focus,
+[data-layout="desktop"] #settings-modal .field select:focus {
+  border-color: var(--info);
+  box-shadow: 0 0 0 3px rgba(21,101,192,0.18);
+}
+[data-layout="desktop"] #settings-modal .theme-cards {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 0;
+  max-width: 560px;
+}
+[data-layout="desktop"] #settings-modal .theme-card {
+  padding: 14px 10px;
+  border-radius: 10px;
+  border-width: 1px;
+}
+[data-layout="desktop"] #settings-modal .theme-card.active {
+  border-color: var(--info);
+  background: rgba(21,101,192,0.10);
+}
+[data-layout="desktop"] #settings-modal .lock-apply-row { margin-top: 14px; }
+[data-layout="desktop"] #settings-modal .lock-apply-row button { min-width: 180px; padding: 8px 18px; }
+[data-layout="desktop"] #settings-modal .settings-danger-row { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+[data-layout="desktop"] #settings-modal .settings-danger-row .danger { width: auto; padding: 8px 18px; font-size: 13px; }
+[data-layout="desktop"] #settings-modal .modal-actions.settings-footer-actions {
+  grid-column: 1 / -1;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin: 0;
+}
+[data-layout="desktop"] #settings-modal .modal-actions.settings-footer-actions button {
+  flex: 0 0 auto;
+  min-width: 120px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-layout="desktop"] #settings-modal #price-test-result,
+[data-layout="desktop"] #settings-modal #sync-test-result {
+  margin-top: 12px;
+}
+[data-layout="desktop"] #settings-modal #lock-config-area .info-box { margin: 8px 0 0; }
 </style>
 </head>
 <body>
@@ -1285,10 +1474,25 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 </div>
 
 <div class="modal-overlay" id="settings-modal">
-  <div class="modal">
-    <h1 data-i18n="app_title">Pair Trade Tracker</h1>
-    <div class="modal-sub" data-i18n="settings_title">Einstellungen</div>
+  <div class="modal settings-modal-shell">
+    <div class="settings-header">
+      <h1 data-i18n="app_title">Pair Trade Tracker</h1>
+      <div class="modal-sub" data-i18n="settings_title">Einstellungen</div>
+    </div>
+    <nav class="settings-nav" aria-label="Settings">
+      <button type="button" class="settings-nav-item active" data-target="sec-theme" data-i18n="settings_theme">Erscheinungsbild</button>
+      <button type="button" class="settings-nav-item" data-target="sec-layout" data-i18n="settings_layout">Ansicht</button>
+      <button type="button" class="settings-nav-item" data-target="sec-font" data-i18n="settings_font_scale">Schriftgröße (Desktop)</button>
+      <button type="button" class="settings-nav-item" data-target="sec-lang" data-i18n="settings_language">Sprache</button>
+      <button type="button" class="settings-nav-item" data-target="sec-lock" data-i18n="settings_lock_title">App-Sperre</button>
+      <button type="button" class="settings-nav-item" data-target="sec-startpage" data-i18n="settings_start_page">Standard-Page</button>
+      <button type="button" class="settings-nav-item" data-target="sec-ccy" data-i18n="settings_home_ccy">Heimat-Währung</button>
+      <button type="button" class="settings-nav-item" data-target="sec-worker" data-i18n="settings_worker_title">Live-Kurse · Cloudflare Worker</button>
+      <button type="button" class="settings-nav-item" data-target="sec-sync" data-i18n="settings_sync_title">Sync</button>
+    </nav>
+    <div class="settings-body">
 
+    <section id="sec-theme">
     <h4 class="section-h" data-i18n="settings_theme">Erscheinungsbild</h4>
     <div class="info-box" data-i18n="settings_theme_info"></div>
     <div class="theme-cards" id="theme-cards">
@@ -1305,7 +1509,9 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         <div class="theme-card-label" data-i18n="theme_dark">Dunkel</div>
       </div>
     </div>
+    </section>
 
+    <section id="sec-layout">
     <h4 class="section-h" data-i18n="settings_layout">Ansicht</h4>
     <div class="info-box" data-i18n="settings_layout_info"></div>
     <div class="theme-cards" id="layout-cards">
@@ -1318,7 +1524,9 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         <div class="theme-card-label" data-i18n="layout_desktop">Desktop</div>
       </div>
     </div>
+    </section>
 
+    <section id="sec-font">
     <h4 class="section-h" data-i18n="settings_font_scale">Schriftgröße (Desktop)</h4>
     <div class="info-box" data-i18n="settings_font_scale_info"></div>
     <div class="theme-cards" id="font-scale-cards">
@@ -1339,7 +1547,9 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         <div class="theme-card-label" data-i18n="scale_xl">XL</div>
       </div>
     </div>
+    </section>
 
+    <section id="sec-lang">
     <h4 class="section-h" data-i18n="settings_language">Sprache</h4>
     <div class="info-box" data-i18n="settings_language_info"></div>
     <div class="field">
@@ -1349,7 +1559,9 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         <option value="en">English</option>
       </select>
     </div>
+    </section>
 
+    <section id="sec-lock">
     <h4 class="section-h" data-i18n="settings_lock_title">App-Sperre</h4>
     <div class="info-box" data-i18n="settings_lock_info"></div>
     <div class="field">
@@ -1374,7 +1586,9 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     </div>
     <div class="lock-apply-row"><button id="lock-apply-btn" class="primary" disabled data-i18n="lock_apply_set">Sperre bestätigen</button></div>
     <div id="lock-apply-result" class="lock-match ok" style="display:none;"></div>
+    </section>
 
+    <section id="sec-startpage">
     <h4 class="section-h" data-i18n="settings_start_page">Standard-Page</h4>
     <div class="info-box" data-i18n="settings_start_page_info"></div>
     <div class="field">
@@ -1386,28 +1600,34 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         <option value="total" data-i18n="page_total">Gesamt</option>
       </select>
     </div>
+    </section>
 
+    <section id="sec-ccy">
     <h4 class="section-h" data-i18n="settings_home_ccy">Heimat-Währung</h4>
     <div class="info-box" data-i18n="settings_home_ccy_info"></div>
     <div class="field"><label data-i18n="settings_home_ccy_label">ISO-Code (EUR, USD, GBP, CHF, ...)</label><input id="home-ccy" type="text" autocapitalize="characters" autocorrect="off" autocomplete="off" placeholder="EUR" maxlength="3"></div>
+    </section>
 
+    <section id="sec-worker">
     <h4 class="section-h" data-i18n="settings_worker_title">Live-Kurse · Cloudflare Worker</h4>
     <div class="info-box" data-i18n="settings_worker_info"></div>
     <div class="field"><label data-i18n="settings_worker_label">Worker-URL</label><input id="worker-url" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="https://yahoo-finance-proxy.dein-name.workers.dev"></div>
     <div id="price-test-result" style="display:none;"></div>
+    </section>
 
+    <section id="sec-sync">
     <h4 class="section-h" data-i18n="settings_sync_title">Sync</h4>
     <div class="info-box" data-i18n="settings_sync_info"></div>
     <div class="field"><label data-i18n="settings_sync_secret">Sync-Secret (Worker)</label><input id="sync-secret" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="64-char hex (openssl rand -hex 32)"></div>
     <div id="sync-test-result" style="display:none;"></div>
+    <div class="settings-danger-row"><button id="sync-disable" class="danger" data-i18n="settings_sync_disable">Sync ausschalten</button></div>
+    </section>
 
-    <div class="modal-actions">
+    </div>
+    <div class="modal-actions settings-footer-actions">
       <button id="settings-cancel" data-i18n="btn_cancel">Abbrechen</button>
       <button id="settings-test" data-i18n="btn_test_both">Beides testen</button>
       <button id="settings-save" class="primary" data-i18n="btn_save">Speichern</button>
-    </div>
-    <div class="modal-actions" style="margin-top:4px;">
-      <button id="sync-disable" class="danger" style="flex:1;" data-i18n="settings_sync_disable">Sync ausschalten</button>
     </div>
   </div>
 </div>
@@ -4225,8 +4445,51 @@ function openSettings() {
   const result = document.getElementById("lock-apply-result");
   if (result) result.style.display = "none";
   document.getElementById("settings-modal").classList.add("open");
+  // Desktop: reset Nav + Scroll auf erste Sektion
+  if (document.documentElement.getAttribute("data-layout") === "desktop") {
+    const body = document.querySelector("#settings-modal .settings-body");
+    if (body) body.scrollTop = 0;
+    const navItems = document.querySelectorAll("#settings-modal .settings-nav-item");
+    navItems.forEach((it, i) => it.classList.toggle("active", i === 0));
+  }
   closeMenu();
 }
+
+// Settings-Sidebar-Nav: Click → scroll, Scroll → highlight active item
+(function initSettingsNav() {
+  const nav = document.querySelector("#settings-modal .settings-nav");
+  const body = document.querySelector("#settings-modal .settings-body");
+  if (!nav || !body) return;
+  nav.addEventListener("click", e => {
+    const btn = e.target.closest(".settings-nav-item");
+    if (!btn) return;
+    const targetId = btn.getAttribute("data-target");
+    const target = document.getElementById(targetId);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelectorAll("#settings-modal .settings-nav-item").forEach(it => it.classList.toggle("active", it === btn));
+  });
+  // Scroll-spy: aktiviert das Nav-Item für die Section die gerade ganz oben im Viewport ist
+  let scrollTimer = null;
+  body.addEventListener("scroll", () => {
+    if (scrollTimer) return;
+    scrollTimer = requestAnimationFrame(() => {
+      scrollTimer = null;
+      if (document.documentElement.getAttribute("data-layout") !== "desktop") return;
+      const sections = body.querySelectorAll("section[id^='sec-']");
+      const bodyTop = body.getBoundingClientRect().top;
+      let activeId = sections[0] ? sections[0].id : null;
+      sections.forEach(sec => {
+        const r = sec.getBoundingClientRect();
+        if (r.top - bodyTop <= 24) activeId = sec.id;
+      });
+      if (activeId) {
+        document.querySelectorAll("#settings-modal .settings-nav-item").forEach(it =>
+          it.classList.toggle("active", it.getAttribute("data-target") === activeId)
+        );
+      }
+    });
+  });
+})();
 
 // Show/hide the lock-config area based on the enabled select; also show
 // the "leave empty to keep current code" hint only when a code already exists.

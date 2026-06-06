@@ -874,8 +874,18 @@ export default {
   async scheduled(event, env, ctx) {
     const cronStr = (event && event.cron) ? String(event.cron) : "";
     if (isFastCron(cronStr)) {
+      // Market-Hours-Gate: Cron läuft 24/7, aber Loss/Profit-Alarme prüfen wir nur
+      // wenn irgendein relevanter Markt offen sein KÖNNTE (Mo-Fr 09:00-23:00 Berlin).
+      // Außerhalb passieren keine Kursbewegungen → Yahoo-Call wäre Verschwendung.
+      // Override mit env-flag RUN_24_7=1 (für Debug/Testing).
+      if (env.RUN_24_7 !== "1" && !isWithinTradingHours()) {
+        console.log("scheduled: outside trading hours, skipping alarm check");
+        return;
+      }
       ctx.waitUntil(runAlarmCheck(env).catch(e => console.error("cron error:", e)));
     } else {
+      // Squeeze-Cron läuft täglich (z.B. 06:00 UTC) — kein Gating, Snapshot ist
+      // Hintergrund-Daten und muss auch am Wochenende einmal refreshen.
       ctx.waitUntil(runShortSqueezeCheck(env).catch(e => console.error("squeeze cron error:", e)));
     }
   }
