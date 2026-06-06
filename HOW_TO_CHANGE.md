@@ -55,6 +55,59 @@ Hat nichts mit Code zu tun. In Telegram an **@BotFather** schreiben → `/mybots
 
 Cloudflare-Dashboard → Worker → "Settings" → "Variables and Secrets" → entsprechendes Secret editieren oder neu anlegen → Save. Worker muss nicht neu deployed werden, Secrets sind sofort wirksam.
 
+### F) Migration: JSONBin → Cloudflare KV als Sync-Storage (einmalig, Mai 2026)
+
+**Wozu:** Worker wird zur einzigen Sync-Quelle, JSONBin-Abhängigkeit raus. Keine externen Single-Points-of-Failure mehr, keine 10k-Monats-Quota. Sync zwischen iPhone+Mac läuft jetzt über deinen eigenen Worker statt jsonbin.io.
+
+**Voraussetzung:** Sektion E (KV-Namespace `TRADEBOOK_CACHE` ist gebunden) muss schon erledigt sein.
+
+**Setup-Schritte (einmalig, ~15 Min):**
+
+1. **Sync-Secret generieren** — random 32-Zeichen-String. Auf Mac/Linux:
+   ```bash
+   openssl rand -hex 32
+   ```
+   Output kopieren und SICHER notieren (Passwort-Manager).
+
+2. **Secret im Cloudflare-Dashboard hinterlegen:**
+   - Worker → Settings → Variables and Secrets → **„Add"**
+   - Type: **Secret**
+   - Variable name: **`SYNC_SECRET`** (genau so geschrieben)
+   - Value: das in Schritt 1 generierte Secret rein
+   - Save
+
+3. **Neuen Worker-Code deployen** (Workflow B aus dieser Datei).
+
+4. **JSONBin-Daten in KV importieren** (einmalig, solange JSONBin noch erreichbar ist):
+   ```bash
+   curl -X POST \
+     -H "Authorization: Bearer <DEIN_SYNC_SECRET>" \
+     https://yahoo-finance-proxy.fabian-terhorst.workers.dev/migrate-from-jsonbin
+   ```
+   Bei Erfolg kommt eine Response mit `ok: true` und der Anzahl migrierter Trades/Baskets/AlertStates zurück. Falls JSONBin grad nicht erreichbar ist (Quota / Outage): manuelle Alternative — JSONBin-Web-UI öffnen, JSON kopieren, mit `curl -X POST -d @datei.json` an `/tradebook` schicken.
+
+5. **Neue `index.html` deployen** (Workflow A).
+
+6. **App-Settings auf beiden Geräten** (iPhone + Mac) updaten:
+   - Settings öffnen
+   - Sync-Sektion: das neue Feld **„Sync-Secret (Worker)"** mit demselben Secret befüllen
+   - Worker-URL prüfen (sollte schon gesetzt sein)
+   - **„Test"** klicken — Sync-Test sollte „OK, N Trades" zeigen
+   - **Speichern**
+
+7. **Cross-Device-Sync verifizieren:**
+   - Auf Mac einen Trade kurz editieren (z.B. Name ändern) → Sync wird ausgelöst
+   - Auf iPhone die App reopen → Pull-Sync zieht die Änderung
+   - Wenn der neue Name auf iPhone sichtbar ist → Migration komplett
+
+8. **Aufräumen (optional, nach 1-2 Wochen ohne Probleme):**
+   - JSONBin-Account löschen oder auslaufen lassen
+   - Cloudflare-Dashboard → Worker → Settings → Variables and Secrets → `JSONBIN_KEY` und `JSONBIN_BIN_ID` löschen
+   - App-Settings: Legacy-Felder (X-Master-Key, Bin-ID) leer machen
+   - Worker-Code: optional den JSONBin-Code-Pfad rauslöschen (löscht ~50 Zeilen, ist aber pure Polish)
+
+**Falls die Migration scheitert:** Worker behält die Legacy-Pfade als Fallback. Solange `apiKey + binId` in App-Settings stehen und JSONBin wieder reachable wird, läuft alles wie vorher. Du kannst den Migrations-Schritt 4 jederzeit nochmal versuchen.
+
 ### E) KV-Namespace für Worker-Resilience anlegen (einmalig, seit Mai 2026)
 
 **Wozu:** der Worker fängt JSONBin-Outages und Quota-Exhaustions mit einem KV-Cache-Fallback ab. Ohne diesen Namespace verhält sich der Worker wie vorher (keine Telegram-Alarme wenn JSONBin gerade nicht erreichbar ist). Mit Namespace: Alarme laufen weiter mit dem letzten bekannten Trade-Stand, plus du kriegst eine Telegram-Warnung wenn der Fallback aktiv wird.

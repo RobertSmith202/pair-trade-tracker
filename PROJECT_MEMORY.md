@@ -659,6 +659,55 @@ Yahoo's `defaultKeyStatistics` füllt `shortPercentOfFloat` zuverlässig nur fü
 
 **Worker-Endpoint zum manuellen Testen:** `GET /check-squeeze` (analog zu `/check`).
 
+### Sync-Migration: JSONBin → Cloudflare KV (Mai 2026)
+
+**Auslöser:** JSONBin Free-Tier-Quota (10k Requests/Monat) wurde wiederholt überschritten, dabei stoppte der Worker-Alarm-Cron stillschweigend. Robert verpasste einen Loss-Alarm der hätte feuern müssen. Architektur-Single-Point-of-Failure JSONBin wurde komplett entfernt — Worker-eigenes Cloudflare-KV ist seit Mai 2026 die alleinige Wahrheits-Quelle für Trade-Daten.
+
+**Neue Architektur:**
+
+```
+iPhone-App ──POST /tradebook──→  Cloudflare Worker  ──→  KV (Storage der Wahrheit)
+                                  (Auth via Bearer)        ↑
+Mac-App ───GET /tradebook────→                              │
+                                                       Worker-Cron (Alarm-Check)
+                                                       liest direkt aus KV
+```
+
+**Frontend-Sync (`syncMode()`-Dispatcher):**
+- Wenn `syncSettings.syncSecret + priceSettings.workerUrl` → **Worker-Modus** (neuer Default)
+- Sonst wenn `syncSettings.apiKey + syncSettings.binId` → **JSONBin-Modus** (Legacy, bleibt für Übergang)
+- Sonst → Sync disabled
+
+Beide Modi koexistieren — Robert kann mit altem Frontend (JSONBin) und neuem Frontend (Worker) parallel arbeiten, solange JSONBin noch erreichbar ist. Nach kompletter Migration kann der JSONBin-Account gelöscht und die Worker-Secrets `JSONBIN_KEY`/`JSONBIN_BIN_ID` aus dem CF-Dashboard entfernt werden.
+
+**Neue Worker-Endpoints:**
+- `GET /tradebook` (Bearer-Auth) — liefert das aktuelle Tradebook aus KV
+- `POST /tradebook` (Bearer-Auth) — schreibt das Tradebook in KV
+- `POST /migrate-from-jsonbin` (Bearer-Auth) — einmaliger Import von JSONBin in KV. Setzt voraus dass JSONBin gerade erreichbar ist. Liest Trades+Baskets+AlertStates und kopiert sie nach KV.
+
+**Auth-Mechanismus:** neues Cloudflare-Secret `SYNC_SECRET` (32-Zeichen-Random-String). Beide Geräte tragen dasselbe Secret in App-Settings → Sync-Secret-Feld ein. Worker prüft `Authorization: Bearer <SYNC_SECRET>` Header bei jedem Sync-Request.
+
+**Storage:** localStorage-Key `pair_trade_sync_v1` hat jetzt vier Felder: `apiKey`, `binId`, `syncSecret`, `enabled`. Erste zwei sind Legacy, dritter ist der neue Pfad.
+
+**`loadTradebook(env)` (Worker)** nach der Migration:
+- KV zuerst → bei Treffer direkt return
+- KV leer? → JSONBin-Cold-Start-Fallback wenn Secrets noch gesetzt, sonst Error
+- `loadTradebook` ist die ZENTRALE Lese-Funktion für ALLE Cron-Pfade (runAlarmCheck, runShortSqueezeCheck, Telegram-Webhook, sendTestAlert)
+
+**`saveTradebook(env, record)` (Worker)** nach der Migration:
+- KV ist **primärer** Schreib-Pfad — schreibt immer dort hin
+- JSONBin-Mirror nur best-effort wenn Secrets gesetzt (für Übergangs-Phase damit alte Frontend-Versionen noch funktionieren)
+- Nach Migrations-Abschluss: JSONBin-Secrets aus CF entfernen, Worker schreibt nur noch KV
+
+**Migrations-Flow für User:**
+1. Cloudflare-Dashboard: Worker → Settings → neues Secret `SYNC_SECRET` anlegen (z.B. mit `openssl rand -hex 32`)
+2. Neuer Worker-Code deployen (Endpoints aktiv)
+3. Manuell migrieren: `curl -X POST -H "Authorization: Bearer <SECRET>" https://yahoo-finance-proxy.../migrate-from-jsonbin`
+4. Neue HTML deployen
+5. App-Settings auf Mac UND iPhone: Sync-Secret in das neue Feld eintragen, Test laufen lassen, Speichern
+6. Verifizieren dass Sync zwischen Geräten funktioniert (Trade auf einem Device anlegen, am anderen Pull-Sync triggern)
+7. Optional: JSONBin-Account löschen + Cloudflare-Secrets `JSONBIN_KEY`/`JSONBIN_BIN_ID` entfernen
+
 ### Worker-Resilience: KV-Cache-Fallback (seit Mai 2026)
 
 Der Worker geht nicht mehr direkt durch `jsonbinRead`/`jsonbinWrite` für die Alarm-Cron-Logik, sondern durch die Wrapper `loadTradebook(env)` / `saveTradebook(env, record)`. Hintergrund: JSONBin-Outages (HTTP 520) und Quota-Exhaustions (HTTP 403 Free-Tier 10k/Monat) führten dazu dass der Worker-Cron die Trades nicht mehr lesen konnte → keine Telegram-Alarme wurden gesendet, der User merkte es nicht. **Konkreter Vorfall:** Mai 2026, Robert legte einen Trade mit Verlust-Schwelle an, gestrige Handelstag bis 23:00, Schwelle wurde verletzt, kein Alarm — JSONBin-Quota war erschöpft, Worker konnte nicht lesen.

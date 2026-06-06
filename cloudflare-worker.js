@@ -11,7 +11,15 @@ const PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000;
 // Robuste Cron-Dispatch: der schnelle Loss/Profit-Cron startet mit "*/3 " (3-Min-Intervall).
 // Alles andere (z.B. "0 17 * * *" für täglich 17:00 UTC) wird als Squeeze-Cron behandelt.
 // Damit kannst du die Squeeze-Cron-Zeit im Cloudflare-Dashboard frei ändern ohne Code-Update.
-const FAST_CRON_PREFIX = "*/3";
+// Cron-Dispatcher: erkennt Fast-Cron (Alarm-Check, * oder */N im Minuten-Feld) vs.
+// Daily-Cron (Squeeze-Check, fixe Minute wie "0 6 * * *"). Damit kannst du im
+// Cloudflare-Dashboard zwischen */3, */2, */1 oder * wechseln ohne den Worker
+// neu deployen zu müssen — Dispatcher erkennt alle als "Fast" weil Minuten-Feld
+// mit * anfängt. Squeeze-Cron hat eine fixe Ziffer (z.B. "0") als ersten Token.
+function isFastCron(cronStr) {
+  const firstField = String(cronStr || "").trim().split(/\s+/)[0] || "";
+  return firstField.startsWith("*");
+}
 const TRADING_START_HOUR = 9;
 const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
@@ -110,57 +118,145 @@ const FALLBACK_WARN_KV_KEY = "fallback_warn:last_ts";
 const FALLBACK_WARN_MIN_INTERVAL_MS = 60 * 60 * 1000;  // 1h zwischen Warnungen
 const KV_TTL_SECONDS = 7 * 24 * 3600;                  // 7 Tage Cache-Aufbewahrung
 
+// loadTradebook: KV ist seit der JSONBin→KV-Migration (Mai 2026) der PRIMÄRE Storage.
+// JSONBin ist nur noch Cold-Start-Fallback falls KV leer ist UND JSONBin-Secrets noch
+// gesetzt sind — dieser Pfad existiert für die Migration von alten Bins. Nach erfolgreicher
+// Migration kann der JSONBin-Read-Block komplett raus, plus die Secrets im CF-Dashboard.
 async function loadTradebook(env) {
+  // 1. KV zuerst — das ist der reguläre Pfad
+  if (env.TRADEBOOK_CACHE) {
+    try {
+      const cached = await env.TRADEBOOK_CACHE.get(TRADEBOOK_KV_KEY, { type: "json" });
+      if (cached && cached.data) {
+        return { data: cached.data, source: "kv", ts: cached.ts || 0 };
+      }
+    } catch (kvErr) {
+      console.warn("KV read failed:", kvErr.message);
+      // weiter zu JSONBin-Fallback
+    }
+  }
+  // 2. JSONBin-Fallback nur für Cold-Start / Migration
+  if (!env.JSONBIN_BIN_ID || !env.JSONBIN_KEY) {
+    throw new Error("KV empty and no JSONBin credentials for cold-start fallback");
+  }
   try {
     const data = await jsonbinRead(env);
-    // Spiegeln in KV (best-effort, Fehler werden geschluckt)
+    // Erfolgreich von JSONBin gelesen → in KV spiegeln damit der nächste Read direkt aus KV kommt
     if (env.TRADEBOOK_CACHE) {
       try {
         await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
           JSON.stringify({ data, ts: Date.now() }),
           { expirationTtl: KV_TTL_SECONDS });
-      } catch (e) { /* swallowed: KV-write-fail darf den Cron-Lauf nicht crashen */ }
+      } catch (e) { /* swallowed */ }
     }
-    return { data, source: "jsonbin" };
+    return { data, source: "jsonbin_bootstrap" };
   } catch (jbErr) {
-    if (!env.TRADEBOOK_CACHE) throw jbErr;  // Kein Binding → kein Fallback möglich
-    let cached;
-    try {
-      cached = await env.TRADEBOOK_CACHE.get(TRADEBOOK_KV_KEY, { type: "json" });
-    } catch (kvErr) {
-      throw new Error(`jsonbin failed (${jbErr.message}) and KV-read failed (${kvErr.message})`);
-    }
-    if (!cached || !cached.data) {
-      throw new Error(`jsonbin failed (${jbErr.message}) and no KV-cache yet — nothing to fall back to`);
-    }
-    const ageMin = Math.max(0, Math.round((Date.now() - (cached.ts || 0)) / 60000));
-    // Telegram-Warnung an User, aber rate-limited (1×/h)
-    await maybeSendFallbackWarning(env, cached.data, ageMin, jbErr.message);
-    return { data: cached.data, source: "kv_cache", ageMin };
+    throw new Error(`KV empty and JSONBin-fallback failed: ${jbErr.message}`);
   }
 }
 
+// saveTradebook: KV ist der primäre Persistenz-Layer. JSONBin-Mirror wird nur dann
+// versucht wenn die Secrets noch gesetzt sind (Übergangs-Phase) — schlägt's fehl,
+// ist's egal weil KV schon den State hält.
 async function saveTradebook(env, record) {
-  // Always update KV mirror with the new state — auch wenn JSONBin gleich klappt,
-  // damit der Cache nach jedem geschriebenen Update auf dem aktuellsten Stand ist.
+  // 1. KV schreiben — der Hauptpfad
   if (env.TRADEBOOK_CACHE) {
-    try {
-      await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
-        JSON.stringify({ data: record, ts: Date.now() }),
-        { expirationTtl: KV_TTL_SECONDS });
-    } catch (e) { /* swallowed */ }
+    await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
+      JSON.stringify({ data: record, ts: Date.now() }),
+      { expirationTtl: KV_TTL_SECONDS });
+  } else {
+    throw new Error("TRADEBOOK_CACHE binding not configured — cannot save");
   }
-  // JSONBin-Write versuchen
+  // 2. JSONBin-Mirror nur best-effort (für Migrations-Phase, kann später raus)
+  if (env.JSONBIN_BIN_ID && env.JSONBIN_KEY) {
+    try {
+      await jsonbinWrite(env, record);
+      return { ok: true, source: "kv_and_jsonbin" };
+    } catch (jbErr) {
+      console.warn("jsonbin mirror failed (KV is authoritative):", jbErr.message);
+      return { ok: true, source: "kv_only", jsonbinError: jbErr.message };
+    }
+  }
+  return { ok: true, source: "kv_only" };
+}
+
+// Auth-Check für Frontend-Sync-Endpoints. Erwartet Authorization: Bearer <SYNC_SECRET>.
+// Das Secret wird in Cloudflare-Dashboard → Worker → Settings → Secrets als SYNC_SECRET
+// angelegt (32-Zeichen-Random-String empfohlen). Beide Geräte (iPhone + Mac) tragen
+// dasselbe Secret in ihre App-Settings ein.
+function checkSyncAuth(req, env) {
+  if (!env.SYNC_SECRET) return { ok: false, msg: "SYNC_SECRET not configured on worker" };
+  const h = req.headers.get("Authorization") || "";
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  if (!m) return { ok: false, msg: "missing Bearer token" };
+  if (m[1].trim() !== env.SYNC_SECRET) return { ok: false, msg: "invalid sync secret" };
+  return { ok: true };
+}
+
+// GET /tradebook — Frontend pulled hier her statt von JSONBin.
+async function handleTradebookGet(req, env) {
+  const auth = checkSyncAuth(req, env);
+  if (!auth.ok) return jsonResponse({ error: auth.msg }, 401);
   try {
-    await jsonbinWrite(env, record);
-    return { ok: true, source: "jsonbin" };
-  } catch (jbErr) {
-    // JSONBin-Write fehlgeschlagen — KV ist schon aktualisiert (siehe oben),
-    // also wird der nächste Cron-Tick (oder ein Frontend-Pull) mit JSONBin
-    // wieder die richtigen States haben sobald JSONBin wieder erreichbar ist.
-    // Limitation: bis JSONBin zurück ist, weiß das Frontend nichts vom State-Change.
-    console.warn("jsonbin write failed, kept in KV only:", jbErr.message);
-    return { ok: true, source: "kv_only", error: jbErr.message };
+    const result = await loadTradebook(env);
+    return jsonResponse({
+      data: result.data,
+      source: result.source,
+      ts: result.ts || Date.now()
+    });
+  } catch (e) {
+    return jsonResponse({ error: e.message }, 500);
+  }
+}
+
+// POST /tradebook — Frontend pushed hier her statt zu JSONBin.
+async function handleTradebookPost(req, env) {
+  const auth = checkSyncAuth(req, env);
+  if (!auth.ok) return jsonResponse({ error: auth.msg }, 401);
+  let body;
+  try { body = await req.json(); }
+  catch { return jsonResponse({ error: "invalid JSON body" }, 400); }
+  // Sanity-Check: tradebook sollte zumindest ein Objekt sein, idealerweise mit trades-Array
+  if (!body || typeof body !== "object") {
+    return jsonResponse({ error: "body must be an object" }, 400);
+  }
+  try {
+    const result = await saveTradebook(env, body);
+    return jsonResponse({ ok: true, source: result.source });
+  } catch (e) {
+    return jsonResponse({ error: e.message }, 500);
+  }
+}
+
+// POST /migrate-from-jsonbin — einmaliger Migrations-Endpoint. Liest direkt von JSONBin,
+// schreibt in KV. Wird vom User manuell aufgerufen wenn JSONBin reachable ist.
+// Nach Migration kann der JSONBin-Account gelöscht und die Secrets im CF-Dashboard
+// entfernt werden — der Worker läuft dann komplett KV-only.
+async function handleMigrateFromJsonbin(req, env) {
+  const auth = checkSyncAuth(req, env);
+  if (!auth.ok) return jsonResponse({ error: auth.msg }, 401);
+  if (!env.JSONBIN_BIN_ID || !env.JSONBIN_KEY) {
+    return jsonResponse({ error: "JSONBin secrets not configured" }, 400);
+  }
+  if (!env.TRADEBOOK_CACHE) {
+    return jsonResponse({ error: "TRADEBOOK_CACHE binding not configured" }, 500);
+  }
+  try {
+    const data = await jsonbinRead(env);
+    await env.TRADEBOOK_CACHE.put(TRADEBOOK_KV_KEY,
+      JSON.stringify({ data, ts: Date.now() }),
+      { expirationTtl: KV_TTL_SECONDS });
+    return jsonResponse({
+      ok: true,
+      message: "Migration complete. Tradebook now lives in KV.",
+      stats: {
+        trades: Array.isArray(data.trades) ? data.trades.length : 0,
+        baskets: Array.isArray(data.baskets) ? data.baskets.length : 0,
+        alertStates: data.alertStates ? Object.keys(data.alertStates).length : 0
+      }
+    });
+  } catch (e) {
+    return jsonResponse({ error: "migration failed: " + e.message }, 500);
   }
 }
 
@@ -750,13 +846,17 @@ export default {
     if (url.pathname === "/" || url.pathname === "") {
       const s = url.searchParams.get("symbol");
       if (s) return yahooProxy(s);
-      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook");
+      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST)");
     }
     if (url.pathname === "/check") { try { return jsonResponse(await runAlarmCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/check-squeeze") { try { return jsonResponse(await runShortSqueezeCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/test-alert") return textResponse(await sendTestAlert(env));
     if (url.pathname === "/setup-webhook") return setupWebhook(req, env);
     if (url.pathname === "/telegram-webhook" && req.method === "POST") return handleTelegramWebhook(req, env);
+    // Sync-Endpoints für Frontend (ersetzt direkten JSONBin-Zugriff, seit Mai 2026)
+    if (url.pathname === "/tradebook" && req.method === "GET")  return handleTradebookGet(req, env);
+    if (url.pathname === "/tradebook" && req.method === "POST") return handleTradebookPost(req, env);
+    if (url.pathname === "/migrate-from-jsonbin" && req.method === "POST") return handleMigrateFromJsonbin(req, env);
     return textResponse("not found", 404);
   },
   // Mehrere Cron-Trigger im Cloudflare-Dashboard: "*/3 * * * *" für Loss/Profit,
@@ -765,7 +865,7 @@ export default {
   // Vorteil: die Squeeze-Cron-Zeit kann im Dashboard frei geändert werden.
   async scheduled(event, env, ctx) {
     const cronStr = (event && event.cron) ? String(event.cron) : "";
-    if (cronStr.startsWith(FAST_CRON_PREFIX)) {
+    if (isFastCron(cronStr)) {
       ctx.waitUntil(runAlarmCheck(env).catch(e => console.error("cron error:", e)));
     } else {
       ctx.waitUntil(runShortSqueezeCheck(env).catch(e => console.error("squeeze cron error:", e)));

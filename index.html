@@ -99,7 +99,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .tt-btn.active { background: var(--info); color: white; }
 .trade-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
 .trade-list[data-view="list"] { gap: 6px; }
-.trade-list[data-view="list"] .trade-card { padding: 10px 12px; }
+.trade-list[data-view="list"] .trade-card { padding: 8px 12px; }
 /* Listen-Ansicht-Zeile im Watchlist-Stil: Key-Metrics (PnL + %) ganz links wo
    das Auge zuerst hinwandert, Trade-Identifikation in der Mitte, Actions rechts.
    4-Spalten-Grid: [PnL] [%-Pill] [Name + Tickers] [Edit/Delete].
@@ -157,8 +157,24 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
   min-width: 0;
+}
+/* Alarm-Pills in dedizierter Zeile zwischen Name und Ticker-Sub. Verhindert dass
+   die Pills bei knappem horizontalen Platz (iPhone-Breite) chaotisch über mehrere
+   Linien wrappen und der Trade-Name allein über ihnen schwebt. Pills sind hier
+   absichtlich enger getuned als ihre Standard-Card-Variante — passend zur
+   Listen-Dichte. */
+.trade-row-info-alarms {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 1px 0;
+}
+.trade-row-info-alarms .alarm-pill {
+  margin-left: 0;
+  font-size: 9px;
+  padding: 1px 5px;
+  line-height: 1.3;
 }
 .trade-row-name {
   font-weight: 700;
@@ -1380,10 +1396,12 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="field"><label data-i18n="settings_worker_label">Worker-URL</label><input id="worker-url" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="https://yahoo-finance-proxy.dein-name.workers.dev"></div>
     <div id="price-test-result" style="display:none;"></div>
 
-    <h4 class="section-h" data-i18n="settings_sync_title">Sync · JSONBin</h4>
+    <h4 class="section-h" data-i18n="settings_sync_title">Sync</h4>
     <div class="info-box" data-i18n="settings_sync_info"></div>
-    <div class="field"><label data-i18n="settings_sync_key">X-Master-Key</label><input id="sync-key" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="$2a$10$..."></div>
-    <div class="field"><label data-i18n="settings_sync_bin">Bin-ID</label><input id="sync-bin" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="65f..."></div>
+    <div class="field"><label data-i18n="settings_sync_secret">Sync-Secret (Worker)</label><input id="sync-secret" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="random 32-char string"></div>
+    <div class="field-help" data-i18n="settings_sync_legacy_note" style="font-size:11px;color:var(--muted);margin:-4px 0 8px;">Legacy: JSONBin-Felder unten bleiben für Übergang funktional.</div>
+    <div class="field"><label data-i18n="settings_sync_key">X-Master-Key (Legacy JSONBin)</label><input id="sync-key" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="$2a$10$..."></div>
+    <div class="field"><label data-i18n="settings_sync_bin">Bin-ID (Legacy JSONBin)</label><input id="sync-bin" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="65f..."></div>
     <div id="sync-test-result" style="display:none;"></div>
 
     <div class="modal-actions">
@@ -1555,8 +1573,11 @@ const STRINGS = {
     settings_home_ccy_info: "Alle PnL-Werte und Notionals in dieser Währung. Standard für Einstand-Eingabe bei neuen Trades. Bei bestehenden Trades bleibt die Einstands-Whg pfadunabhängig fix.",
     settings_worker_title: "Live-Kurse · Cloudflare Worker", settings_worker_info: "URL deines Yahoo-Finance-Proxy-Workers (workers.dev).",
     settings_worker_label: "Worker-URL",
-    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master-Key + Bin-ID von jsonbin.io.",
-    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin-ID",
+    settings_sync_title: "Sync", settings_sync_info: "Sync-Secret aus dem Cloudflare-Worker (Bearer-Token). JSONBin-Felder sind Legacy und können nach Migration leer bleiben.",
+    settings_sync_secret: "Sync-Secret (Worker)",
+    settings_sync_legacy_note: "Legacy: JSONBin-Felder unten bleiben für Übergang funktional.",
+    settings_sync_key: "X-Master-Key (Legacy JSONBin)", settings_sync_bin: "Bin-ID (Legacy JSONBin)",
+    test_sync_no_worker_url: "Worker-URL nicht gesetzt — Worker-Sync nicht möglich",
     settings_sync_disable: "Sync ausschalten", settings_sync_disable_confirm: "Sync ausschalten? Lokale Daten bleiben erhalten.",
     test_worker_loading: "Worker testen…", test_sync_loading: "JSONBin testen…",
     test_worker_ok: "OK — AAPL aktuell {price} {ccy}", test_worker_no_price: "Antwort unerwartet",
@@ -1731,8 +1752,11 @@ const STRINGS = {
     settings_home_ccy_info: "All P&L values and notionals shown in this currency. Default for entry input on new trades. Existing trades keep their entry currency fixed (path-independent).",
     settings_worker_title: "Live quotes · Cloudflare Worker", settings_worker_info: "URL of your Yahoo Finance proxy Worker (workers.dev).",
     settings_worker_label: "Worker URL",
-    settings_sync_title: "Sync · JSONBin", settings_sync_info: "Master key + bin ID from jsonbin.io.",
-    settings_sync_key: "X-Master-Key", settings_sync_bin: "Bin ID",
+    settings_sync_title: "Sync", settings_sync_info: "Sync secret from your Cloudflare worker (Bearer token). JSONBin fields are legacy and can be left empty after migration.",
+    settings_sync_secret: "Sync secret (worker)",
+    settings_sync_legacy_note: "Legacy: JSONBin fields below remain functional during transition.",
+    settings_sync_key: "X-Master-Key (Legacy JSONBin)", settings_sync_bin: "Bin ID (Legacy JSONBin)",
+    test_sync_no_worker_url: "Worker URL not set — worker sync not possible",
     settings_sync_disable: "Disable sync", settings_sync_disable_confirm: "Disable sync? Local data is kept.",
     test_worker_loading: "Testing worker…", test_sync_loading: "Testing JSONBin…",
     test_worker_ok: "OK — AAPL is at {price} {ccy}", test_worker_no_price: "Unexpected response",
@@ -2404,7 +2428,9 @@ function setActiveFontScaleCard(scale) {
   });
 }
 
-function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", enabled: false }; } }
+// syncSecret hinzugekommen Mai 2026 — Bearer-Token für Worker-Sync. Legacy-Felder
+// apiKey + binId für JSONBin-Pfad bleiben funktional bis User migriert ist.
+function loadSyncSettings() { try { const raw = localStorage.getItem(SYNC_KEY); if (!raw) return { apiKey: "", binId: "", syncSecret: "", enabled: false }; return Object.assign({ apiKey: "", binId: "", syncSecret: "", enabled: false }, JSON.parse(raw)); } catch { return { apiKey: "", binId: "", syncSecret: "", enabled: false }; } }
 function saveSyncSettings() { localStorage.setItem(SYNC_KEY, JSON.stringify(syncSettings)); }
 function loadPriceSettings() { try { const raw = localStorage.getItem(PRICE_KEY); if (!raw) return { workerUrl: "", homeCurrency: "EUR" }; return Object.assign({ workerUrl: "", homeCurrency: "EUR" }, JSON.parse(raw)); } catch { return { workerUrl: "", homeCurrency: "EUR" }; } }
 function savePriceSettings() { localStorage.setItem(PRICE_KEY, JSON.stringify(priceSettings)); }
@@ -2667,15 +2693,68 @@ async function ensureFxRatesForTrades() {
   for (const p of pairs) { const [from, to] = p.split("/"); await fetchFxRate(from, to); }
 }
 
+// === Sync-Backend-Dispatcher =============================================
+// Seit Mai 2026 Migration: Sync läuft primär über den eigenen Cloudflare-Worker
+// (KV-Storage als Quelle der Wahrheit). JSONBin-Legacy-Pfad bleibt nur als
+// Fallback wenn der User noch alte Credentials konfiguriert hat (Übergangs-Mode).
+//
+// syncSettings-Felder:
+//   syncSecret  → Bearer-Token für Worker-/tradebook-Endpoints (neuer Modus)
+//   apiKey      → JSONBin Master-Key (Legacy)
+//   binId       → JSONBin Bin-ID (Legacy)
+//   enabled     → globaler An/Aus-Schalter
+//
+// Dispatch-Logik:
+//   - syncSecret + priceSettings.workerUrl → Worker-Sync (neuer Default)
+//   - apiKey + binId                       → JSONBin (Legacy, weiter unterstützt)
+//   - sonst                                → disabled
+function syncMode() {
+  if (syncSettings.syncSecret && priceSettings.workerUrl) return "worker";
+  if (syncSettings.apiKey && syncSettings.binId) return "jsonbin";
+  return null;
+}
+
+// JSONBin-Helpers (Legacy-Pfad, bleibt für User mit alten Credentials)
 function jsonbinHeaders() { return { "X-Master-Key": syncSettings.apiKey, "Content-Type": "application/json" }; }
 async function jsonbinPull() { const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(syncSettings.binId) + "/latest"; const res = await fetch(url, { headers: jsonbinHeaders(), cache: "no-store" }); if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); } const data = await res.json(); return data.record || {}; }
 async function jsonbinPush(payload) { const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(syncSettings.binId); const res = await fetch(url, { method: "PUT", headers: jsonbinHeaders(), body: JSON.stringify(payload) }); if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); } }
 
+// Worker-Sync-Helpers (neuer Pfad)
+function tradebookEndpointUrl() {
+  const base = (priceSettings.workerUrl || "").replace(/[?#].*$/, "").replace(/\/$/, "");
+  return base + "/tradebook";
+}
+function tradebookHeaders() { return { "Authorization": "Bearer " + syncSettings.syncSecret, "Content-Type": "application/json" }; }
+async function tradebookPull() {
+  const res = await fetch(tradebookEndpointUrl(), { headers: tradebookHeaders(), cache: "no-store" });
+  if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); }
+  const wrapper = await res.json();
+  return wrapper.data || {};
+}
+async function tradebookPush(payload) {
+  const res = await fetch(tradebookEndpointUrl(), { method: "POST", headers: tradebookHeaders(), body: JSON.stringify(payload) });
+  if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); }
+}
+
+// Backend-agnostische Aliases — dispatcht je nach syncMode
+async function remotePull() {
+  const mode = syncMode();
+  if (mode === "worker") return tradebookPull();
+  if (mode === "jsonbin") return jsonbinPull();
+  throw new Error("no sync mode configured");
+}
+async function remotePush(payload) {
+  const mode = syncMode();
+  if (mode === "worker") return tradebookPush(payload);
+  if (mode === "jsonbin") return jsonbinPush(payload);
+  throw new Error("no sync mode configured");
+}
+
 async function syncPull() {
-  if (!syncSettings.enabled || !syncSettings.apiKey || !syncSettings.binId) return { ok: false };
+  if (!syncSettings.enabled || !syncMode()) return { ok: false };
   setSyncStatus("loading", t("status_pull"));
   try {
-    const remote = await jsonbinPull();
+    const remote = await remotePull();
     const remoteMod = remote.lastModified || 0;
     if (remoteMod > localLastModified) {
       trades = Array.isArray(remote.trades) ? remote.trades : [];
@@ -2698,12 +2777,12 @@ async function syncPull() {
   } catch (e) { setSyncStatus("err", t("status_pull_err", { err: e.message })); return { ok: false, error: e.message }; }
 }
 async function syncPush() {
-  if (!syncSettings.enabled || !syncSettings.apiKey || !syncSettings.binId) return { ok: false };
+  if (!syncSettings.enabled || !syncMode()) return { ok: false };
   setSyncStatus("loading", t("status_push"));
   try {
     let remoteStates = alertStates;
-    try { const remote = await jsonbinPull(); remoteStates = remote.alertStates || alertStates; } catch {}
-    await jsonbinPush({ trades, baskets, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
+    try { const remote = await remotePull(); remoteStates = remote.alertStates || alertStates; } catch {}
+    await remotePush({ trades, baskets, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
     alertStates = remoteStates;
     persistLocal();
     setSyncStatus("ok", t("status_sync_pushed", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
@@ -2713,13 +2792,30 @@ async function syncPush() {
 async function syncFull() { if (!syncSettings.enabled) return; const r = await syncPull(); if (!r.ok) return; if (!r.updated) await syncPush(); }
 function scheduleSyncPush() { if (!syncSettings.enabled) return; if (syncDebounce) clearTimeout(syncDebounce); syncDebounce = setTimeout(() => syncPush(), 1500); }
 function setSyncStatus(state, msg) { const el = document.getElementById("sync-status"); el.className = "status " + state; el.textContent = msg; }
+
+// Test-Helper akzeptiert sowohl Worker-Sync-Secret als auch JSONBin-Legacy-Credentials.
+// Auto-Detect: wenn `key` aussieht wie ein langer Hex-String und kein binId mitgegeben
+// wurde → Worker-Modus. Wenn binId mitgegeben wurde → JSONBin-Legacy. Bei Worker-Modus
+// muss zusätzlich priceSettings.workerUrl gesetzt sein (sonst kein Endpoint).
 async function testSyncCredentials(key, binId) {
   try {
-    const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(binId) + "/latest";
-    const res = await fetch(url, { headers: { "X-Master-Key": key }, cache: "no-store" });
+    if (binId) {
+      // Legacy: JSONBin
+      const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(binId) + "/latest";
+      const res = await fetch(url, { headers: { "X-Master-Key": key }, cache: "no-store" });
+      if (!res.ok) { const txt = await res.text().catch(() => ""); return { ok: false, msg: "HTTP " + res.status + (txt ? " — " + txt.slice(0,120) : "") }; }
+      const data = await res.json();
+      const rec = data.record || {};
+      const tc = Array.isArray(rec.trades) ? rec.trades.length : 0;
+      return { ok: true, msg: t("test_sync_ok", { n: tc }) };
+    }
+    // Worker-Modus
+    const base = (priceSettings.workerUrl || "").replace(/[?#].*$/, "").replace(/\/$/, "");
+    if (!base) return { ok: false, msg: t("test_sync_no_worker_url") };
+    const res = await fetch(base + "/tradebook", { headers: { "Authorization": "Bearer " + key }, cache: "no-store" });
     if (!res.ok) { const txt = await res.text().catch(() => ""); return { ok: false, msg: "HTTP " + res.status + (txt ? " — " + txt.slice(0,120) : "") }; }
-    const data = await res.json();
-    const rec = data.record || {};
+    const wrapper = await res.json();
+    const rec = wrapper.data || {};
     const tc = Array.isArray(rec.trades) ? rec.trades.length : 0;
     return { ok: true, msg: t("test_sync_ok", { n: tc }) };
   } catch (e) { return { ok: false, msg: (e.message || e) }; }
@@ -3094,8 +3190,9 @@ function renderOneTradeRow(tr, c) {
       <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
       <div class="trade-row-info">
         <div class="trade-row-info-line1">
-          <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}${aPill}
+          <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}
         </div>
+        ${aPill ? `<div class="trade-row-info-alarms">${aPill}</div>` : ''}
         <div class="trade-row-tickers">${tickers}</div>
       </div>
       <div class="trade-row-actions">
@@ -4158,6 +4255,7 @@ function openSettings() {
   setActiveFontScaleCard(loadFontScale());
   document.getElementById("home-ccy").value = homeCurrency;
   document.getElementById("worker-url").value = priceSettings.workerUrl || "";
+  document.getElementById("sync-secret").value = syncSettings.syncSecret || "";
   document.getElementById("sync-key").value = syncSettings.apiKey || "";
   document.getElementById("sync-bin").value = syncSettings.binId || "";
   document.getElementById("price-test-result").style.display = "none";
@@ -4353,6 +4451,7 @@ document.getElementById("settings-cancel").addEventListener("click", closeSettin
 document.getElementById("settings-modal").addEventListener("click", e => { if (e.target.id === "settings-modal") closeSettings(); });
 document.getElementById("settings-test").addEventListener("click", async () => {
   const wu = document.getElementById("worker-url").value.trim();
+  const ss = document.getElementById("sync-secret").value.trim();
   const sk = document.getElementById("sync-key").value.trim();
   const sb = document.getElementById("sync-bin").value.trim();
   const pEl = document.getElementById("price-test-result"); const sEl = document.getElementById("sync-test-result");
@@ -4360,8 +4459,24 @@ document.getElementById("settings-test").addEventListener("click", async () => {
   sEl.style.display = "block"; sEl.className = "test-result"; sEl.textContent = t("test_sync_loading");
   if (wu) { const pr = await testPriceCredentials(wu); pEl.className = "test-result " + (pr.ok ? "ok" : "err"); pEl.textContent = t("test_worker_prefix") + pr.msg; }
   else { pEl.className = "test-result err"; pEl.textContent = t("test_worker_no_url"); }
-  if (sk && sb) { const sr = await testSyncCredentials(sk, sb); sEl.className = "test-result " + (sr.ok ? "ok" : "err"); sEl.textContent = t("test_sync_prefix") + sr.msg; }
-  else { sEl.className = "test-result err"; sEl.textContent = t("test_sync_no_creds"); }
+  // Sync-Test: Worker-Modus hat Vorrang (wenn Sync-Secret + Worker-URL gesetzt),
+  // sonst Legacy-JSONBin-Mode (apiKey + binId).
+  if (ss && wu) {
+    // Worker-Modus testen — temporär die Worker-URL setzen damit testSyncCredentials sie sieht
+    const savedWu = priceSettings.workerUrl;
+    priceSettings.workerUrl = wu;
+    const sr = await testSyncCredentials(ss, "");
+    priceSettings.workerUrl = savedWu;
+    sEl.className = "test-result " + (sr.ok ? "ok" : "err");
+    sEl.textContent = t("test_sync_prefix") + sr.msg;
+  } else if (sk && sb) {
+    const sr = await testSyncCredentials(sk, sb);
+    sEl.className = "test-result " + (sr.ok ? "ok" : "err");
+    sEl.textContent = t("test_sync_prefix") + sr.msg;
+  } else {
+    sEl.className = "test-result err";
+    sEl.textContent = t("test_sync_no_creds");
+  }
 });
 document.getElementById("settings-save").addEventListener("click", async () => {
   // Lock-Settings werden NICHT mehr hier behandelt — der dedizierte
@@ -4370,13 +4485,26 @@ document.getElementById("settings-save").addEventListener("click", async () => {
   // versehentlich gespeichert wird.
   const hc = document.getElementById("home-ccy").value.trim().toUpperCase().slice(0,3);
   const wu = document.getElementById("worker-url").value.trim();
+  const ss = document.getElementById("sync-secret").value.trim();
   const sk = document.getElementById("sync-key").value.trim();
   const sb = document.getElementById("sync-bin").value.trim();
   const langChoice = document.getElementById("lang-select").value;
   const startPageChoice = document.getElementById("start-page-select").value;
   if (hc && /^[A-Z]{3}$/.test(hc)) { homeCurrency = hc; priceSettings.homeCurrency = hc; }
   priceSettings.workerUrl = wu; savePriceSettings();
-  if (sk && sb) { syncSettings.apiKey = sk; syncSettings.binId = sb; syncSettings.enabled = true; saveSyncSettings(); setSyncStatus("ok", t("status_sync_active")); }
+  // Sync-Felder schreiben + enablen wenn irgendein gültiges Set vorhanden ist
+  syncSettings.syncSecret = ss;
+  syncSettings.apiKey = sk;
+  syncSettings.binId = sb;
+  const hasWorkerSync = ss && wu;
+  const hasJsonbinSync = sk && sb;
+  if (hasWorkerSync || hasJsonbinSync) {
+    syncSettings.enabled = true;
+    saveSyncSettings();
+    setSyncStatus("ok", t("status_sync_active"));
+  } else {
+    saveSyncSettings();
+  }
   saveLangPreference(langChoice);
   if (PAGES.includes(startPageChoice)) saveStartPage(startPageChoice);
   setLanguage(langChoice);
