@@ -1399,9 +1399,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <h4 class="section-h" data-i18n="settings_sync_title">Sync</h4>
     <div class="info-box" data-i18n="settings_sync_info"></div>
     <div class="field"><label data-i18n="settings_sync_secret">Sync-Secret (Worker)</label><input id="sync-secret" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="64-char hex (openssl rand -hex 32)"></div>
-    <div class="field-help" data-i18n="settings_sync_legacy_note" style="font-size:11px;color:var(--muted);margin:-4px 0 8px;">Legacy: JSONBin-Felder unten bleiben für Übergang funktional.</div>
-    <div class="field"><label data-i18n="settings_sync_key">X-Master-Key (Legacy JSONBin)</label><input id="sync-key" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="$2a$10$..."></div>
-    <div class="field"><label data-i18n="settings_sync_bin">Bin-ID (Legacy JSONBin)</label><input id="sync-bin" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="65f..."></div>
     <div id="sync-test-result" style="display:none;"></div>
 
     <div class="modal-actions">
@@ -2693,33 +2690,19 @@ async function ensureFxRatesForTrades() {
   for (const p of pairs) { const [from, to] = p.split("/"); await fetchFxRate(from, to); }
 }
 
-// === Sync-Backend-Dispatcher =============================================
-// Seit Mai 2026 Migration: Sync läuft primär über den eigenen Cloudflare-Worker
-// (KV-Storage als Quelle der Wahrheit). JSONBin-Legacy-Pfad bleibt nur als
-// Fallback wenn der User noch alte Credentials konfiguriert hat (Übergangs-Mode).
-//
-// syncSettings-Felder:
-//   syncSecret  → Bearer-Token für Worker-/tradebook-Endpoints (neuer Modus)
-//   apiKey      → JSONBin Master-Key (Legacy)
-//   binId       → JSONBin Bin-ID (Legacy)
+// === Sync über eigenen Cloudflare-Worker =================================
+// Seit Mai 2026 ist JSONBin komplett raus. Sync läuft ausschließlich gegen
+// den eigenen Worker (KV als Storage der Wahrheit). Auth via Bearer-Token
+// im Authorization-Header. syncSettings-Felder:
+//   syncSecret  → Bearer-Token für Worker-/tradebook-Endpoints
 //   enabled     → globaler An/Aus-Schalter
-//
-// Dispatch-Logik:
-//   - syncSecret + priceSettings.workerUrl → Worker-Sync (neuer Default)
-//   - apiKey + binId                       → JSONBin (Legacy, weiter unterstützt)
-//   - sonst                                → disabled
-function syncMode() {
-  if (syncSettings.syncSecret && priceSettings.workerUrl) return "worker";
-  if (syncSettings.apiKey && syncSettings.binId) return "jsonbin";
-  return null;
+// Storage-Schema von loadSyncSettings hält apiKey/binId noch als Felder
+// (für Backward-Compat alter localStorage-Einträge), die Werte werden aber
+// nicht mehr ausgelesen oder beschrieben.
+function syncConfigured() {
+  return !!(syncSettings.syncSecret && priceSettings.workerUrl);
 }
 
-// JSONBin-Helpers (Legacy-Pfad, bleibt für User mit alten Credentials)
-function jsonbinHeaders() { return { "X-Master-Key": syncSettings.apiKey, "Content-Type": "application/json" }; }
-async function jsonbinPull() { const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(syncSettings.binId) + "/latest"; const res = await fetch(url, { headers: jsonbinHeaders(), cache: "no-store" }); if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); } const data = await res.json(); return data.record || {}; }
-async function jsonbinPush(payload) { const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(syncSettings.binId); const res = await fetch(url, { method: "PUT", headers: jsonbinHeaders(), body: JSON.stringify(payload) }); if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); } }
-
-// Worker-Sync-Helpers (neuer Pfad)
 function tradebookEndpointUrl() {
   const base = (priceSettings.workerUrl || "").replace(/[?#].*$/, "").replace(/\/$/, "");
   return base + "/tradebook";
@@ -2736,25 +2719,11 @@ async function tradebookPush(payload) {
   if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); }
 }
 
-// Backend-agnostische Aliases — dispatcht je nach syncMode
-async function remotePull() {
-  const mode = syncMode();
-  if (mode === "worker") return tradebookPull();
-  if (mode === "jsonbin") return jsonbinPull();
-  throw new Error("no sync mode configured");
-}
-async function remotePush(payload) {
-  const mode = syncMode();
-  if (mode === "worker") return tradebookPush(payload);
-  if (mode === "jsonbin") return jsonbinPush(payload);
-  throw new Error("no sync mode configured");
-}
-
 async function syncPull() {
-  if (!syncSettings.enabled || !syncMode()) return { ok: false };
+  if (!syncSettings.enabled || !syncConfigured()) return { ok: false };
   setSyncStatus("loading", t("status_pull"));
   try {
-    const remote = await remotePull();
+    const remote = await tradebookPull();
     const remoteMod = remote.lastModified || 0;
     if (remoteMod > localLastModified) {
       trades = Array.isArray(remote.trades) ? remote.trades : [];
@@ -2777,12 +2746,12 @@ async function syncPull() {
   } catch (e) { setSyncStatus("err", t("status_pull_err", { err: e.message })); return { ok: false, error: e.message }; }
 }
 async function syncPush() {
-  if (!syncSettings.enabled || !syncMode()) return { ok: false };
+  if (!syncSettings.enabled || !syncConfigured()) return { ok: false };
   setSyncStatus("loading", t("status_push"));
   try {
     let remoteStates = alertStates;
-    try { const remote = await remotePull(); remoteStates = remote.alertStates || alertStates; } catch {}
-    await remotePush({ trades, baskets, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
+    try { const remote = await tradebookPull(); remoteStates = remote.alertStates || alertStates; } catch {}
+    await tradebookPush({ trades, baskets, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
     alertStates = remoteStates;
     persistLocal();
     setSyncStatus("ok", t("status_sync_pushed", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
@@ -2793,26 +2762,12 @@ async function syncFull() { if (!syncSettings.enabled) return; const r = await s
 function scheduleSyncPush() { if (!syncSettings.enabled) return; if (syncDebounce) clearTimeout(syncDebounce); syncDebounce = setTimeout(() => syncPush(), 1500); }
 function setSyncStatus(state, msg) { const el = document.getElementById("sync-status"); el.className = "status " + state; el.textContent = msg; }
 
-// Test-Helper akzeptiert sowohl Worker-Sync-Secret als auch JSONBin-Legacy-Credentials.
-// Auto-Detect: wenn `key` aussieht wie ein langer Hex-String und kein binId mitgegeben
-// wurde → Worker-Modus. Wenn binId mitgegeben wurde → JSONBin-Legacy. Bei Worker-Modus
-// muss zusätzlich priceSettings.workerUrl gesetzt sein (sonst kein Endpoint).
-async function testSyncCredentials(key, binId) {
+// Test-Helper für Worker-Sync. Braucht Sync-Secret + Worker-URL (aus priceSettings).
+async function testSyncCredentials(secret) {
   try {
-    if (binId) {
-      // Legacy: JSONBin
-      const url = "https://api.jsonbin.io/v3/b/" + encodeURIComponent(binId) + "/latest";
-      const res = await fetch(url, { headers: { "X-Master-Key": key }, cache: "no-store" });
-      if (!res.ok) { const txt = await res.text().catch(() => ""); return { ok: false, msg: "HTTP " + res.status + (txt ? " — " + txt.slice(0,120) : "") }; }
-      const data = await res.json();
-      const rec = data.record || {};
-      const tc = Array.isArray(rec.trades) ? rec.trades.length : 0;
-      return { ok: true, msg: t("test_sync_ok", { n: tc }) };
-    }
-    // Worker-Modus
     const base = (priceSettings.workerUrl || "").replace(/[?#].*$/, "").replace(/\/$/, "");
     if (!base) return { ok: false, msg: t("test_sync_no_worker_url") };
-    const res = await fetch(base + "/tradebook", { headers: { "Authorization": "Bearer " + key }, cache: "no-store" });
+    const res = await fetch(base + "/tradebook", { headers: { "Authorization": "Bearer " + secret }, cache: "no-store" });
     if (!res.ok) { const txt = await res.text().catch(() => ""); return { ok: false, msg: "HTTP " + res.status + (txt ? " — " + txt.slice(0,120) : "") }; }
     const wrapper = await res.json();
     const rec = wrapper.data || {};
@@ -4256,8 +4211,6 @@ function openSettings() {
   document.getElementById("home-ccy").value = homeCurrency;
   document.getElementById("worker-url").value = priceSettings.workerUrl || "";
   document.getElementById("sync-secret").value = syncSettings.syncSecret || "";
-  document.getElementById("sync-key").value = syncSettings.apiKey || "";
-  document.getElementById("sync-bin").value = syncSettings.binId || "";
   document.getElementById("price-test-result").style.display = "none";
   document.getElementById("sync-test-result").style.display = "none";
   document.getElementById("sync-disable").style.display = syncSettings.enabled ? "block" : "none";
@@ -4452,25 +4405,17 @@ document.getElementById("settings-modal").addEventListener("click", e => { if (e
 document.getElementById("settings-test").addEventListener("click", async () => {
   const wu = document.getElementById("worker-url").value.trim();
   const ss = document.getElementById("sync-secret").value.trim();
-  const sk = document.getElementById("sync-key").value.trim();
-  const sb = document.getElementById("sync-bin").value.trim();
   const pEl = document.getElementById("price-test-result"); const sEl = document.getElementById("sync-test-result");
   pEl.style.display = "block"; pEl.className = "test-result"; pEl.textContent = t("test_worker_loading");
   sEl.style.display = "block"; sEl.className = "test-result"; sEl.textContent = t("test_sync_loading");
   if (wu) { const pr = await testPriceCredentials(wu); pEl.className = "test-result " + (pr.ok ? "ok" : "err"); pEl.textContent = t("test_worker_prefix") + pr.msg; }
   else { pEl.className = "test-result err"; pEl.textContent = t("test_worker_no_url"); }
-  // Sync-Test: Worker-Modus hat Vorrang (wenn Sync-Secret + Worker-URL gesetzt),
-  // sonst Legacy-JSONBin-Mode (apiKey + binId).
   if (ss && wu) {
-    // Worker-Modus testen — temporär die Worker-URL setzen damit testSyncCredentials sie sieht
+    // testSyncCredentials liest priceSettings.workerUrl — temporär setzen damit die noch nicht gespeicherte Worker-URL aus dem Feld berücksichtigt wird
     const savedWu = priceSettings.workerUrl;
     priceSettings.workerUrl = wu;
-    const sr = await testSyncCredentials(ss, "");
+    const sr = await testSyncCredentials(ss);
     priceSettings.workerUrl = savedWu;
-    sEl.className = "test-result " + (sr.ok ? "ok" : "err");
-    sEl.textContent = t("test_sync_prefix") + sr.msg;
-  } else if (sk && sb) {
-    const sr = await testSyncCredentials(sk, sb);
     sEl.className = "test-result " + (sr.ok ? "ok" : "err");
     sEl.textContent = t("test_sync_prefix") + sr.msg;
   } else {
@@ -4481,24 +4426,15 @@ document.getElementById("settings-test").addEventListener("click", async () => {
 document.getElementById("settings-save").addEventListener("click", async () => {
   // Lock-Settings werden NICHT mehr hier behandelt — der dedizierte
   // "Sperre bestätigen / entfernen"-Button macht das atomar, sobald geklickt.
-  // Damit ist ausgeschlossen, dass eine nicht-übereinstimmende Code-Eingabe
-  // versehentlich gespeichert wird.
   const hc = document.getElementById("home-ccy").value.trim().toUpperCase().slice(0,3);
   const wu = document.getElementById("worker-url").value.trim();
   const ss = document.getElementById("sync-secret").value.trim();
-  const sk = document.getElementById("sync-key").value.trim();
-  const sb = document.getElementById("sync-bin").value.trim();
   const langChoice = document.getElementById("lang-select").value;
   const startPageChoice = document.getElementById("start-page-select").value;
   if (hc && /^[A-Z]{3}$/.test(hc)) { homeCurrency = hc; priceSettings.homeCurrency = hc; }
   priceSettings.workerUrl = wu; savePriceSettings();
-  // Sync-Felder schreiben + enablen wenn irgendein gültiges Set vorhanden ist
   syncSettings.syncSecret = ss;
-  syncSettings.apiKey = sk;
-  syncSettings.binId = sb;
-  const hasWorkerSync = ss && wu;
-  const hasJsonbinSync = sk && sb;
-  if (hasWorkerSync || hasJsonbinSync) {
+  if (ss && wu) {
     syncSettings.enabled = true;
     saveSyncSettings();
     setSyncStatus("ok", t("status_sync_active"));
