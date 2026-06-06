@@ -82,12 +82,101 @@ function isWithinTradingHours() {
 // Sector/Industry-Lookup für Branchen-Donut. Cached aggressiv in KV (30 Tage),
 // weil sich Yahoo's Klassifizierung praktisch nie ändert.
 // Returns { sector, industry, source: "cache"|"yahoo"|"unknown" }.
+//
+// WICHTIG: Yahoo's quoteSummary-API (v10) verlangt seit Mitte 2023 einen
+// Crumb-Token plus passende Session-Cookies, sonst antwortet sie mit
+// "401 Invalid Crumb". Flow:
+//   1. GET https://fc.yahoo.com/ → liefert A1/A3-Cookies via Set-Cookie
+//   2. GET https://query2.finance.yahoo.com/v1/test/getcrumb mit Cookie
+//      → returnt einen kurzen Crumb-String (z.B. "abc.123XYZ")
+//   3. GET quoteSummary?crumb=<crumb>&... mit demselben Cookie
+// Crumbs sind ein paar Stunden gültig. Wir cachen in KV für 6h.
 const PROFILE_KV_PREFIX = "profile:";
 const PROFILE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 Tage
+const CRUMB_KV_KEY = "yahoo_crumb_v1";
+const CRUMB_TTL_SECONDS = 6 * 60 * 60; // 6 Stunden
+const YH_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+// Sammelt Set-Cookie-Header von einer Response. Cloudflare Workers haben
+// `headers.getSetCookie()` für getrennte Set-Cookie-Werte (Workers Runtime
+// 2023+). Fallback: `headers.get("set-cookie")` (concatenated string).
+function extractCookiePairs(res) {
+  let raws = [];
+  try {
+    if (typeof res.headers.getSetCookie === "function") raws = res.headers.getSetCookie() || [];
+  } catch {}
+  if (raws.length === 0) {
+    const concat = res.headers.get("set-cookie") || "";
+    if (concat) raws = [concat];
+  }
+  return raws.map(c => String(c).split(";")[0].trim()).filter(Boolean);
+}
+
+// Holt einen frischen Crumb + Cookie-String. Drei Fallback-Endpoints, weil
+// fc.yahoo.com gelegentlich 404 zurückgibt (setzt aber Cookies), und
+// finance.yahoo.com manchmal ein Region-Redirect macht.
+async function fetchYahooCrumb() {
+  // Schritt 1: A1/A3 Session-Cookies einsammeln
+  const cookieUrls = [
+    "https://fc.yahoo.com/",
+    "https://finance.yahoo.com/quote/AAPL",
+    "https://login.yahoo.com/"
+  ];
+  let cookieHeader = "";
+  let lastStatus = "";
+  for (const u of cookieUrls) {
+    try {
+      const r = await fetch(u, {
+        method: "GET",
+        headers: { "User-Agent": YH_UA, "Accept": "text/html,*/*" },
+        redirect: "follow"
+      });
+      lastStatus = `${u} → ${r.status}`;
+      const pairs = extractCookiePairs(r);
+      // Wir brauchen mindestens einen A1/A3-Cookie, der Crumb-Service akzeptiert keinen leeren Cookie
+      const wanted = pairs.filter(p => /^(A[13]|A1S|GUC|B|cmp|gpp)=/.test(p));
+      if (wanted.length > 0) { cookieHeader = wanted.join("; "); break; }
+      if (pairs.length > 0 && !cookieHeader) cookieHeader = pairs.join("; "); // wenigstens irgendwas, falls die A-Cookies nicht erkannt werden
+    } catch (e) { lastStatus = `${u} → ${e.message}`; }
+  }
+  if (!cookieHeader) throw new Error("no yahoo cookies (" + lastStatus + ")");
+  // Schritt 2: Crumb holen — manchmal braucht's mehrere Versuche bis das Cookie greift
+  let lastErr = "";
+  for (let i = 0; i < 2; i++) {
+    const crumbRes = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
+      method: "GET",
+      headers: { "User-Agent": YH_UA, "Accept": "*/*", "Cookie": cookieHeader }
+    });
+    const text = (await crumbRes.text()).trim();
+    if (crumbRes.ok && text && text.length < 50 && !/^[\s\S]*(too\s*many|error|html)/i.test(text)) {
+      return { crumb: text, cookie: cookieHeader, ts: Date.now() };
+    }
+    lastErr = `getcrumb http ${crumbRes.status} → "${text.slice(0, 60)}"`;
+  }
+  throw new Error(lastErr);
+}
+
+// Cached den Crumb in KV für 6h, refreshed bei Bedarf. forceRefresh=true
+// erzwingt einen neuen Crumb (falls quoteSummary trotz frischem Cache scheitert).
+async function getYahooCrumb(env, forceRefresh = false) {
+  if (!forceRefresh && env.TRADEBOOK_CACHE) {
+    try {
+      const cached = await env.TRADEBOOK_CACHE.get(CRUMB_KV_KEY, { type: "json" });
+      if (cached && cached.crumb && cached.cookie) return cached;
+    } catch (e) { console.warn("crumb KV read failed:", e.message); }
+  }
+  const fresh = await fetchYahooCrumb();
+  if (env.TRADEBOOK_CACHE) {
+    try { await env.TRADEBOOK_CACHE.put(CRUMB_KV_KEY, JSON.stringify(fresh), { expirationTtl: CRUMB_TTL_SECONDS }); }
+    catch (e) { console.warn("crumb KV write failed:", e.message); }
+  }
+  return fresh;
+}
+
 async function handleProfile(symbol, env) {
   const sym = String(symbol).toUpperCase().trim();
   if (!sym) return jsonResponse({ error: "missing symbol" }, 400);
-  // KV-Cache prüfen
+  // KV-Cache prüfen (pro Ticker)
   if (env.TRADEBOOK_CACHE) {
     try {
       const cached = await env.TRADEBOOK_CACHE.get(PROFILE_KV_PREFIX + sym, { type: "json" });
@@ -96,25 +185,34 @@ async function handleProfile(symbol, env) {
       }
     } catch (e) { console.warn("profile KV read failed for", sym, e.message); }
   }
-  // Yahoo abrufen
-  const u = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=assetProfile`;
-  try {
-    const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" } });
-    if (!r.ok) return jsonResponse({ symbol: sym, sector: null, industry: null, source: "unknown", error: "yahoo http " + r.status });
-    const j = await r.json();
-    const profile = j?.quoteSummary?.result?.[0]?.assetProfile || null;
-    const sector = (profile?.sector || "").trim() || null;
-    const industry = (profile?.industry || "").trim() || null;
-    // In KV cachen (nur wenn wir was gefunden haben — sonst Yahoo nochmal probieren beim nächsten Aufruf)
-    if (env.TRADEBOOK_CACHE && sector) {
-      try {
-        await env.TRADEBOOK_CACHE.put(PROFILE_KV_PREFIX + sym, JSON.stringify({ sector, industry, ts: Date.now() }), { expirationTtl: PROFILE_TTL_SECONDS });
-      } catch (e) { console.warn("profile KV write failed for", sym, e.message); }
-    }
-    return jsonResponse({ symbol: sym, sector, industry, source: sector ? "yahoo" : "unknown" });
-  } catch (e) {
-    return jsonResponse({ symbol: sym, sector: null, industry: null, source: "unknown", error: "fetch failed: " + e.message });
+  // Yahoo abrufen, mit Crumb-Retry-Loop: erster Versuch mit gecachtem Crumb,
+  // bei 401/403 noch ein Versuch mit frischem Crumb (Cookie/Crumb abgelaufen)
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let crumbData;
+    try { crumbData = await getYahooCrumb(env, attempt > 0); }
+    catch (e) { lastError = "crumb: " + e.message; break; }
+    const u = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=assetProfile&crumb=${encodeURIComponent(crumbData.crumb)}`;
+    try {
+      const r = await fetch(u, {
+        method: "GET",
+        headers: { "User-Agent": YH_UA, "Accept": "application/json,text/plain,*/*", "Cookie": crumbData.cookie }
+      });
+      if (r.status === 401 || r.status === 403) { lastError = "yahoo " + r.status; continue; /* retry mit forceRefresh */ }
+      if (!r.ok) { lastError = "yahoo http " + r.status; break; }
+      const j = await r.json();
+      const profile = j?.quoteSummary?.result?.[0]?.assetProfile || null;
+      const sector = (profile?.sector || "").trim() || null;
+      const industry = (profile?.industry || "").trim() || null;
+      if (env.TRADEBOOK_CACHE && sector) {
+        try {
+          await env.TRADEBOOK_CACHE.put(PROFILE_KV_PREFIX + sym, JSON.stringify({ sector, industry, ts: Date.now() }), { expirationTtl: PROFILE_TTL_SECONDS });
+        } catch (e) { console.warn("profile KV write failed for", sym, e.message); }
+      }
+      return jsonResponse({ symbol: sym, sector, industry, source: sector ? "yahoo" : "unknown" });
+    } catch (e) { lastError = "fetch: " + e.message; break; }
   }
+  return jsonResponse({ symbol: sym, sector: null, industry: null, source: "unknown", error: lastError || "unknown" });
 }
 
 async function yahooProxy(symbol) {
