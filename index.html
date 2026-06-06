@@ -380,12 +380,15 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .beta-hero-val { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
 .beta-hero-val.pos { color: var(--pos); }
 .beta-hero-val.neg { color: var(--neg); }
+.beta-hero-val.muted { color: var(--muted); font-weight: 600; }
 .beta-hero-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
 .beta-sub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
 .beta-sub-cell { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
 .beta-sub-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
 .beta-sub-val { font-size: 16px; font-weight: 700; color: var(--text); }
 .beta-sub-val.muted { color: var(--muted); font-weight: 600; font-size: 13px; }
+.beta-sub-val.pos { color: var(--pos); }
+.beta-sub-val.neg { color: var(--neg); }
 .beta-contributors { margin-bottom: 12px; }
 .beta-contributors-head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; font-weight: 700; }
 .beta-contributors-list { display: flex; flex-direction: column; gap: 0; }
@@ -1598,14 +1601,14 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="beta-exposure" id="beta-exposure" style="display:none">
       <h4 class="beta-exposure-title" data-i18n="beta_title">Markt-Exposure (Beta)</h4>
       <div class="beta-hero">
-        <div class="beta-hero-label" data-i18n="beta_dollar_label">Beta-adjustiertes Netto-Exposure</div>
-        <div class="beta-hero-val tabular" id="beta-dollar-val">—</div>
-        <div class="beta-hero-sub" id="beta-dollar-hint">—</div>
+        <div class="beta-hero-label" data-i18n="beta_hero_label">Portfolio-Beta</div>
+        <div class="beta-hero-val tabular" id="beta-hero-val">—</div>
+        <div class="beta-hero-sub" id="beta-hero-hint">—</div>
       </div>
       <div class="beta-sub-grid">
         <div class="beta-sub-cell">
-          <div class="beta-sub-label" data-i18n="beta_per_net">β je Netto-€</div>
-          <div class="beta-sub-val tabular" id="beta-per-net">—</div>
+          <div class="beta-sub-label" data-i18n="beta_dollar_short">Beta-€-Exposure</div>
+          <div class="beta-sub-val tabular" id="beta-dollar-val">—</div>
         </div>
         <div class="beta-sub-cell">
           <div class="beta-sub-label" data-i18n="beta_coverage">Coverage</div>
@@ -1910,7 +1913,12 @@ const STRINGS = {
     sector_unknown: "Unbekannt",
     sector_loading: "Branchen werden geladen…",
     beta_title: "Markt-Exposure (Beta)",
+    beta_hero_label: "Portfolio-Beta",
+    beta_hero_hint: "Bei +1 % Markt → {pct} Portfolio-Bewegung",
+    beta_hero_hint_neutral: "Buch ist effektiv market-neutral — die Euro-Sicht unten zeigt das Restrisiko.",
+    beta_hero_na: "≈ 0",
     beta_dollar_label: "Beta-adjustiertes Netto-Exposure",
+    beta_dollar_short: "Beta-€-Exposure",
     beta_dollar_hint: "Bei +1 % Markt-Bewegung bewegt sich dein Portfolio ungefähr um {amt}",
     beta_per_gross: "β je Brutto-€",
     beta_per_net: "β je Netto-€",
@@ -2114,7 +2122,12 @@ const STRINGS = {
     sector_unknown: "Unknown",
     sector_loading: "Loading sectors…",
     beta_title: "Market exposure (beta)",
+    beta_hero_label: "Portfolio beta",
+    beta_hero_hint: "On +1 % market → {pct} portfolio move",
+    beta_hero_hint_neutral: "Book is effectively market-neutral — see the euro figure below for residual risk.",
+    beta_hero_na: "≈ 0",
     beta_dollar_label: "Beta-adjusted net exposure",
+    beta_dollar_short: "Beta-€ exposure",
     beta_dollar_hint: "On a +1 % market move, your book moves about {amt}",
     beta_per_gross: "β per gross €",
     beta_per_net: "β per net €",
@@ -4297,25 +4310,35 @@ function renderBetaExposure(totalRows) {
   const b = computePortfolioBeta(totalRows);
   if (b.grossAll <= 0) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
-  // Hero-Zahl
-  const dollarEl = document.getElementById("beta-dollar-val");
-  const hintEl   = document.getElementById("beta-dollar-hint");
-  if (dollarEl) {
-    dollarEl.textContent = (b.betaDollar > 0 ? "+" : "") + fmtMoney(b.betaDollar, homeCurrency);
-    dollarEl.className = "beta-hero-val tabular " + (b.betaDollar > 0 ? "pos" : b.betaDollar < 0 ? "neg" : "");
+  // Hero = Portfolio-Beta als dimensionslose Zahl (β/Netto). Bei market-neutral n/a.
+  const heroEl = document.getElementById("beta-hero-val");
+  const hintEl = document.getElementById("beta-hero-hint");
+  if (heroEl) {
+    if (b.betaPerNet == null) {
+      heroEl.textContent = t("beta_hero_na");
+      heroEl.className = "beta-hero-val tabular muted";
+    } else {
+      const sign = b.betaPerNet > 0 ? "+" : "";
+      heroEl.textContent = sign + b.betaPerNet.toFixed(2);
+      heroEl.className = "beta-hero-val tabular " + (b.betaPerNet > 0 ? "pos" : b.betaPerNet < 0 ? "neg" : "");
+    }
   }
   if (hintEl) {
-    const onePct = b.betaDollar * 0.01;
-    const sign = onePct > 0 ? "+" : (onePct < 0 ? "" : "");
-    hintEl.textContent = t("beta_dollar_hint", { amt: sign + fmtMoney(onePct, homeCurrency) });
+    if (b.betaPerNet == null) {
+      hintEl.textContent = t("beta_hero_hint_neutral");
+    } else {
+      const movePct = b.betaPerNet; // bei +1% Markt bewegt sich Portfolio um β × 1% = β % (in Prozent-Einheiten)
+      const sign = movePct > 0 ? "+" : "";
+      hintEl.textContent = t("beta_hero_hint", { pct: sign + movePct.toFixed(2) + " %" });
+    }
   }
-  // Sub-Zahlen (Brutto-Beta wurde bewusst weggelassen: bei stark long-orientierten Büchern
-  // verwässert die Brutto-Sicht das effektive Markt-Exposure und ist wenig aussagekräftig)
-  const nE = document.getElementById("beta-per-net");
-  if (nE) {
-    if (b.betaPerNet == null) { nE.textContent = t("beta_per_net_na"); nE.className = "beta-sub-val tabular muted"; }
-    else                      { nE.textContent = b.betaPerNet.toFixed(3);  nE.className = "beta-sub-val tabular"; }
+  // Sub-Zelle 1: Beta-Euro-Exposure (in €) — die robuste Größe, immer definiert
+  const dollarEl = document.getElementById("beta-dollar-val");
+  if (dollarEl) {
+    dollarEl.textContent = (b.betaDollar > 0 ? "+" : "") + fmtMoney(b.betaDollar, homeCurrency);
+    dollarEl.className = "beta-sub-val tabular " + (b.betaDollar > 0 ? "pos" : b.betaDollar < 0 ? "neg" : "");
   }
+  // Sub-Zelle 2: Coverage
   const cE = document.getElementById("beta-coverage");
   if (cE) { cE.textContent = (b.coverage * 100).toFixed(0) + " %"; cE.className = "beta-sub-val tabular " + (b.coverage < 0.8 ? "muted" : ""); }
   // Top-Contributors: nach |contribution| sortiert, mit-Daten zuerst, max 8 anzeigen
