@@ -1398,7 +1398,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
 
     <h4 class="section-h" data-i18n="settings_sync_title">Sync</h4>
     <div class="info-box" data-i18n="settings_sync_info"></div>
-    <div class="field"><label data-i18n="settings_sync_secret">Sync-Secret (Worker)</label><input id="sync-secret" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="random 32-char string"></div>
+    <div class="field"><label data-i18n="settings_sync_secret">Sync-Secret (Worker)</label><input id="sync-secret" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="64-char hex (openssl rand -hex 32)"></div>
     <div class="field-help" data-i18n="settings_sync_legacy_note" style="font-size:11px;color:var(--muted);margin:-4px 0 8px;">Legacy: JSONBin-Felder unten bleiben für Übergang funktional.</div>
     <div class="field"><label data-i18n="settings_sync_key">X-Master-Key (Legacy JSONBin)</label><input id="sync-key" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="$2a$10$..."></div>
     <div class="field"><label data-i18n="settings_sync_bin">Bin-ID (Legacy JSONBin)</label><input id="sync-bin" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="65f..."></div>
