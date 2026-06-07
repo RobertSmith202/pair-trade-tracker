@@ -309,21 +309,27 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .tabular { font-variant-numeric: tabular-nums; }
 
 .total-breakdown { display: flex; flex-direction: column; gap: 12px; padding-bottom: 14px; }
-.portfolio-donut { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
-.portfolio-donut-title { font-size: 11px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
-.donut-grid { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
-.donut-svg { width: 130px; height: 130px; flex-shrink: 0; }
-.donut-svg circle { transition: stroke-dasharray 0.4s ease-out, stroke-dashoffset 0.4s ease-out; }
-.donut-legend { display: flex; flex-direction: column; gap: 8px; }
-.donut-legend-item { display: grid; grid-template-columns: 14px 1fr auto; column-gap: 8px; align-items: baseline; font-size: 13px; }
-.donut-legend-color { width: 14px; height: 14px; border-radius: 4px; align-self: center; }
-.donut-legend-color.pair  { background: var(--info); }
-.donut-legend-color.long  { background: var(--pos); }
-.donut-legend-color.short { background: var(--neg); }
-.donut-legend-label { color: var(--text); font-weight: 600; }
-.donut-legend-pct { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
-.donut-legend-amount { grid-column: 2 / -1; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: -2px; }
-.donut-help { font-size: 11px; color: var(--muted); margin-top: 12px; line-height: 1.4; }
+/* Portfolio-Verteilung als horizontale Stacked-Bar — bewusst visuell distinkt
+   von den Sektor-Donuts darunter, damit nicht zwei Donut-Sektionen direkt
+   nacheinander stehen. */
+.portfolio-split { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+.portfolio-split-title { font-size: 11px; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+.portfolio-split-bar { display: flex; width: 100%; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(127,127,127,0.10); }
+.portfolio-split-seg { height: 100%; transition: width 0.4s ease-out; }
+.portfolio-split-seg.pair  { background: var(--info); }
+.portfolio-split-seg.long  { background: var(--pos); }
+.portfolio-split-seg.short { background: var(--neg); }
+.portfolio-split-legend { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+.portfolio-split-row { display: flex; flex-direction: column; gap: 2px; padding-left: 10px; border-left: 3px solid; }
+.portfolio-split-row.pair  { border-left-color: var(--info); }
+.portfolio-split-row.long  { border-left-color: var(--pos); }
+.portfolio-split-row.short { border-left-color: var(--neg); }
+.portfolio-split-row-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; }
+.portfolio-split-row-pct { font-size: 18px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.portfolio-split-row-amt { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.portfolio-split-help { font-size: 11px; color: var(--muted); margin-top: 14px; line-height: 1.4; padding-top: 12px; border-top: 1px solid var(--border); }
+[data-layout="mobile"] .portfolio-split-legend { grid-template-columns: 1fr; gap: 8px; }
+[data-layout="mobile"] .portfolio-split-row-pct { font-size: 16px; }
 
 /* Branchen-Donuts (Long / Short / Brutto) + Netto-Tabelle auf Gesamt-Page */
 .sector-donuts { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
@@ -1519,20 +1525,15 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         </div>
       </div>
     </div>
-    <div class="portfolio-donut" id="portfolio-donut" style="display:none">
-      <h4 class="portfolio-donut-title" data-i18n="donut_title">Portfolio-Verteilung</h4>
-      <div class="donut-grid">
-        <svg class="donut-svg" viewBox="0 0 200 200" aria-hidden="true">
-          <circle cx="100" cy="100" r="80" stroke="rgba(127,127,127,0.14)" stroke-width="32" fill="none"/>
-          <g transform="rotate(-90 100 100)">
-            <circle id="donut-seg-pair"  cx="100" cy="100" r="80" stroke="var(--info)" stroke-width="32" fill="none" stroke-dasharray="0 503" stroke-dashoffset="0" stroke-linecap="butt"/>
-            <circle id="donut-seg-long"  cx="100" cy="100" r="80" stroke="var(--pos)"  stroke-width="32" fill="none" stroke-dasharray="0 503" stroke-dashoffset="0" stroke-linecap="butt"/>
-            <circle id="donut-seg-short" cx="100" cy="100" r="80" stroke="var(--neg)"  stroke-width="32" fill="none" stroke-dasharray="0 503" stroke-dashoffset="0" stroke-linecap="butt"/>
-          </g>
-        </svg>
-        <div class="donut-legend" id="donut-legend"></div>
+    <div class="portfolio-split" id="portfolio-donut" style="display:none">
+      <h4 class="portfolio-split-title" data-i18n="donut_title">Portfolio-Verteilung</h4>
+      <div class="portfolio-split-bar" id="portfolio-split-bar">
+        <div class="portfolio-split-seg pair"  id="split-seg-pair"  style="width:0%"></div>
+        <div class="portfolio-split-seg long"  id="split-seg-long"  style="width:0%"></div>
+        <div class="portfolio-split-seg short" id="split-seg-short" style="width:0%"></div>
       </div>
-      <div class="donut-help" data-i18n="donut_help"></div>
+      <div class="portfolio-split-legend" id="portfolio-split-legend"></div>
+      <div class="portfolio-split-help" data-i18n="donut_help"></div>
     </div>
     <!-- Branchen-Exposure: 3 Donuts (Long / Short / Brutto) + Netto-Tabelle.
          Basis: Einstands-Notional pro Leg, in Home-Currency. Sektoren kommen
@@ -4003,13 +4004,14 @@ function updateTotalBreakdown() {
   }
 }
 
-// Portfolio-Donut auf der Gesamt-Page: zeigt die Notional-Verteilung über die
-// drei Trade-Typen (Paar / Long / Short) als drei stroke-dasharray-Segmente
-// auf einem gemeinsamen Kreis.
+// Portfolio-Verteilung auf der Gesamt-Page: zeigt die Notional-Aufteilung
+// über die drei Trade-Typen (Paar / Long / Short) als horizontale
+// Stacked-Bar plus 3-Spalten-Legende mit Prozent + Notional. Bewusst
+// kein Donut mehr — visuell distinkt von den Sektor-Donuts darunter.
 function updatePortfolioDonut(totalRows) {
   const wrap = document.getElementById("portfolio-donut");
   if (!wrap) return;
-  // Notional pro Typ aufsummieren
+  // Notional pro Typ aufsummieren (Brutto pro Trade-Typ, FX-konvertiert in Home-Currency)
   const sums = { pair: 0, long: 0, short: 0 };
   let totalNotional = 0;
   for (const row of totalRows) {
@@ -4021,29 +4023,27 @@ function updatePortfolioDonut(totalRows) {
   }
   if (totalNotional <= 0) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
-  // Umfang des Kreises (r=80): 2π·80 ≈ 502.65
-  const C = 2 * Math.PI * 80;
-  const lenPair  = (sums.pair  / totalNotional) * C;
-  const lenLong  = (sums.long  / totalNotional) * C;
-  const lenShort = (sums.short / totalNotional) * C;
-  const setSeg = (id, length, offset) => {
-    const el = document.getElementById(id); if (!el) return;
-    el.setAttribute("stroke-dasharray", length + " " + C);
-    el.setAttribute("stroke-dashoffset", String(-offset));
-  };
-  setSeg("donut-seg-pair",  lenPair,  0);
-  setSeg("donut-seg-long",  lenLong,  lenPair);
-  setSeg("donut-seg-short", lenShort, lenPair + lenLong);
-  // Legende mit Prozentwerten + EUR-Notional
   const pctPair  = (sums.pair  / totalNotional) * 100;
   const pctLong  = (sums.long  / totalNotional) * 100;
   const pctShort = (sums.short / totalNotional) * 100;
-  const legend = document.getElementById("donut-legend");
+  // Bar-Segmente: Breite proportional zum Anteil
+  const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct.toFixed(3) + "%"; };
+  setWidth("split-seg-pair",  pctPair);
+  setWidth("split-seg-long",  pctLong);
+  setWidth("split-seg-short", pctShort);
+  // Legende — 3-Spalten-Grid, jede Spalte mit farbiger Linke-Border + Prozent groß + Notional darunter
+  const legend = document.getElementById("portfolio-split-legend");
   if (legend) {
+    const row = (cls, label, pct, amt) =>
+      `<div class="portfolio-split-row ${cls}">
+         <div class="portfolio-split-row-label">${escapeHtml(label)}</div>
+         <div class="portfolio-split-row-pct">${pct.toFixed(1)} %</div>
+         <div class="portfolio-split-row-amt">${fmtMoney(amt, homeCurrency)}</div>
+       </div>`;
     legend.innerHTML =
-      `<div class="donut-legend-item"><span class="donut-legend-color pair"></span><span class="donut-legend-label">${t("page_pairs")}</span><span class="donut-legend-pct">${pctPair.toFixed(1)} %</span><span class="donut-legend-amount">${fmtMoney(sums.pair, homeCurrency)}</span></div>` +
-      `<div class="donut-legend-item"><span class="donut-legend-color long"></span><span class="donut-legend-label">${t("page_longs")}</span><span class="donut-legend-pct">${pctLong.toFixed(1)} %</span><span class="donut-legend-amount">${fmtMoney(sums.long, homeCurrency)}</span></div>` +
-      `<div class="donut-legend-item"><span class="donut-legend-color short"></span><span class="donut-legend-label">${t("page_shorts")}</span><span class="donut-legend-pct">${pctShort.toFixed(1)} %</span><span class="donut-legend-amount">${fmtMoney(sums.short, homeCurrency)}</span></div>`;
+      row("pair",  t("page_pairs"),  pctPair,  sums.pair) +
+      row("long",  t("page_longs"),  pctLong,  sums.long) +
+      row("short", t("page_shorts"), pctShort, sums.short);
   }
 }
 
