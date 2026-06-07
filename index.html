@@ -411,6 +411,15 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .beta-contrib-val.pos { color: var(--pos); }
 .beta-contrib-val.neg { color: var(--neg); }
 .beta-disclaimer { font-size: 11px; color: var(--muted); line-height: 1.4; padding-top: 8px; border-top: 1px solid var(--border); }
+/* S&P-500-Vergleichszeile: zwei kompakte Zellen mit Pfeil dazwischen */
+.beta-sp-check { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+.beta-sp-cell { flex: 1; min-width: 0; }
+.beta-sp-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; margin-bottom: 4px; }
+.beta-sp-val { font-size: 18px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.beta-sp-val.pos { color: var(--pos); }
+.beta-sp-val.neg { color: var(--neg); }
+.beta-sp-val.muted { color: var(--muted); font-weight: 600; font-size: 14px; }
+.beta-sp-arrow { color: var(--muted); font-size: 16px; flex-shrink: 0; padding: 0 4px; }
 [data-layout="desktop"] .beta-hero-val { font-size: 36px; }
 [data-layout="desktop"] .beta-sub-val { font-size: 18px; }
 /* Basket-Karten auf Long/Short-Page */
@@ -1621,6 +1630,21 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
         <div class="beta-contributors-list" id="beta-contributors-list"></div>
       </div>
       <div class="beta-disclaimer" data-i18n="beta_disclaimer">Basis: Yahoo 5-Jahres-Beta, monatlich gemessen, gegen S&P 500. Manuelle Override im Trade-Form möglich.</div>
+      <!-- S&P-500-Vergleich: aktuelle Tagesperformance des Referenz-Index plus
+           die daraus per β abgeleitete erwartete Portfolio-Bewegung. Damit
+           kann der User direkt prüfen wie akkurat das Beta die heutige
+           Bewegung erklärt — gegen die tatsächliche Performance oben. -->
+      <div class="beta-sp-check" id="beta-sp-check" style="display:none">
+        <div class="beta-sp-cell">
+          <div class="beta-sp-label" data-i18n="beta_sp_today">S&P 500 heute</div>
+          <div class="beta-sp-val tabular" id="beta-sp-pct">—</div>
+        </div>
+        <div class="beta-sp-arrow">→</div>
+        <div class="beta-sp-cell">
+          <div class="beta-sp-label" data-i18n="beta_sp_expected">Erwartet (β × S&P)</div>
+          <div class="beta-sp-val tabular" id="beta-sp-expected">—</div>
+        </div>
+      </div>
     </div>
   </section>
 </div>
@@ -1932,6 +1956,8 @@ const STRINGS = {
     beta_short_side: "Short",
     beta_override_marker: "Override",
     beta_no_data: "keine Beta-Daten verfügbar",
+    beta_sp_today: "S&P 500 heute",
+    beta_sp_expected: "Erwartet (β × S&P)",
     btn_new_basket: "+ Neuer Korb",
     basket_default_name: "Korb",
     basket_count_n: "× {n} Trades",
@@ -2141,6 +2167,8 @@ const STRINGS = {
     beta_short_side: "Short",
     beta_override_marker: "override",
     beta_no_data: "no beta data available",
+    beta_sp_today: "S&P 500 today",
+    beta_sp_expected: "Expected (β × S&P)",
     btn_new_basket: "+ New basket",
     basket_default_name: "Basket",
     basket_count_n: "× {n} trades",
@@ -4302,6 +4330,55 @@ function computePortfolioBeta(totalRows) {
   return { contributors, betaDollar, betaPerGross, betaPerNet, coverage, longNotionalAll, shortNotionalAll, grossAll, netAll };
 }
 
+// Holt S&P 500 (^GSPC) und zeigt Tages-Δ% + erwartete Portfolio-Bewegung (β × Δ%).
+// Nutzt fetchPrice → existierender PRICE_CACHE, kein zusätzlicher Worker-Roundtrip
+// pro Render. Async: erste Anzeige aus Cache (wenn vorhanden), Update sobald da.
+let spBenchmarkInflight = false;
+async function updateSpReferenceBenchmark(betaPerNet) {
+  const wrap = document.getElementById("beta-sp-check");
+  if (!wrap) return;
+  if (!priceSettings.workerUrl) { wrap.style.display = "none"; return; }
+  // Render aus Cache wenn vorhanden, sonst trigger async fetch
+  const cached = PRICE_CACHE.get("^GSPC");
+  const renderFrom = (data) => {
+    if (!data || data.error) { wrap.style.display = "none"; return; }
+    const px = data.price, prev = data.previousClose;
+    if (!isFinite(px) || !isFinite(prev) || prev <= 0) { wrap.style.display = "none"; return; }
+    const spPct = ((px - prev) / prev) * 100;
+    wrap.style.display = "flex";
+    const spEl = document.getElementById("beta-sp-pct");
+    if (spEl) {
+      const sign = spPct > 0 ? "+" : "";
+      spEl.textContent = sign + spPct.toFixed(2) + " %";
+      spEl.className = "beta-sp-val tabular " + (spPct > 0 ? "pos" : spPct < 0 ? "neg" : "");
+    }
+    const expEl = document.getElementById("beta-sp-expected");
+    if (expEl) {
+      if (betaPerNet == null) {
+        expEl.textContent = t("beta_per_net_na");
+        expEl.className = "beta-sp-val tabular muted";
+      } else {
+        const expectedPct = betaPerNet * spPct;
+        const sign = expectedPct > 0 ? "+" : "";
+        expEl.textContent = sign + expectedPct.toFixed(2) + " %";
+        expEl.className = "beta-sp-val tabular " + (expectedPct > 0 ? "pos" : expectedPct < 0 ? "neg" : "");
+      }
+    }
+  };
+  if (cached && !cached.error) {
+    renderFrom(cached);
+    return;
+  }
+  // Cache leer → async fetch (parallel, blockt Render nicht)
+  if (spBenchmarkInflight) return;
+  spBenchmarkInflight = true;
+  try {
+    const data = await fetchPrice("^GSPC");
+    renderFrom(data);
+  } catch (e) { wrap.style.display = "none"; }
+  finally { spBenchmarkInflight = false; }
+}
+
 function renderBetaExposure(totalRows) {
   const wrap = document.getElementById("beta-exposure");
   if (!wrap) return;
@@ -4341,6 +4418,11 @@ function renderBetaExposure(totalRows) {
   // Sub-Zelle 2: Coverage
   const cE = document.getElementById("beta-coverage");
   if (cE) { cE.textContent = (b.coverage * 100).toFixed(0) + " %"; cE.className = "beta-sub-val tabular " + (b.coverage < 0.8 ? "muted" : ""); }
+  // S&P-500-Tagesperformance + erwartete Portfolio-Bewegung daraus.
+  // ^GSPC wird über den existierenden fetchPrice-Mechanismus geholt (Worker-Cache),
+  // d.h. der Call wiederholt sich nicht jeden Render. Async — wenn Daten da sind,
+  // wird die Zeile asynchron sichtbar.
+  updateSpReferenceBenchmark(b.betaPerNet);
   // Top-Contributors: nach |contribution| sortiert, mit-Daten zuerst, max 8 anzeigen
   const sorted = b.contributors.slice().sort((a, c) => {
     if (a.hasData && !c.hasData) return -1;
