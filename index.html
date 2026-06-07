@@ -420,6 +420,10 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .beta-sp-val.neg { color: var(--neg); }
 .beta-sp-val.muted { color: var(--muted); font-weight: 600; font-size: 14px; }
 .beta-sp-arrow { color: var(--muted); font-size: 16px; flex-shrink: 0; padding: 0 4px; }
+[data-layout="mobile"] .beta-sp-check { gap: 6px; padding: 10px; }
+[data-layout="mobile"] .beta-sp-arrow { display: none; }
+[data-layout="mobile"] .beta-sp-val { font-size: 14px; }
+[data-layout="mobile"] .beta-sp-label { font-size: 9px; }
 [data-layout="desktop"] .beta-hero-val { font-size: 36px; }
 [data-layout="desktop"] .beta-sub-val { font-size: 18px; }
 /* Basket-Karten auf Long/Short-Page */
@@ -1644,6 +1648,11 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
           <div class="beta-sp-label" data-i18n="beta_sp_expected">Erwartet (β × S&P)</div>
           <div class="beta-sp-val tabular" id="beta-sp-expected">—</div>
         </div>
+        <div class="beta-sp-arrow">→</div>
+        <div class="beta-sp-cell">
+          <div class="beta-sp-label" data-i18n="beta_sp_actual">Portfolio heute</div>
+          <div class="beta-sp-val tabular" id="beta-sp-actual">—</div>
+        </div>
       </div>
     </div>
   </section>
@@ -1958,6 +1967,7 @@ const STRINGS = {
     beta_no_data: "keine Beta-Daten verfügbar",
     beta_sp_today: "S&P 500 heute",
     beta_sp_expected: "Erwartet (β × S&P)",
+    beta_sp_actual: "Portfolio heute",
     btn_new_basket: "+ Neuer Korb",
     basket_default_name: "Korb",
     basket_count_n: "× {n} Trades",
@@ -2169,6 +2179,7 @@ const STRINGS = {
     beta_no_data: "no beta data available",
     beta_sp_today: "S&P 500 today",
     beta_sp_expected: "Expected (β × S&P)",
+    beta_sp_actual: "Portfolio today",
     btn_new_basket: "+ New basket",
     basket_default_name: "Basket",
     basket_count_n: "× {n} trades",
@@ -4273,9 +4284,17 @@ function computePortfolioBeta(totalRows) {
   let longNotionalAll = 0, shortNotionalAll = 0;
   let longNotionalWithBeta = 0, shortNotionalWithBeta = 0;
   let betaDollar = 0;
+  // Tatsächliche Tagesperformance des Portfolios in Home-Currency.
+  // todayDeltaHome pro Trade ist bereits short-vorzeichen-korrekt aus computeTrade.
+  let todayDeltaTotal = 0;
+  let todayHasData = false;
   for (const row of totalRows) {
     const tr = row.trade, c = row.c;
     const tranches = c.tranches || [];
+    if (c.todayDeltaHome != null && isFinite(c.todayDeltaHome)) {
+      todayDeltaTotal += c.todayDeltaHome;
+      todayHasData = true;
+    }
     if (hasLong(tr)) {
       let totalLongNotional = 0;
       for (const tres of tranches) {
@@ -4327,17 +4346,23 @@ function computePortfolioBeta(totalRows) {
   // β/Netto nur sinnvoll wenn |Netto| > 5% des Brutto — sonst market-neutral → Division durch ~0 explodiert
   const betaPerNet     = (grossAll > 0 && Math.abs(netAll) > 0.05 * grossAll) ? betaDollar / netAll : null;
   const coverage       = grossAll > 0 ? grossWithBeta / grossAll : 0;
-  return { contributors, betaDollar, betaPerGross, betaPerNet, coverage, longNotionalAll, shortNotionalAll, grossAll, netAll };
+  return { contributors, betaDollar, betaPerGross, betaPerNet, coverage, longNotionalAll, shortNotionalAll, grossAll, netAll, todayDelta: todayHasData ? todayDeltaTotal : null };
 }
 
-// Holt S&P 500 (^GSPC) und zeigt Tages-Δ% + erwartete Portfolio-Bewegung (β × Δ%).
-// Nutzt fetchPrice → existierender PRICE_CACHE, kein zusätzlicher Worker-Roundtrip
-// pro Render. Async: erste Anzeige aus Cache (wenn vorhanden), Update sobald da.
+// Holt S&P 500 (^GSPC) und zeigt 3 Zellen: Markt heute / Beta-Erwartung / Tatsächlich.
+// Tatsächliche Performance wird konsistent zur Beta-Lesart gerechnet:
+//   actualPct = todayDelta / |netNotional| × 100
+// Damit ist der Vergleich Erwartet ↔ Tatsächlich direkt auf gleicher %-Basis.
+// Am Wochenende (Sa/So) wird die Sektion komplett ausgeblendet, weil Yahoo
+// dort nur den letzten Handelstags-Δ liefert — ein "heute"-Label wäre irreführend.
 let spBenchmarkInflight = false;
-async function updateSpReferenceBenchmark(betaPerNet) {
+async function updateSpReferenceBenchmark(betaPerNet, todayDelta, netAll, grossAll) {
   const wrap = document.getElementById("beta-sp-check");
   if (!wrap) return;
   if (!priceSettings.workerUrl) { wrap.style.display = "none"; return; }
+  // Wochenend-Gate
+  const day = new Date().getDay();
+  if (day === 0 || day === 6) { wrap.style.display = "none"; return; }
   // Render aus Cache wenn vorhanden, sonst trigger async fetch
   const cached = PRICE_CACHE.get("^GSPC");
   const renderFrom = (data) => {
@@ -4346,12 +4371,14 @@ async function updateSpReferenceBenchmark(betaPerNet) {
     if (!isFinite(px) || !isFinite(prev) || prev <= 0) { wrap.style.display = "none"; return; }
     const spPct = ((px - prev) / prev) * 100;
     wrap.style.display = "flex";
+    // Zelle 1: S&P heute
     const spEl = document.getElementById("beta-sp-pct");
     if (spEl) {
       const sign = spPct > 0 ? "+" : "";
       spEl.textContent = sign + spPct.toFixed(2) + " %";
       spEl.className = "beta-sp-val tabular " + (spPct > 0 ? "pos" : spPct < 0 ? "neg" : "");
     }
+    // Zelle 2: Erwartet = β × S&P
     const expEl = document.getElementById("beta-sp-expected");
     if (expEl) {
       if (betaPerNet == null) {
@@ -4362,6 +4389,21 @@ async function updateSpReferenceBenchmark(betaPerNet) {
         const sign = expectedPct > 0 ? "+" : "";
         expEl.textContent = sign + expectedPct.toFixed(2) + " %";
         expEl.className = "beta-sp-val tabular " + (expectedPct > 0 ? "pos" : expectedPct < 0 ? "neg" : "");
+      }
+    }
+    // Zelle 3: Tatsächliche Portfolio-Bewegung heute. Bei market-neutral n/a
+    // (analog zu betaPerNet — selbe Bezugsgröße = Netto-Notional, selbes Problem).
+    const actEl = document.getElementById("beta-sp-actual");
+    if (actEl) {
+      const marketNeutral = (netAll == null || grossAll == null || grossAll <= 0 || Math.abs(netAll) <= 0.05 * grossAll);
+      if (todayDelta == null || marketNeutral) {
+        actEl.textContent = t("beta_per_net_na");
+        actEl.className = "beta-sp-val tabular muted";
+      } else {
+        const actualPct = (todayDelta / Math.abs(netAll)) * 100;
+        const sign = actualPct > 0 ? "+" : "";
+        actEl.textContent = sign + actualPct.toFixed(2) + " %";
+        actEl.className = "beta-sp-val tabular " + (actualPct > 0 ? "pos" : actualPct < 0 ? "neg" : "");
       }
     }
   };
@@ -4418,11 +4460,11 @@ function renderBetaExposure(totalRows) {
   // Sub-Zelle 2: Coverage
   const cE = document.getElementById("beta-coverage");
   if (cE) { cE.textContent = (b.coverage * 100).toFixed(0) + " %"; cE.className = "beta-sub-val tabular " + (b.coverage < 0.8 ? "muted" : ""); }
-  // S&P-500-Tagesperformance + erwartete Portfolio-Bewegung daraus.
+  // S&P-500-Tagesperformance + erwartete Portfolio-Bewegung + tatsächliche heute.
   // ^GSPC wird über den existierenden fetchPrice-Mechanismus geholt (Worker-Cache),
   // d.h. der Call wiederholt sich nicht jeden Render. Async — wenn Daten da sind,
   // wird die Zeile asynchron sichtbar.
-  updateSpReferenceBenchmark(b.betaPerNet);
+  updateSpReferenceBenchmark(b.betaPerNet, b.todayDelta, b.netAll, b.grossAll);
   // Top-Contributors: nach |contribution| sortiert, mit-Daten zuerst, max 8 anzeigen
   const sorted = b.contributors.slice().sort((a, c) => {
     if (a.hasData && !c.hasData) return -1;
