@@ -6,7 +6,14 @@
 // Pair-Trades: nur pct-Mode für Loss/Profit (Spread hat keinen Quoted Price).
 // Short-Squeeze nur für type=short oder pair (überwacht in beiden Fällen shortTicker).
 // Cron-Dispatch: "* ..."- oder "*/N ..."-Pattern → Loss/Profit-Check, alles andere → Squeeze-Check.
-const ALERT_REPEAT_MS = 1 * 60 * 1000;
+// WICHTIG: bewusst 45s, NICHT exakt 60s. Der Cron (* * * * *) ist der eigentliche
+// Frequenz-Begrenzer und feuert höchstens 1× pro Minute. Cloudflare führt Crons aber
+// mit ein paar Sekunden Jitter aus — bei exakt 60000ms würde die Schwelle den
+// Minuten-Cron um Haaresbreite verfehlen und der Loss-Alarm käme nur alle 2 Minuten.
+// 45s liegt sicher unter 60s (15s Jitter-Toleranz) und garantiert Feuern bei jedem
+// Minuten-Cron. Ein Doppel-Feuern innerhalb einer Minute ist unmöglich, weil der
+// Cron nicht öfter als 1×/Min aufwacht.
+const ALERT_REPEAT_MS = 45 * 1000;
 const PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000;
 // Robuste Cron-Dispatch: der schnelle Loss/Profit-Cron startet mit "*/3 " (3-Min-Intervall).
 // Alles andere (z.B. "0 17 * * *" für täglich 17:00 UTC) wird als Squeeze-Cron behandelt.
