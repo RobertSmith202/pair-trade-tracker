@@ -1262,7 +1262,9 @@ html[data-privacy="on"] .ds-status-value {
 /* Eye-Toggle-Button: aktiver Zustand markiert per SVG (JS swappt das Icon).
    Mobile nutzt .menu-btn.icon-Styling, Desktop den ds-action-Look. */
 #btn-privacy svg { width: 18px; height: 18px; display: block; }
-#ds-privacy.active { color: var(--info); }
+/* Desktop-Privacy-Button: etwas größer/prominenter als die anderen Sidebar-Aktionen */
+.ds-action-privacy { padding: 12px 12px; font-size: 14px; margin-top: 2px; }
+#ds-privacy.active { color: var(--info); border-color: var(--info); background: rgba(21,101,192,0.08); }
 </style>
 </head>
 <body>
@@ -1376,10 +1378,10 @@ html[data-privacy="on"] .ds-status-value {
   <div class="ds-actions">
     <button class="ds-action ds-action-primary" id="ds-new-trade"   data-i18n="btn_new_trade"  type="button">+ Neuer Trade</button>
     <button class="ds-action" id="ds-refresh" data-i18n="btn_refresh" type="button">↻ Kurse</button>
+    <button class="ds-action ds-action-privacy" id="ds-privacy" type="button">👁 <span data-i18n="privacy_hide">Beträge verbergen</span></button>
   </div>
   <div class="ds-spacer"></div>
   <div class="ds-footer">
-    <button class="ds-action ds-action-ghost" id="ds-privacy" type="button">👁 <span data-i18n="privacy_hide">Beträge verbergen</span></button>
     <button class="ds-action ds-action-ghost" id="ds-settings" data-i18n="ds_settings_btn" type="button">⚙ Einstellungen</button>
   </div>
 </aside>
