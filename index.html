@@ -314,6 +314,9 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
    nacheinander stehen. */
 .portfolio-split { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
 .portfolio-split-title { font-size: 11px; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+.portfolio-split-block { margin-bottom: 16px; }
+.portfolio-split-block:last-of-type { margin-bottom: 0; }
+.portfolio-split-blocklabel { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 8px; }
 .portfolio-split-bar { display: flex; width: 100%; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(127,127,127,0.10); }
 .portfolio-split-seg { height: 100%; transition: width 0.4s ease-out; }
 .portfolio-split-seg.pair  { background: var(--info); }
@@ -1540,11 +1543,24 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     </div>
     <div class="portfolio-split" id="portfolio-donut" style="display:none">
       <h4 class="portfolio-split-title" data-i18n="donut_title">Portfolio-Verteilung</h4>
-      <div class="portfolio-split-bar" id="portfolio-split-bar">
-        <div class="portfolio-split-seg long"  id="split-seg-long"  style="width:0%"></div>
-        <div class="portfolio-split-seg short" id="split-seg-short" style="width:0%"></div>
+      <!-- Block 1: aktueller Marktwert (dynamisch) -->
+      <div class="portfolio-split-block">
+        <div class="portfolio-split-blocklabel" data-i18n="donut_current_label">Aktuell · Marktwert</div>
+        <div class="portfolio-split-bar" id="portfolio-split-bar-current">
+          <div class="portfolio-split-seg long"  id="split-seg-long"  style="width:0%"></div>
+          <div class="portfolio-split-seg short" id="split-seg-short" style="width:0%"></div>
+        </div>
+        <div class="portfolio-split-legend" id="portfolio-split-legend"></div>
       </div>
-      <div class="portfolio-split-legend" id="portfolio-split-legend"></div>
+      <!-- Block 2: Einstands-Notional (investiert) -->
+      <div class="portfolio-split-block">
+        <div class="portfolio-split-blocklabel" data-i18n="donut_entry_label">Einstand · investiert</div>
+        <div class="portfolio-split-bar" id="portfolio-split-bar-entry">
+          <div class="portfolio-split-seg long"  id="split-seg-long-entry"  style="width:0%"></div>
+          <div class="portfolio-split-seg short" id="split-seg-short-entry" style="width:0%"></div>
+        </div>
+        <div class="portfolio-split-legend" id="portfolio-split-legend-entry"></div>
+      </div>
       <div class="portfolio-split-help" data-i18n="donut_help"></div>
     </div>
     <!-- Branchen-Exposure: 3 Donuts (Long / Short / Brutto) + Netto-Tabelle.
@@ -1934,8 +1950,10 @@ const STRINGS = {
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     lock_title: "App gesperrt", lock_welcome: "Welcome", lock_sub: "Code eingeben um fortzufahren", lock_unlock: "Entsperren",
     lock_wrong: "Zugriff verweigert", lock_loading: "Authentifizierung",
-    donut_title: "Long / Short-Ausrichtung (aktueller Wert)",
-    donut_help: "Zeigt ob dein Buch aktuell net long oder net short liegt — auf Basis des aktuellen Marktwerts jeder Position (Live-Preis × Stück), nicht des Einstands. Pair-Trades werden in ihre Legs zerlegt: Long-Leg zählt zu Long, Short-Leg zu Short. FX-konvertiert in deiner Heimat-Währung.",
+    donut_title: "Long / Short-Ausrichtung",
+    donut_current_label: "Aktuell · Marktwert",
+    donut_entry_label: "Einstand · investiert",
+    donut_help: "Oben: aktuelle Ausrichtung nach Marktwert jeder Position (Live-Preis × Stück) — zeigt wo du JETZT stehst. Unten: Ausrichtung nach investiertem Einstands-Betrag. Pair-Trades werden in ihre Legs zerlegt (Long-Leg zu Long, Short-Leg zu Short). FX-konvertiert in deiner Heimat-Währung.",
     sector_title: "Exposure nach Branche",
     sector_sub: "Aktueller Marktwert je Sektor (Live-Preis × Stück) — in Home-Currency. Pair-Trades werden gesplittet: Long-Leg im Long-Donut, Short-Leg im Short-Donut, beide im Brutto-Donut.",
     sector_long: "Long-Exposure",
@@ -2146,8 +2164,10 @@ const STRINGS = {
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     lock_title: "App locked", lock_welcome: "Welcome", lock_sub: "Enter code to continue", lock_unlock: "Unlock",
     lock_wrong: "Access denied", lock_loading: "Authenticating",
-    donut_title: "Long / short tilt (current value)",
-    donut_help: "Shows whether your book is currently net long or net short — based on the current market value of each position (live price × shares), not entry cost. Pair trades are broken into their legs: long leg counts toward long, short leg toward short. FX-converted into your home currency.",
+    donut_title: "Long / short tilt",
+    donut_current_label: "Current · market value",
+    donut_entry_label: "Entry · invested",
+    donut_help: "Top: current tilt by market value of each position (live price × shares) — shows where you stand NOW. Bottom: tilt by invested entry cost. Pair trades are broken into their legs (long leg to long, short leg to short). FX-converted into your home currency.",
     sector_title: "Exposure by sector",
     sector_sub: "Current market value per sector (live price × shares) — in home currency. Pair trades are split: long leg in the long donut, short leg in the short donut, both in the gross donut.",
     sector_long: "Long exposure",
@@ -4042,52 +4062,61 @@ function updateTotalBreakdown() {
   }
 }
 
-// Portfolio-Verteilung auf der Gesamt-Page: NUR Long vs. Short als horizontale
-// Stacked-Bar. Pair-Trades werden in ihre Legs aufgeteilt — Long-Leg zählt in
-// die Long-Summe, Short-Leg in die Short-Summe. Es gibt bewusst KEINE
-// Pair-Kategorie mehr.
-// Basis: AKTUELLER Marktwert je Leg (Live-Preis × Stück × FX), NICHT Einstands-
-// Notional. Grund: die Frage "bin ich netto long oder short" misst das reale
-// Markt-Exposure JETZT — ein Long der sich verdoppelt hat, trägt doppeltes
-// Risiko und muss doppelt zählen. Konsistent mit der Beta-Karte, die ebenfalls
-// aktuelles Notional nutzt. Fallback auf Einstand nur wenn kein Live-Preis da.
+// Portfolio-Verteilung auf der Gesamt-Page: Long vs. Short in ZWEI Balken.
+// Pair-Trades werden in ihre Legs aufgeteilt — Long-Leg in Long, Short-Leg in
+// Short. Keine Pair-Kategorie mehr.
+//   Balken 1 (oben)  = AKTUELLER Marktwert je Leg (Live-Preis × Stück × FX)
+//                      → zeigt wo du JETZT stehst (reales Markt-Exposure).
+//   Balken 2 (unten) = EINSTANDS-Notional je Leg (Einstiegspreis × Stück × FX)
+//                      → zeigt wie du das Kapital ursprünglich verteilt hast.
 function updatePortfolioDonut(totalRows) {
   const wrap = document.getElementById("portfolio-donut");
   if (!wrap) return;
-  let sumLong = 0, sumShort = 0;
+  let curLong = 0, curShort = 0;     // aktueller Marktwert
+  let entLong = 0, entShort = 0;     // Einstands-Notional
   for (const row of totalRows) {
     const c = row.c;
-    const tranches = c.tranches || [];
-    for (const tres of tranches) {
+    for (const tres of (c.tranches || [])) {
       const lQty = tres.tranche?.longQty || 0;
       const sQty = tres.tranche?.shortQty || 0;
-      const lVal = legCurrentNotionalHome(tres.long, lQty);
-      const sVal = legCurrentNotionalHome(tres.short, sQty);
-      if (lVal != null && isFinite(lVal) && lVal > 0) sumLong  += lVal;
-      if (sVal != null && isFinite(sVal) && sVal > 0) sumShort += sVal;
+      // aktuell
+      const lCur = legCurrentNotionalHome(tres.long, lQty);
+      const sCur = legCurrentNotionalHome(tres.short, sQty);
+      if (lCur != null && isFinite(lCur) && lCur > 0) curLong  += lCur;
+      if (sCur != null && isFinite(sCur) && sCur > 0) curShort += sCur;
+      // Einstand (entryNotionalInHome ist bereits FX-konvertiert)
+      const lEnt = tres.long?.entryNotionalInHome;
+      const sEnt = tres.short?.entryNotionalInHome;
+      if (lEnt != null && isFinite(lEnt) && lEnt > 0) entLong  += lEnt;
+      if (sEnt != null && isFinite(sEnt) && sEnt > 0) entShort += sEnt;
     }
   }
-  const total = sumLong + sumShort;
-  if (total <= 0) { wrap.style.display = "none"; return; }
+  const curTotal = curLong + curShort;
+  const entTotal = entLong + entShort;
+  if (curTotal <= 0 && entTotal <= 0) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
-  const pctLong  = (sumLong  / total) * 100;
-  const pctShort = (sumShort / total) * 100;
-  // Bar-Segmente: Breite proportional zum Anteil
   const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct.toFixed(3) + "%"; };
-  setWidth("split-seg-long",  pctLong);
-  setWidth("split-seg-short", pctShort);
-  // Legende — 2-Spalten-Grid: Long / Short, jeweils Prozent + Notional
-  const legend = document.getElementById("portfolio-split-legend");
-  if (legend) {
-    const rowHtml = (cls, label, pct, amt) =>
-      `<div class="portfolio-split-row ${cls}">
-         <div class="portfolio-split-row-label">${escapeHtml(label)}</div>
-         <div class="portfolio-split-row-pct">${pct.toFixed(1)} %</div>
-         <div class="portfolio-split-row-amt">${fmtMoney(amt, homeCurrency)}</div>
-       </div>`;
-    legend.innerHTML =
-      rowHtml("long",  t("page_longs"),  pctLong,  sumLong) +
-      rowHtml("short", t("page_shorts"), pctShort, sumShort);
+  const rowHtml = (cls, label, pct, amt) =>
+    `<div class="portfolio-split-row ${cls}">
+       <div class="portfolio-split-row-label">${escapeHtml(label)}</div>
+       <div class="portfolio-split-row-pct">${pct.toFixed(1)} %</div>
+       <div class="portfolio-split-row-amt">${fmtMoney(amt, homeCurrency)}</div>
+     </div>`;
+  // Block 1: aktueller Marktwert
+  if (curTotal > 0) {
+    const pL = (curLong / curTotal) * 100, pS = (curShort / curTotal) * 100;
+    setWidth("split-seg-long",  pL);
+    setWidth("split-seg-short", pS);
+    const lg = document.getElementById("portfolio-split-legend");
+    if (lg) lg.innerHTML = rowHtml("long", t("page_longs"), pL, curLong) + rowHtml("short", t("page_shorts"), pS, curShort);
+  }
+  // Block 2: Einstands-Notional
+  if (entTotal > 0) {
+    const pL = (entLong / entTotal) * 100, pS = (entShort / entTotal) * 100;
+    setWidth("split-seg-long-entry",  pL);
+    setWidth("split-seg-short-entry", pS);
+    const lg = document.getElementById("portfolio-split-legend-entry");
+    if (lg) lg.innerHTML = rowHtml("long", t("page_longs"), pL, entLong) + rowHtml("short", t("page_shorts"), pS, entShort);
   }
 }
 
