@@ -1472,7 +1472,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="aggregate" data-agg="pair">
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
-      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-notional-cur>&nbsp;</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
     <div class="trade-list" data-list="pair"></div>
   </section>
@@ -1487,7 +1487,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="aggregate" data-agg="long">
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
-      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-notional-cur>&nbsp;</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
     <div class="basket-actions"><button class="btn-new-basket" data-basket-new="long" data-i18n="btn_new_basket" type="button">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="long"></div>
@@ -1503,7 +1503,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="aggregate" data-agg="short">
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
-      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-notional-cur>&nbsp;</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
     <div class="basket-actions"><button class="btn-new-basket" data-basket-new="short" data-i18n="btn_new_basket" type="button">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="short"></div>
@@ -1513,7 +1513,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="aggregate" data-agg="total">
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
-      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-count>0 Trades</div></div>
+      <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-notional-cur>&nbsp;</div><div class="sub" data-agg-count>0 Trades</div></div>
     </div>
     <div class="total-breakdown" data-list="total">
       <div class="breakdown-card bd-pair" data-bd="pair">
@@ -1892,6 +1892,7 @@ const STRINGS = {
     shortcut_esc: "Modal / Form schließen",
     shortcut_note: "Pfeiltasten und Ziffern-Shortcuts funktionieren nur wenn kein Eingabefeld fokussiert ist. <kbd>1</kbd>–<kbd>4</kbd> bewusst ohne Modifier, damit's nicht mit macOS-Screenshots (⌘⇧3/4) oder Browser-Tabs kollidiert.",
     agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
+    agg_notional_current: "aktuell {amt}",
     agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "Trade", agg_trade_plural: "Trades",
     agg_partial: " · {n} unvollständig", agg_loading: "Lädt...", agg_no_trades: "Noch keine Trades",
@@ -2106,6 +2107,7 @@ const STRINGS = {
     shortcut_esc: "Close modal / form",
     shortcut_note: "Arrow keys and digit shortcuts only fire when no input is focused. <kbd>1</kbd>–<kbd>4</kbd> deliberately without modifier to avoid conflicts with macOS screenshots (⌘⇧3/4) and browser tabs.",
     agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
+    agg_notional_current: "now {amt}",
     agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trades",
     agg_partial: " · {n} incomplete", agg_loading: "Loading...", agg_no_trades: "No trades yet",
@@ -4012,23 +4014,36 @@ function updatePageAggregate(pageKey, rows) {
   const elPnl = aggEl.querySelector("[data-agg-pnl]");
   const elPct = aggEl.querySelector("[data-agg-pct]");
   const elNotional = aggEl.querySelector("[data-agg-notional]");
+  const elNotionalCur = aggEl.querySelector("[data-agg-notional-cur]");
   const elPnlSub = aggEl.querySelector("[data-agg-pnl-sub]");
   const elCount = aggEl.querySelector("[data-agg-count]");
   const totalCount = tradesForPage(pageKey).length;
   const valid = rows.filter(r => r.c.totalPnlHome != null);
-  let sumPnl = 0, sumNotional = 0;
-  for (const r of valid) { sumPnl += r.c.totalPnlHome; sumNotional += r.c.totalNotionalHome; }
+  let sumPnl = 0, sumNotional = 0, sumCurrent = 0;
+  for (const r of valid) {
+    sumPnl += r.c.totalPnlHome;
+    sumNotional += r.c.totalNotionalHome;
+    // Aktueller Marktwert je Leg über die Tranchen (beide Legs summiert)
+    for (const tres of (r.c.tranches || [])) {
+      const lCur = legCurrentNotionalHome(tres.long,  tres.tranche?.longQty  || 0);
+      const sCur = legCurrentNotionalHome(tres.short, tres.tranche?.shortQty || 0);
+      if (lCur != null && isFinite(lCur) && lCur > 0) sumCurrent += lCur;
+      if (sCur != null && isFinite(sCur) && sCur > 0) sumCurrent += sCur;
+    }
+  }
   const pct = sumNotional > 0 ? (sumPnl / sumNotional) * 100 : null;
   if (valid.length === 0) {
     elPnl.textContent = "—"; elPnl.className = "value tabular";
     elPct.textContent = "—"; elPct.className = "value tabular";
     elNotional.textContent = "—";
+    if (elNotionalCur) elNotionalCur.innerHTML = "&nbsp;";
     elPnlSub.textContent = totalCount ? t("agg_loading") : t("agg_no_trades");
   } else {
     elPnl.textContent = (sumPnl > 0 ? "+" : "") + fmtMoney(sumPnl, homeCurrency);
     elPnl.className = "value tabular " + signClass(sumPnl);
     elPct.textContent = fmtPct(pct); elPct.className = "value tabular " + signClass(pct);
     elNotional.textContent = fmtMoney(sumNotional, homeCurrency);
+    if (elNotionalCur) elNotionalCur.textContent = sumCurrent > 0 ? t("agg_notional_current", { amt: fmtMoney(sumCurrent, homeCurrency) }) : " ";
     elPnlSub.textContent = t("agg_in_ccy_fx", { ccy: homeCurrency });
   }
   const plural = (totalCount === 1) ? t("agg_trade_singular") : t("agg_trade_plural");
