@@ -319,7 +319,7 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .portfolio-split-seg.pair  { background: var(--info); }
 .portfolio-split-seg.long  { background: var(--pos); }
 .portfolio-split-seg.short { background: var(--neg); }
-.portfolio-split-legend { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+.portfolio-split-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 .portfolio-split-row { display: flex; flex-direction: column; gap: 2px; padding-left: 10px; border-left: 3px solid; }
 .portfolio-split-row.pair  { border-left-color: var(--info); }
 .portfolio-split-row.long  { border-left-color: var(--pos); }
@@ -1541,7 +1541,6 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
     <div class="portfolio-split" id="portfolio-donut" style="display:none">
       <h4 class="portfolio-split-title" data-i18n="donut_title">Portfolio-Verteilung</h4>
       <div class="portfolio-split-bar" id="portfolio-split-bar">
-        <div class="portfolio-split-seg pair"  id="split-seg-pair"  style="width:0%"></div>
         <div class="portfolio-split-seg long"  id="split-seg-long"  style="width:0%"></div>
         <div class="portfolio-split-seg short" id="split-seg-short" style="width:0%"></div>
       </div>
@@ -1935,8 +1934,8 @@ const STRINGS = {
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     lock_title: "App gesperrt", lock_welcome: "Welcome", lock_sub: "Code eingeben um fortzufahren", lock_unlock: "Entsperren",
     lock_wrong: "Zugriff verweigert", lock_loading: "Authentifizierung",
-    donut_title: "Portfolio-Verteilung nach Notional",
-    donut_help: "Anteile der drei Trade-Typen am gesamten Kapitaleinsatz (Long-Notional + Short-Notional). FX-konvertiert in deiner Heimat-Währung.",
+    donut_title: "Long / Short-Verteilung nach Notional",
+    donut_help: "Aufteilung des Kapitaleinsatzes in Long- und Short-Exposure. Pair-Trades werden in ihre Legs zerlegt: Long-Leg zählt zu Long, Short-Leg zu Short. Einstands-Notional, FX-konvertiert in deiner Heimat-Währung.",
     sector_title: "Exposure nach Branche",
     sector_sub: "Einstands-Notional je Sektor — in Home-Currency. Pair-Trades werden gesplittet: Long-Leg im Long-Donut, Short-Leg im Short-Donut, beide im Brutto-Donut.",
     sector_long: "Long-Exposure",
@@ -2147,8 +2146,8 @@ const STRINGS = {
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     lock_title: "App locked", lock_welcome: "Welcome", lock_sub: "Enter code to continue", lock_unlock: "Unlock",
     lock_wrong: "Access denied", lock_loading: "Authenticating",
-    donut_title: "Portfolio split by notional",
-    donut_help: "Share of the three trade types in total capital deployed (long notional + short notional). FX-converted into your home currency.",
+    donut_title: "Long / short split by notional",
+    donut_help: "Split of capital deployed into long vs short exposure. Pair trades are broken into their legs: long leg counts toward long, short leg toward short. Entry notional, FX-converted into your home currency.",
     sector_title: "Exposure by sector",
     sector_sub: "Entry notional per sector — in home currency. Pair trades are split: long leg in the long donut, short leg in the short donut, both in the gross donut.",
     sector_long: "Long exposure",
@@ -4043,46 +4042,41 @@ function updateTotalBreakdown() {
   }
 }
 
-// Portfolio-Verteilung auf der Gesamt-Page: zeigt die Notional-Aufteilung
-// über die drei Trade-Typen (Paar / Long / Short) als horizontale
-// Stacked-Bar plus 3-Spalten-Legende mit Prozent + Notional. Bewusst
-// kein Donut mehr — visuell distinkt von den Sektor-Donuts darunter.
+// Portfolio-Verteilung auf der Gesamt-Page: NUR Long vs. Short als horizontale
+// Stacked-Bar. Pair-Trades werden in ihre Legs aufgeteilt — Long-Leg zählt in
+// die Long-Summe, Short-Leg in die Short-Summe. Es gibt bewusst KEINE
+// Pair-Kategorie mehr. Basis: aggLong/ShortNotionalHome pro Trade (Einstands-
+// Notional je Leg, FX-konvertiert), das die Pair-Legs bereits sauber trennt.
 function updatePortfolioDonut(totalRows) {
   const wrap = document.getElementById("portfolio-donut");
   if (!wrap) return;
-  // Notional pro Typ aufsummieren (Brutto pro Trade-Typ, FX-konvertiert in Home-Currency)
-  const sums = { pair: 0, long: 0, short: 0 };
-  let totalNotional = 0;
+  let sumLong = 0, sumShort = 0;
   for (const row of totalRows) {
-    const n = row.c.totalNotionalHome;
-    if (n == null || !isFinite(n) || n <= 0) continue;
-    const tp = tradeType(row.trade);
-    sums[tp] = (sums[tp] || 0) + n;
-    totalNotional += n;
+    const c = row.c;
+    if (c.aggLongNotionalHome  != null && isFinite(c.aggLongNotionalHome)  && c.aggLongNotionalHome  > 0) sumLong  += c.aggLongNotionalHome;
+    if (c.aggShortNotionalHome != null && isFinite(c.aggShortNotionalHome) && c.aggShortNotionalHome > 0) sumShort += c.aggShortNotionalHome;
   }
-  if (totalNotional <= 0) { wrap.style.display = "none"; return; }
+  const total = sumLong + sumShort;
+  if (total <= 0) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
-  const pctPair  = (sums.pair  / totalNotional) * 100;
-  const pctLong  = (sums.long  / totalNotional) * 100;
-  const pctShort = (sums.short / totalNotional) * 100;
+  const pctLong  = (sumLong  / total) * 100;
+  const pctShort = (sumShort / total) * 100;
   // Bar-Segmente: Breite proportional zum Anteil
   const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct.toFixed(3) + "%"; };
-  setWidth("split-seg-pair",  pctPair);
   setWidth("split-seg-long",  pctLong);
   setWidth("split-seg-short", pctShort);
-  // Legende — 3-Spalten-Grid, jede Spalte mit farbiger Linke-Border + Prozent groß + Notional darunter
+  // Legende — 2-Spalten-Grid: Long / Short, jeweils Prozent + Notional
   const legend = document.getElementById("portfolio-split-legend");
   if (legend) {
-    const row = (cls, label, pct, amt) =>
+    const rowHtml = (cls, label, pct, amt) =>
       `<div class="portfolio-split-row ${cls}">
          <div class="portfolio-split-row-label">${escapeHtml(label)}</div>
          <div class="portfolio-split-row-pct">${pct.toFixed(1)} %</div>
          <div class="portfolio-split-row-amt">${fmtMoney(amt, homeCurrency)}</div>
        </div>`;
     legend.innerHTML =
-      row("pair",  t("page_pairs"),  pctPair,  sums.pair) +
-      row("long",  t("page_longs"),  pctLong,  sums.long) +
-      row("short", t("page_shorts"), pctShort, sums.short);
+      rowHtml("long",  t("page_longs"),  pctLong,  sumLong) +
+      rowHtml("short", t("page_shorts"), pctShort, sumShort);
   }
 }
 
