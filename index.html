@@ -1209,6 +1209,60 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   margin-top: 12px;
 }
 [data-layout="desktop"] #settings-modal #lock-config-area .info-box { margin: 8px 0 0; }
+
+/* === Privatsphäre-Modus (Bitpanda-Style Blur) ==========================
+   Ein Toggle macht alle Geld-/Prozent-/PnL-Zahlen unkenntlich. Die
+   Transition liegt IMMER auf den Ziel-Elementen (nicht nur im Aktiv-Zustand),
+   damit sowohl das Verbergen als auch das Aufdecken sanft animiert. Labels
+   bleiben lesbar — nur die Werte werden verwischt, wie bei Bitpanda/Apple. */
+.value, .aggregate [data-agg-notional-cur], .breakdown-val, .bm-value,
+.leg .v, .tranche-cell .v,
+.trade-row-pnl, .trade-row-pct, .trade-row-today,
+.pnl-abs, .pnl-pct,
+.basket-card-pnl, .basket-card-pct, .bc-pnl, .bc-pct,
+.portfolio-split-row-pct, .portfolio-split-row-amt,
+.sector-donut-total, .sector-donut-center-num, .sector-legend-pct, .sector-net-val,
+.beta-hero-val, .beta-sub-val, .beta-contrib-val, .beta-contrib-formula, .beta-sp-val,
+.ds-status-value {
+  transition: filter 0.38s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.38s ease;
+}
+html[data-privacy="on"] .value,
+html[data-privacy="on"] .aggregate [data-agg-notional-cur],
+html[data-privacy="on"] .breakdown-val,
+html[data-privacy="on"] .bm-value,
+html[data-privacy="on"] .leg .v,
+html[data-privacy="on"] .tranche-cell .v,
+html[data-privacy="on"] .trade-row-pnl,
+html[data-privacy="on"] .trade-row-pct,
+html[data-privacy="on"] .trade-row-today,
+html[data-privacy="on"] .pnl-abs,
+html[data-privacy="on"] .pnl-pct,
+html[data-privacy="on"] .basket-card-pnl,
+html[data-privacy="on"] .basket-card-pct,
+html[data-privacy="on"] .bc-pnl,
+html[data-privacy="on"] .bc-pct,
+html[data-privacy="on"] .portfolio-split-row-pct,
+html[data-privacy="on"] .portfolio-split-row-amt,
+html[data-privacy="on"] .sector-donut-total,
+html[data-privacy="on"] .sector-donut-center-num,
+html[data-privacy="on"] .sector-legend-pct,
+html[data-privacy="on"] .sector-net-val,
+html[data-privacy="on"] .beta-hero-val,
+html[data-privacy="on"] .beta-sub-val,
+html[data-privacy="on"] .beta-contrib-val,
+html[data-privacy="on"] .beta-contrib-formula,
+html[data-privacy="on"] .beta-sp-val,
+html[data-privacy="on"] .ds-status-value {
+  filter: blur(8px);
+  opacity: 0.82;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+/* Eye-Toggle-Button: aktiver Zustand markiert per SVG (JS swappt das Icon).
+   Mobile nutzt .menu-btn.icon-Styling, Desktop den ds-action-Look. */
+#btn-privacy svg { width: 18px; height: 18px; display: block; }
+#ds-privacy.active { color: var(--info); }
 </style>
 </head>
 <body>
@@ -1271,6 +1325,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   <div class="toolbar">
     <button class="primary" id="btn-new" data-i18n="btn_new_trade">+ Neuer Trade</button>
     <button id="btn-refresh" data-i18n="btn_refresh">↻ Kurse</button>
+    <button class="menu-btn icon" id="btn-privacy" aria-label="Beträge verbergen"></button>
     <button class="menu-btn icon" id="btn-menu" aria-label="Menü">⋯</button>
   </div>
   <div class="statusbar">
@@ -1324,6 +1379,7 @@ input.pin-mask { -webkit-text-security: disc; text-security: disc; }
   </div>
   <div class="ds-spacer"></div>
   <div class="ds-footer">
+    <button class="ds-action ds-action-ghost" id="ds-privacy" type="button">👁 <span data-i18n="privacy_hide">Beträge verbergen</span></button>
     <button class="ds-action ds-action-ghost" id="ds-settings" data-i18n="ds_settings_btn" type="button">⚙ Einstellungen</button>
   </div>
 </aside>
@@ -2039,6 +2095,7 @@ const STRINGS = {
     settings_font_scale: "Schriftgröße (Desktop)", settings_font_scale_info: "Skalierung der gesamten Ansicht — Schrift, Padding und Karten vergrößern sich gleichmäßig. Greift nur im Desktop-Modus; auf Handy bleibt's bei der Originalgröße. Pro Gerät einstellbar.",
     scale_small: "Klein", scale_medium: "Mittel", scale_large: "Groß", scale_xl: "Extra-Groß",
     ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Einstellungen",
+    privacy_hide: "Beträge verbergen", privacy_show: "Beträge zeigen",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -2254,6 +2311,7 @@ const STRINGS = {
     settings_font_scale: "Font size (desktop)", settings_font_scale_info: "Scales the entire view — text, padding, cards all grow uniformly. Only applies in desktop mode; mobile keeps original size. Per-device.",
     scale_small: "Small", scale_medium: "Medium", scale_large: "Large", scale_xl: "Extra-large",
     ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Settings",
+    privacy_hide: "Hide amounts", privacy_show: "Show amounts",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -5463,6 +5521,37 @@ document.querySelectorAll('.view-toggle[data-view-for="basket"] .vt-btn').forEac
   });
 });
 document.getElementById("btn-menu").addEventListener("click", openMenu);
+
+// === Privatsphäre-Modus =================================================
+// Verwischt alle Geld-/Prozent-/PnL-Werte (Bitpanda-Style). Zustand in
+// localStorage, überlebt Reloads. Toggle über Mobile-Toolbar + Desktop-Sidebar.
+const PRIVACY_KEY = "pair_trade_privacy_v1";
+let privacyMode = false;
+const EYE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+function loadPrivacyMode() { try { privacyMode = localStorage.getItem(PRIVACY_KEY) === "1"; } catch { privacyMode = false; } }
+function applyPrivacyMode() {
+  document.documentElement.setAttribute("data-privacy", privacyMode ? "on" : "off");
+  const mBtn = document.getElementById("btn-privacy");
+  if (mBtn) { mBtn.innerHTML = privacyMode ? EYE_OFF_SVG : EYE_SVG; mBtn.setAttribute("aria-label", t(privacyMode ? "privacy_show" : "privacy_hide")); }
+  const dBtn = document.getElementById("ds-privacy");
+  if (dBtn) {
+    dBtn.classList.toggle("active", privacyMode);
+    if (dBtn.firstChild && dBtn.firstChild.nodeType === 3) dBtn.firstChild.textContent = privacyMode ? "🙈 " : "👁 ";
+    const span = dBtn.querySelector("span");
+    const key = privacyMode ? "privacy_show" : "privacy_hide";
+    if (span) { span.setAttribute("data-i18n", key); span.textContent = t(key); }
+  }
+}
+function togglePrivacy() {
+  privacyMode = !privacyMode;
+  try { localStorage.setItem(PRIVACY_KEY, privacyMode ? "1" : "0"); } catch {}
+  applyPrivacyMode();
+}
+document.getElementById("btn-privacy").addEventListener("click", togglePrivacy);
+{ const dsPriv = document.getElementById("ds-privacy"); if (dsPriv) dsPriv.addEventListener("click", togglePrivacy); }
+loadPrivacyMode();
+applyPrivacyMode();
 document.getElementById("m-close").addEventListener("click", closeMenu);
 document.getElementById("menu-overlay").addEventListener("click", e => { if (e.target.id === "menu-overlay") closeMenu(); });
 document.getElementById("m-export").addEventListener("click", exportData);
