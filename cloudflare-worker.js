@@ -1,12 +1,12 @@
 // Pair Trade Tracker — Cloudflare Worker
 // Three Alarm-Typen:
-//   • Loss   — alertPctMin / alertPriceMin, alle 3 Min wiederholt bis ack (Cron: */3 * * * *)
-//   • Profit — alertPctMax / alertPriceMax, alle 30 Min wiederholt bis ack (Cron: */3 * * * *)
+//   • Loss   — alertPctMin / alertPriceMin, alle 1 Min wiederholt bis ack (Cron: * * * * *)
+//   • Profit — alertPctMax / alertPriceMax, alle 30 Min wiederholt bis ack (Cron: * * * * *)
 //   • Short-Squeeze — alertShortPct, einmal täglich wiederholt bis ack (Cron: beliebige Tageszeit, z.B. "0 17 * * *" für 17:00 UTC)
 // Pair-Trades: nur pct-Mode für Loss/Profit (Spread hat keinen Quoted Price).
 // Short-Squeeze nur für type=short oder pair (überwacht in beiden Fällen shortTicker).
-// Cron-Dispatch: "*/3 ..."-Pattern → Loss/Profit-Check, alles andere → Squeeze-Check.
-const ALERT_REPEAT_MS = 3 * 60 * 1000;
+// Cron-Dispatch: "* ..."- oder "*/N ..."-Pattern → Loss/Profit-Check, alles andere → Squeeze-Check.
+const ALERT_REPEAT_MS = 1 * 60 * 1000;
 const PROFIT_ALERT_REPEAT_MS = 30 * 60 * 1000;
 // Robuste Cron-Dispatch: der schnelle Loss/Profit-Cron startet mit "*/3 " (3-Min-Intervall).
 // Alles andere (z.B. "0 17 * * *" für täglich 17:00 UTC) wird als Squeeze-Cron behandelt.
@@ -823,7 +823,7 @@ async function runAlarmCheck(env) {
     const st = ensureStateShape(states[id]);
     let stChanged = false;
 
-    // --- LOSS alarm (repeating every 3 min until ack) ---
+    // --- LOSS alarm (repeating every 1 min until ack) ---
     if (hasMin) {
       let breached = false;
       if (minMode === "price") {
