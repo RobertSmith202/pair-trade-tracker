@@ -1934,10 +1934,10 @@ const STRINGS = {
     menu_export: "Export (JSON kopieren)", menu_import: "Import (JSON einfügen)", menu_clear_all: "Alle Trades löschen",
     lock_title: "App gesperrt", lock_welcome: "Welcome", lock_sub: "Code eingeben um fortzufahren", lock_unlock: "Entsperren",
     lock_wrong: "Zugriff verweigert", lock_loading: "Authentifizierung",
-    donut_title: "Long / Short-Verteilung nach Notional",
-    donut_help: "Aufteilung des Kapitaleinsatzes in Long- und Short-Exposure. Pair-Trades werden in ihre Legs zerlegt: Long-Leg zählt zu Long, Short-Leg zu Short. Einstands-Notional, FX-konvertiert in deiner Heimat-Währung.",
+    donut_title: "Long / Short-Ausrichtung (aktueller Wert)",
+    donut_help: "Zeigt ob dein Buch aktuell net long oder net short liegt — auf Basis des aktuellen Marktwerts jeder Position (Live-Preis × Stück), nicht des Einstands. Pair-Trades werden in ihre Legs zerlegt: Long-Leg zählt zu Long, Short-Leg zu Short. FX-konvertiert in deiner Heimat-Währung.",
     sector_title: "Exposure nach Branche",
-    sector_sub: "Einstands-Notional je Sektor — in Home-Currency. Pair-Trades werden gesplittet: Long-Leg im Long-Donut, Short-Leg im Short-Donut, beide im Brutto-Donut.",
+    sector_sub: "Aktueller Marktwert je Sektor (Live-Preis × Stück) — in Home-Currency. Pair-Trades werden gesplittet: Long-Leg im Long-Donut, Short-Leg im Short-Donut, beide im Brutto-Donut.",
     sector_long: "Long-Exposure",
     sector_short: "Short-Exposure",
     sector_gross: "Brutto-Exposure",
@@ -2146,10 +2146,10 @@ const STRINGS = {
     menu_export: "Export (copy JSON)", menu_import: "Import (paste JSON)", menu_clear_all: "Delete all trades",
     lock_title: "App locked", lock_welcome: "Welcome", lock_sub: "Enter code to continue", lock_unlock: "Unlock",
     lock_wrong: "Access denied", lock_loading: "Authenticating",
-    donut_title: "Long / short split by notional",
-    donut_help: "Split of capital deployed into long vs short exposure. Pair trades are broken into their legs: long leg counts toward long, short leg toward short. Entry notional, FX-converted into your home currency.",
+    donut_title: "Long / short tilt (current value)",
+    donut_help: "Shows whether your book is currently net long or net short — based on the current market value of each position (live price × shares), not entry cost. Pair trades are broken into their legs: long leg counts toward long, short leg toward short. FX-converted into your home currency.",
     sector_title: "Exposure by sector",
-    sector_sub: "Entry notional per sector — in home currency. Pair trades are split: long leg in the long donut, short leg in the short donut, both in the gross donut.",
+    sector_sub: "Current market value per sector (live price × shares) — in home currency. Pair trades are split: long leg in the long donut, short leg in the short donut, both in the gross donut.",
     sector_long: "Long exposure",
     sector_short: "Short exposure",
     sector_gross: "Gross exposure",
@@ -4045,16 +4045,27 @@ function updateTotalBreakdown() {
 // Portfolio-Verteilung auf der Gesamt-Page: NUR Long vs. Short als horizontale
 // Stacked-Bar. Pair-Trades werden in ihre Legs aufgeteilt — Long-Leg zählt in
 // die Long-Summe, Short-Leg in die Short-Summe. Es gibt bewusst KEINE
-// Pair-Kategorie mehr. Basis: aggLong/ShortNotionalHome pro Trade (Einstands-
-// Notional je Leg, FX-konvertiert), das die Pair-Legs bereits sauber trennt.
+// Pair-Kategorie mehr.
+// Basis: AKTUELLER Marktwert je Leg (Live-Preis × Stück × FX), NICHT Einstands-
+// Notional. Grund: die Frage "bin ich netto long oder short" misst das reale
+// Markt-Exposure JETZT — ein Long der sich verdoppelt hat, trägt doppeltes
+// Risiko und muss doppelt zählen. Konsistent mit der Beta-Karte, die ebenfalls
+// aktuelles Notional nutzt. Fallback auf Einstand nur wenn kein Live-Preis da.
 function updatePortfolioDonut(totalRows) {
   const wrap = document.getElementById("portfolio-donut");
   if (!wrap) return;
   let sumLong = 0, sumShort = 0;
   for (const row of totalRows) {
     const c = row.c;
-    if (c.aggLongNotionalHome  != null && isFinite(c.aggLongNotionalHome)  && c.aggLongNotionalHome  > 0) sumLong  += c.aggLongNotionalHome;
-    if (c.aggShortNotionalHome != null && isFinite(c.aggShortNotionalHome) && c.aggShortNotionalHome > 0) sumShort += c.aggShortNotionalHome;
+    const tranches = c.tranches || [];
+    for (const tres of tranches) {
+      const lQty = tres.tranche?.longQty || 0;
+      const sQty = tres.tranche?.shortQty || 0;
+      const lVal = legCurrentNotionalHome(tres.long, lQty);
+      const sVal = legCurrentNotionalHome(tres.short, sQty);
+      if (lVal != null && isFinite(lVal) && lVal > 0) sumLong  += lVal;
+      if (sVal != null && isFinite(sVal) && sVal > 0) sumShort += sVal;
+    }
   }
   const total = sumLong + sumShort;
   if (total <= 0) { wrap.style.display = "none"; return; }
@@ -4110,20 +4121,26 @@ function allUsedTickers() {
   return Array.from(set);
 }
 
-// Aggregiere Einstands-Notional je Sektor: gibt long/short/gross/net Maps zurück
+// Aggregiere AKTUELLEN Marktwert je Sektor (dynamisch, nicht Einstand): gibt
+// long/short/gross/net Maps zurück. Basis pro Leg: Live-Preis × Stück × FX
+// (legCurrentNotionalHome), damit die Donuts das reale Exposure JETZT zeigen.
+// Pair-Legs werden über die Tranchen einzeln ihrem jeweiligen Ticker-Sektor
+// zugeordnet (Long-Leg → long-Map, Short-Leg → short-Map).
 function computeSectorExposure(totalRows) {
   const long = new Map(), short = new Map();
   for (const row of totalRows) {
     const tr = row.trade, c = row.c;
-    if (hasLong(tr) && c.aggLongNotionalHome != null && c.aggLongNotionalHome > 0) {
-      const sym = String(tr.longTicker || "").toUpperCase();
-      const sec = (SECTOR_CACHE.get(sym)?.sector) || "Unknown";
-      long.set(sec, (long.get(sec) || 0) + c.aggLongNotionalHome);
-    }
-    if (hasShort(tr) && c.aggShortNotionalHome != null && c.aggShortNotionalHome > 0) {
-      const sym = String(tr.shortTicker || "").toUpperCase();
-      const sec = (SECTOR_CACHE.get(sym)?.sector) || "Unknown";
-      short.set(sec, (short.get(sec) || 0) + c.aggShortNotionalHome);
+    const longSec  = hasLong(tr)  ? ((SECTOR_CACHE.get(String(tr.longTicker  || "").toUpperCase())?.sector)  || "Unknown") : null;
+    const shortSec = hasShort(tr) ? ((SECTOR_CACHE.get(String(tr.shortTicker || "").toUpperCase())?.sector) || "Unknown") : null;
+    for (const tres of (c.tranches || [])) {
+      if (longSec != null) {
+        const v = legCurrentNotionalHome(tres.long, tres.tranche?.longQty || 0);
+        if (v != null && isFinite(v) && v > 0) long.set(longSec, (long.get(longSec) || 0) + v);
+      }
+      if (shortSec != null) {
+        const v = legCurrentNotionalHome(tres.short, tres.tranche?.shortQty || 0);
+        if (v != null && isFinite(v) && v > 0) short.set(shortSec, (short.get(shortSec) || 0) + v);
+      }
     }
   }
   const gross = new Map(), net = new Map();
