@@ -356,6 +356,54 @@ async function saveTradebook(env, record) {
   return { ok: true, source: "kv_only" };
 }
 
+// Persistiert Alarm-States OHNE den restlichen Tradebook zu klobbern.
+//
+// KRITISCH: Der Alarm-Cron lädt den Tradebook, macht dann SEKUNDENLANG Yahoo-Fetches,
+// und schreibt am Ende zurück. Würde er dabei seinen VERALTETEN trades-Snapshot
+// zurückschreiben (`{...record, alertStates}`), dann würde ein Trade, den der User
+// während des Checks gelöscht hat, wieder auferstehen ("Zombie-Trade") — und der
+// nächste Cron alarmiert weiter. Genau das war der Bug: gelöschter Trade, aber
+// weiterhin Minuten-Alarme.
+//
+// Fix: kurz VOR dem Schreiben den frischesten Record neu laden und nur die
+// Alarm-States hineinmergen. Damit gewinnen zwischenzeitliche Frontend-Löschungen
+// und Telegram-Quittierungen. Das Race-Fenster schrumpft von "ganze Check-Dauer"
+// auf "Mikrosekunden zwischen Reload und Write".
+function alarmAckWins(mine, theirs) {
+  // Wenn zwischenzeitlich per Telegram quittiert wurde (state "acknowledged"),
+  // darf der Cron das nicht auf "triggered"/"notified" zurücksetzen. Nur solange
+  // der Cron-State noch aktiv alarmiert — bei Erholung (idle) gewinnt idle, damit
+  // ein späterer neuer Breach wieder alarmieren kann.
+  const pick = (m, t) => (t && t.state === "acknowledged" && m && (m.state === "triggered" || m.state === "notified")) ? t : m;
+  if (!theirs) return mine;
+  return {
+    min:     pick(mine?.min,     theirs.min),
+    max:     pick(mine?.max,     theirs.max),
+    squeeze: pick(mine?.squeeze, theirs.squeeze)
+  };
+}
+async function persistAlarmStates(env, computedStates) {
+  const fresh = (await loadTradebook(env)).data || {};
+  const freshStates = fresh.alertStates || {};
+  // Gültige IDs = Trades + Baskets im FRISCHEN Record. States ohne zugehörige
+  // Entität werden verworfen (kein Zombie-State für gelöschte Trades/Körbe).
+  const validIds = new Set([
+    ...(Array.isArray(fresh.trades)  ? fresh.trades.map(x => x.id)  : []),
+    ...(Array.isArray(fresh.baskets) ? fresh.baskets.map(x => x.id) : [])
+  ]);
+  const merged = {};
+  // 1. Basis: gültige States aus dem frischen Record (prunt Zombies automatisch)
+  for (const id of Object.keys(freshStates)) {
+    if (validIds.has(id)) merged[id] = freshStates[id];
+  }
+  // 2. Overlay: die vom Cron berechneten Änderungen — aber Ack gewinnt
+  for (const id of Object.keys(computedStates)) {
+    if (!validIds.has(id)) continue; // gelöschter Trade → State verwerfen
+    merged[id] = alarmAckWins(computedStates[id], freshStates[id]);
+  }
+  await saveTradebook(env, { ...fresh, alertStates: merged });
+}
+
 // Auth-Check für Frontend-Sync-Endpoints. Erwartet Authorization: Bearer <SYNC_SECRET>.
 // Das Secret wird in Cloudflare-Dashboard → Worker → Settings → Secrets als SYNC_SECRET
 // angelegt (32-Zeichen-Random-String empfohlen). Beide Geräte (iPhone + Mac) tragen
@@ -784,7 +832,7 @@ async function runShortSqueezeCheck(env) {
     if (stChanged) { states[id] = st; stateChanged = true; }
   }
 
-  if (stateChanged) await saveTradebook(env, { ...record, alertStates: states });
+  if (stateChanged) await persistAlarmStates(env, states);
   return { ok: true, results };
 }
 
@@ -944,7 +992,7 @@ async function runAlarmCheck(env) {
     if (stChanged) { states[bId] = st; stateChanged = true; }
   }
 
-  if (stateChanged) await saveTradebook(env, { ...record, alertStates: states });
+  if (stateChanged) await persistAlarmStates(env, states);
   return { ok: true, results };
 }
 
@@ -1003,7 +1051,7 @@ async function handleTelegramWebhook(req, env) {
     }
     if (touched) { states[id] = st; changed = true; }
   }
-  if (changed) { try { await saveTradebook(env, { ...record, alertStates: states }); } catch {} }
+  if (changed) { try { await persistAlarmStates(env, states); } catch {} }
   await sendTelegram(env, workerT(lang, "ack_received"));
   return textResponse("ok");
 }
