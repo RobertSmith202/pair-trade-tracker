@@ -264,9 +264,20 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .trade-row-topstrip { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 5px; padding-left: 2px; }
 .trade-row-topstrip .alarm-capsule, .trade-row-topstrip .target-pill, .trade-row-topstrip .tranche-badge { margin-left: 0; }
 .trade-row-topstrip .alarm-capsule { font-size: 9px; padding: 2px 5px; }
-/* Korb-Head: Alarm-Hülle links vom Namen (statt rechts), Dots bleiben rechts */
+/* Korb-Head: Cluster links = Bündel → Dots → Name (feste Reihenfolge, ganz links) */
 .basket-card-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
 .basket-card-head-left .alarm-capsule { margin-left: 0; }
+.basket-card-head-left .basket-target-dots { flex-shrink: 0; }
+
+/* Desktop: hier ist Platz — Meta-Elemente NICHT so klein wie auf dem Handy.
+   Feste Reihenfolge bleibt (Bündel → Ziel-Punkt → Tranchen), nur größer. */
+[data-layout="desktop"] .trade-row-topstrip { gap: 6px; margin-bottom: 6px; }
+[data-layout="desktop"] .alarm-capsule { font-size: 12px; padding: 3px 9px; letter-spacing: 0; }
+[data-layout="desktop"] .trade-row-topstrip .alarm-capsule { font-size: 12px; padding: 3px 9px; }
+[data-layout="desktop"] .target-pill { font-size: 11px; padding: 3px 8px; }
+[data-layout="desktop"] .target-pill.watching { padding: 3px 7px; }
+[data-layout="desktop"] .tranche-badge { font-size: 11px; }
+[data-layout="desktop"] .target-dot { width: 10px; height: 10px; }
 
 /* Korb-Zielkurs-Dots: ein Dot pro Trade-mit-Ziel. Jeder leuchtet einzeln blau
    auf, sobald SEIN Trade das Ziel erreicht (Leuchtsystem). */
@@ -3913,7 +3924,8 @@ function renderOneTradeRow(tr, c) {
   // mitte die Trade-Identifikation (Name + alarm pills + Ticker-Sub-Zeile), rechts
   // Edit/Delete. Vertikale Pixel-Spalten-Konsistenz über mehrere Trades hinweg
   // (tabular-nums-Pflicht in CSS) macht die Liste scanbar wie ein Reuters-Quote.
-  const metaBundle = `${aCapsule}${tBadge}${tPill}`;
+  // Feste Reihenfolge: Alarm-Bündel → Ziel-Punkt → Tranchen-Badge
+  const metaBundle = `${aCapsule}${tPill}${tBadge}`;
   card.innerHTML = `
     ${metaBundle ? `<div class="trade-row-topstrip">${metaBundle}</div>` : ''}
     <div class="${rowClass}"${tappableAttr}>
@@ -3979,7 +3991,7 @@ function renderOneTradeCard(tr, c) {
   const displayName = tr.name || (tradeType(tr) === "long" ? tr.longTicker : tradeType(tr) === "short" ? tr.shortTicker : (tr.longTicker + " / " + tr.shortTicker));
   card.innerHTML = `
     <div class="${headClass}" data-toggle-tranches="${tr.id}">
-      <div class="trade-name">${escapeHtml(displayName)}${tBadge}${aCapsule}${tPill}</div>
+      <div class="trade-name">${escapeHtml(displayName)}${aCapsule}${tPill}${tBadge}</div>
       <div class="trade-actions"><button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button><button class="icon danger" data-act="del" data-id="${tr.id}">×</button></div>
     </div>
     <div class="trade-perf">
@@ -4125,8 +4137,7 @@ function renderBasketCard(basket) {
   if (anyBasketTargetReached) card.classList.add("target-reached");
   card.innerHTML = `
     <div class="basket-card-head">
-      <div class="basket-card-head-left">${basketCapsule}<div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}</div></div>
-      ${targetDotsHtml ? `<div class="basket-card-head-meta">${targetDotsHtml}</div>` : ""}
+      <div class="basket-card-head-left">${basketCapsule}${targetDotsHtml}<div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}</div></div>
     </div>
     <div class="basket-card-row">
       <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
