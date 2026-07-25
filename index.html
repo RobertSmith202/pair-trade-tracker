@@ -12,9 +12,9 @@
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231a1a1a'/><text x='50%25' y='62%25' text-anchor='middle' fill='white' font-size='28' font-weight='700' font-family='sans-serif'>L|S</text></svg>">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-:root { color-scheme: light; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; }
-:root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #1f3a26; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #3a1f24; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; }
-:root[data-theme="midnight"] { color-scheme: dark; --bg: #07071a; --card: #11112a; --border: #232342; --text: #e8e8f5; --muted: #8e8eac; --pos: #6bc46e; --pos-bg: #143019; --pos-soft: #15301f; --neg: #ff6b7d; --neg-bg: #371218; --neg-soft: #3a1620; --accent: #d9d9ee; --warn: #ffc266; --info: #7fc0ee; }
+:root { color-scheme: light; --bg: #fafafa; --card: #ffffff; --border: #e5e5e5; --text: #1a1a1a; --muted: #666; --pos: #2e7d32; --pos-bg: #e8f5e9; --pos-soft: #f0f9f0; --neg: #b00020; --neg-bg: #fdecee; --neg-soft: #fdf3f3; --accent: #1a1a1a; --warn: #b88500; --info: #1565c0; --target: #1e88e5; --target-edge: #38a3ff; --target-soft: rgba(56,163,255,0.10); }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #0f0f10; --card: #1a1a1c; --border: #2a2a2c; --text: #f0f0f0; --muted: #999; --pos: #6bc46e; --pos-bg: #173a1c; --pos-soft: #1f3a26; --neg: #ff6b7d; --neg-bg: #3a1419; --neg-soft: #3a1f24; --accent: #f0f0f0; --warn: #ffb84d; --info: #6ab0e6; --target: #5db4ff; --target-edge: #5db4ff; --target-soft: rgba(93,180,255,0.13); }
+:root[data-theme="midnight"] { color-scheme: dark; --bg: #07071a; --card: #11112a; --border: #232342; --text: #e8e8f5; --muted: #8e8eac; --pos: #6bc46e; --pos-bg: #143019; --pos-soft: #15301f; --neg: #ff6b7d; --neg-bg: #371218; --neg-soft: #3a1620; --accent: #d9d9ee; --warn: #ffc266; --info: #7fc0ee; --target: #66c6ff; --target-edge: #66c6ff; --target-soft: rgba(102,198,255,0.14); }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: calc(env(safe-area-inset-top) + 6px) 0 calc(env(safe-area-inset-bottom) + 50px) 0; font-size: 15px; -webkit-font-smoothing: antialiased; max-width: 640px; margin: 0 auto; overflow-x: hidden; }
 .aggregate { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 8px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .agg-cell .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
@@ -223,7 +223,31 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 }
 .page-dot.active { background: var(--info); width: 14px; }
 
-.trade-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+.trade-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; transition: border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease; }
+/* Zielkurs erreicht: hellblaue Akzent-Kante links + sanfter Blau-Verlauf.
+   position:relative für die ::before-Kante. Overflow bleibt sichtbar. */
+.trade-card.target-reached {
+  position: relative;
+  border-color: var(--target-edge);
+  background:
+    linear-gradient(90deg, var(--target-soft) 0%, transparent 55%),
+    var(--card);
+  box-shadow: 0 0 0 1px var(--target-edge) inset, 0 2px 14px -6px var(--target-edge);
+}
+.trade-card.target-reached::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 16px 0 0 16px;
+  background: var(--target-edge);
+}
+/* Ziel-Pille (◎) neben dem Trade-Namen — hellblau, wie die Alarm-Pillen aufgebaut */
+.target-pill { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; padding: 3px 7px; border-radius: 4px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.2px; background: var(--target-soft); color: var(--target); border: 1px solid var(--target-edge); }
+.target-pill-side { font-size: 9px; opacity: 0.85; }
+/* Erreichter Kurs in der Leg-Zeile hellblau hervorgehoben */
+.leg .v.target-hit { color: var(--target); font-weight: 700; }
+.leg .target-inline { color: var(--target); font-weight: 700; }
 .trade-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .trade-name { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
 .trade-actions { display: flex; gap: 6px; flex-shrink: 0; }
@@ -1471,6 +1495,12 @@ html[data-privacy="on"] .ds-status-value {
     <div class="help" data-i18n="form_squeeze_help"></div>
     <div class="info-box" id="form-squeeze-non-us" style="display:none;" data-i18n="form_squeeze_non_us_warn"></div>
   </div>
+  <div class="form-section target" id="form-target-section">
+    <h4 data-i18n="form_target_title">◎ Zielkurs (optional)</h4>
+    <div class="field" id="form-target-long-field"><label id="f-long-target-label" data-i18n="form_target_long">Zielkurs Long — Markierung bei Kurs ≥ Ziel</label><input id="f-long-target" type="text" inputmode="decimal" autocomplete="off" placeholder="z.B. 200"></div>
+    <div class="field" id="form-target-short-field"><label id="f-short-target-label" data-i18n="form_target_short">Zielkurs Short — Markierung bei Kurs ≤ Ziel</label><input id="f-short-target" type="text" inputmode="decimal" autocomplete="off" placeholder="z.B. 80"></div>
+    <div class="help" data-i18n="form_target_help"></div>
+  </div>
   <div class="form-actions"><button id="f-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="f-save" data-i18n="btn_save">Speichern</button></div>
 </div>
 
@@ -2127,6 +2157,12 @@ const STRINGS = {
     err_alarm_invalid: "Alarm-Schwelle: ungültige Zahl. Beispiel: -30",
     err_beta_invalid: "Beta-Override: ungültige Zahl. Beispiel: 1,2",
     form_beta_override: "Beta-Override (optional, leer = Yahoo)",
+    err_target_invalid: "Zielkurs: ungültige Zahl. Nur positive Werte, z.B. 200",
+    form_target_title: "◎ Zielkurs (optional)",
+    form_target_long: "Zielkurs Long — Markierung bei Kurs ≥ Ziel",
+    form_target_short: "Zielkurs Short — Markierung bei Kurs ≤ Ziel",
+    form_target_help: "Optional. In der Notierungswährung der Position (wie der angezeigte Aktuell-Kurs). Wird der Zielkurs erreicht, färbt sich der Trade hellblau — keine Benachrichtigung, nur eine stille Markierung.",
+    target_reached_pill: "Ziel erreicht",
     save_warn_intro: "⚠ Folgende Schwellen würden beim aktuellen Kurs sofort auslösen:",
     save_warn_line_min_pct: "• Verlust-Schwelle {thr} (Performance jetzt: {cur})",
     save_warn_line_max_pct: "• Gewinn-Schwelle {thr} (Performance jetzt: {cur})",
@@ -2343,6 +2379,12 @@ const STRINGS = {
     err_alarm_invalid: "Alarm threshold: invalid number. Example: -30",
     err_beta_invalid: "Beta override: invalid number. Example: 1.2",
     form_beta_override: "Beta override (optional, blank = Yahoo)",
+    err_target_invalid: "Target price: invalid number. Positive values only, e.g. 200",
+    form_target_title: "◎ Target price (optional)",
+    form_target_long: "Long target — mark when price ≥ target",
+    form_target_short: "Short target — mark when price ≤ target",
+    form_target_help: "Optional. In the position's quoted currency (like the displayed current price). When the target is hit, the trade turns light blue — no notification, just a quiet marker.",
+    target_reached_pill: "Target hit",
     save_warn_intro: "⚠ The following thresholds would trigger immediately at current prices:",
     save_warn_line_min_pct: "• Loss threshold {thr} (performance now: {cur})",
     save_warn_line_max_pct: "• Profit threshold {thr} (performance now: {cur})",
@@ -3639,7 +3681,7 @@ function alarmStatusHtml(tr) {
   return html;
 }
 
-function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
+function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg, targetHit) {
   const isLong = side === "long";
   const apiCcy = leg.apiCcy; const entryCcy = leg.entryCcy;
   const fxNote = (apiCcy !== entryCcy) ? `<span class="fx-note">(${apiCcy}→${entryCcy}${leg.apiToEntryFx != null ? ' · ' + leg.apiToEntryFx.toFixed(4) : ''})</span>` : '';
@@ -3655,7 +3697,7 @@ function legHtml(side, ticker, qty, entry, useNative, lp, lpx, leg) {
     <div class="leg ${side}">
       <div class="leg-head"><span class="side">${sideLabel}</span><div class="ticker">${escapeHtml(ticker)}${lp?.name && lp.name !== ticker ? ' <span class="muted" style="font-weight:400;font-size:11px;">' + escapeHtml(lp.name) + '</span>' : ''}<span class="ccy-tag">${entryCcy}</span></div></div>
       <div class="row"><span>${t("card_qty_x_entry")}</span><span class="v">${fmtNum(qty)} × ${fmtMoney(entry, entryCcy)}</span></div>
-      <div class="row" data-flash-ticker="${tickerUpper}"><span>${t("card_current")} ${fxNote}</span><span class="v">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (leg.livePxInEntry != null ? fmtMoney(leg.livePxInEntry, entryCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
+      <div class="row${targetHit ? ' target-hit-row' : ''}" data-flash-ticker="${tickerUpper}"><span>${t("card_current")}${targetHit ? ' <span class="target-inline">◎</span>' : ''} ${fxNote}</span><span class="v${targetHit ? ' target-hit' : ''}">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (leg.livePxInEntry != null ? fmtMoney(leg.livePxInEntry, entryCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
       ${todayHtml}
       ${fxMissing && !lp?.error ? `<div class="row"><span class="neg">${t("card_fx_unavailable")}</span><span></span></div>` : ''}
       <div class="row pnl-line ${signClass(leg.pnlInHome)}"><span>${t("card_pnl")} ${homeNote}</span><span class="v">${leg.pnlInHome != null ? (leg.pnlInHome > 0 ? "+" : "") + fmtMoney(leg.pnlInHome, homeCurrency) : "—"}</span></div>
@@ -3707,7 +3749,28 @@ function alarmPillHtml(tr) {
   return html;
 }
 
-function legAggregateHtml(side, ticker, lp, c) {
+// Zielkurs-Status: erreicht wenn Long-Kurs ≥ Ziel bzw. Short-Kurs ≤ Ziel.
+// Vergleich gegen den ANGEZEIGTEN Aktuell-Kurs (livePxInEntry, in Einstands-
+// Währung) — so steht das Ziel in derselben Währung wie der Preis auf der Card.
+function targetStatus(tr, c) {
+  let longR = false, shortR = false;
+  const lPx = c.long?.livePxInEntry;
+  const sPx = c.short?.livePxInEntry;
+  if (tr.longTarget  != null && lPx != null && isFinite(lPx)) longR  = lPx >= tr.longTarget;
+  if (tr.shortTarget != null && sPx != null && isFinite(sPx)) shortR = sPx <= tr.shortTarget;
+  return { long: longR, short: shortR, any: longR || shortR };
+}
+// Ziel-erreicht-Pille (hellblau, ◎). Zeigt bei Pair welche Seite, sonst nur ◎.
+function targetPillHtml(status, tr) {
+  if (!status.any) return "";
+  const type = tradeType(tr);
+  let sideHint = "";
+  if (type === "pair") sideHint = (status.long && status.short) ? "L+S" : (status.long ? "L" : "S");
+  const title = t("target_reached_pill");
+  return `<span class="target-pill" title="${escapeAttr(title)}">◎${sideHint ? ' <span class="target-pill-side">' + sideHint + '</span>' : ''}</span>`;
+}
+
+function legAggregateHtml(side, ticker, lp, c, targetHit) {
   const isLong = side === "long";
   const apiCcy = isLong ? c.longApiCcy : c.shortApiCcy;
   const livePx = isLong ? c.lpx : c.spx;
@@ -3723,7 +3786,7 @@ function legAggregateHtml(side, ticker, lp, c) {
       <div class="leg-head"><span class="side">${sideLabel}</span><div class="ticker">${escapeHtml(ticker)}${lp?.name && lp.name !== ticker ? ' <span class="muted" style="font-weight:400;font-size:11px;">' + escapeHtml(lp.name) + '</span>' : ''}<span class="ccy-tag">${apiCcy}</span></div></div>
       <div class="row"><span>${t("leg_sum_qty")}</span><span class="v">${fmtNum(aggQty)}</span></div>
       <div class="row"><span>${t("leg_sum_notional")}</span><span class="v">${aggNotional != null ? fmtMoney(aggNotional, homeCurrency) : "—"}</span></div>
-      <div class="row" data-flash-ticker="${tickerUpper}"><span>${t("card_current")}</span><span class="v">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (livePx != null ? fmtMoney(livePx, apiCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
+      <div class="row${targetHit ? ' target-hit-row' : ''}" data-flash-ticker="${tickerUpper}"><span>${t("card_current")}${targetHit ? ' <span class="target-inline">◎</span>' : ''}</span><span class="v${targetHit ? ' target-hit' : ''}">${lp?.error ? '<span class="neg">'+escapeHtml(lp.error)+'</span>' : (livePx != null ? fmtMoney(livePx, apiCcy) : "<span class='muted'>" + t("card_loading") + "</span>")}</span></div>
       ${todayHtml}
       <div class="row pnl-line ${signClass(aggPnl)}"><span>${t("leg_sum_pnl")}</span><span class="v">${aggPnl != null ? (aggPnl > 0 ? "+" : "") + fmtMoney(aggPnl, homeCurrency) : "—"}</span></div>
     </div>`;
@@ -3753,10 +3816,12 @@ function tranchePanelHtml(tr, c) {
 
 function renderOneTradeRow(tr, c) {
   const card = document.createElement("div");
-  card.className = "trade-card";
+  const tStatus = targetStatus(tr, c);
+  card.className = "trade-card" + (tStatus.any ? " target-reached" : "");
   const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
   const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
   const aPill = alarmPillHtml(tr);
+  const tPill = targetPillHtml(tStatus, tr);
   const displayName = tr.name || (tradeType(tr) === "long" ? tr.longTicker : tradeType(tr) === "short" ? tr.shortTicker : (tr.longTicker + " / " + tr.shortTicker));
   const tickers = tradeType(tr) === "long" ? escapeHtml(tr.longTicker || "")
                 : tradeType(tr) === "short" ? escapeHtml(tr.shortTicker || "")
@@ -3782,7 +3847,7 @@ function renderOneTradeRow(tr, c) {
       <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
       <div class="trade-row-info">
         <div class="trade-row-info-line1">
-          <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}
+          <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}${tPill}
         </div>
         ${aPill ? `<div class="trade-row-info-alarms">${aPill}</div>` : ''}
         <div class="trade-row-tickers">${tickers}</div>
@@ -3813,11 +3878,14 @@ function renderTradeRowTodaySub(todayPct) {
 }
 
 function renderOneTradeCard(tr, c) {
-  const card = document.createElement("div"); card.className = "trade-card";
+  const card = document.createElement("div");
+  const tStatus = targetStatus(tr, c);
+  card.className = "trade-card" + (tStatus.any ? " target-reached" : "");
   const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
   const firstT = (tr.tranches && tr.tranches[0]) || {};
   const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
   const aPill = alarmPillHtml(tr);
+  const tPill = targetPillHtml(tStatus, tr);
   const headClass = isMulti ? "trade-head tappable" : "trade-head";
   const lp = hasLong(tr) ? PRICE_CACHE.get(tr.longTicker.toUpperCase()) : null;
   const sp = hasShort(tr) ? PRICE_CACHE.get(tr.shortTicker.toUpperCase()) : null;
@@ -3825,17 +3893,17 @@ function renderOneTradeCard(tr, c) {
   const spx = sp && !sp.error ? sp.price : null;
   let legsHtml = "";
   if (isMulti) {
-    if (hasLong(tr))  legsHtml += legAggregateHtml("long",  tr.longTicker,  lp, c);
-    if (hasShort(tr)) legsHtml += legAggregateHtml("short", tr.shortTicker, sp, c);
+    if (hasLong(tr))  legsHtml += legAggregateHtml("long",  tr.longTicker,  lp, c, tStatus.long);
+    if (hasShort(tr)) legsHtml += legAggregateHtml("short", tr.shortTicker, sp, c, tStatus.short);
   } else {
-    if (hasLong(tr))  legsHtml += legHtml("long",  tr.longTicker,  firstT.longQty,  firstT.longEntry,  !!firstT.longEntryNative,  lp, lpx, c.long);
-    if (hasShort(tr)) legsHtml += legHtml("short", tr.shortTicker, firstT.shortQty, firstT.shortEntry, !!firstT.shortEntryNative, sp, spx, c.short);
+    if (hasLong(tr))  legsHtml += legHtml("long",  tr.longTicker,  firstT.longQty,  firstT.longEntry,  !!firstT.longEntryNative,  lp, lpx, c.long, tStatus.long);
+    if (hasShort(tr)) legsHtml += legHtml("short", tr.shortTicker, firstT.shortQty, firstT.shortEntry, !!firstT.shortEntryNative, sp, spx, c.short, tStatus.short);
   }
   const panel = isMulti ? tranchePanelHtml(tr, c) : '';
   const displayName = tr.name || (tradeType(tr) === "long" ? tr.longTicker : tradeType(tr) === "short" ? tr.shortTicker : (tr.longTicker + " / " + tr.shortTicker));
   card.innerHTML = `
     <div class="${headClass}" data-toggle-tranches="${tr.id}">
-      <div class="trade-name">${escapeHtml(displayName)}${tBadge}${aPill}</div>
+      <div class="trade-name">${escapeHtml(displayName)}${tBadge}${aPill}${tPill}</div>
       <div class="trade-actions"><button class="icon" data-act="edit" data-id="${tr.id}">${t("btn_edit")}</button><button class="icon danger" data-act="del" data-id="${tr.id}">×</button></div>
     </div>
     <div class="trade-perf">
@@ -4683,6 +4751,11 @@ function applyFormTypeUI(type) {
     if (sqzInput) sqzInput.value = "";
   }
   updateSqueezeNonUsWarning();
+  // Zielkurs-Felder: Long-Feld nur bei pair/long, Short-Feld nur bei pair/short.
+  const tLongF  = document.getElementById("form-target-long-field");
+  const tShortF = document.getElementById("form-target-short-field");
+  if (tLongF)  tLongF.style.display  = (type === "pair" || type === "long")  ? "block" : "none";
+  if (tShortF) tShortF.style.display = (type === "pair" || type === "short") ? "block" : "none";
   // Threshold mode toggles: only show for single-leg (long/short), never for pair
   const showToggle = (type === "long" || type === "short");
   document.querySelectorAll('.thr-toggle').forEach(el => { el.style.display = showToggle ? "inline-flex" : "none"; });
@@ -4817,6 +4890,9 @@ function openForm(id = null) {
     // Beta-Override-Felder: leer wenn nichts gespeichert (User nutzt Yahoo-Default)
     document.getElementById("f-long-beta").value  = (tr.longBetaOverride  != null) ? formatForInput(tr.longBetaOverride)  : "";
     document.getElementById("f-short-beta").value = (tr.shortBetaOverride != null) ? formatForInput(tr.shortBetaOverride) : "";
+    // Zielkurs-Felder
+    document.getElementById("f-long-target").value  = (tr.longTarget  != null) ? formatForInput(tr.longTarget)  : "";
+    document.getElementById("f-short-target").value = (tr.shortTarget != null) ? formatForInput(tr.shortTarget) : "";
     // Populate threshold inputs based on each threshold's stored mode
     if (minMode === "price") {
       document.getElementById("f-alert-pct").value = (tr.alertPriceMin != null) ? formatForInput(Math.abs(tr.alertPriceMin)) : "";
@@ -4851,7 +4927,7 @@ function openForm(id = null) {
     applyFormTypeUI(initialType);
     // Typ-Wahl im Form ausblenden wenn Basket-Kontext: Trade muss zum Korb-Typ passen
     typeSection.style.display = (tradeFormBasketContext || currentPage !== "total") ? "none" : "block";
-    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max","f-alert-squeeze","f-long-beta","f-short-beta"].forEach(i => document.getElementById(i).value = "");
+    ["f-name","f-long-ticker","f-long-qty","f-long-entry","f-short-ticker","f-short-qty","f-short-entry","f-alert-pct","f-alert-max","f-alert-squeeze","f-long-beta","f-short-beta","f-long-target","f-short-target"].forEach(i => document.getElementById(i).value = "");
     document.getElementById("f-long-native").checked = false;
     document.getElementById("f-short-native").checked = false;
     setMulti(false);
@@ -5109,6 +5185,12 @@ function saveForm() {
   let longBetaOverride = null, shortBetaOverride = null;
   if (longBetaRaw)  { const p = parseDecimal(longBetaRaw);  if (!isFinite(p)) { alert(t("err_beta_invalid")); return; } longBetaOverride = p; }
   if (shortBetaRaw) { const p = parseDecimal(shortBetaRaw); if (!isFinite(p)) { alert(t("err_beta_invalid")); return; } shortBetaOverride = p; }
+  // Zielkurs: leer = null (keine Markierung), sonst positive Zahl im Einstands-Ccy der Position
+  const longTargetRaw  = document.getElementById("f-long-target").value.trim();
+  const shortTargetRaw = document.getElementById("f-short-target").value.trim();
+  let longTarget = null, shortTarget = null;
+  if (longTargetRaw)  { const p = parseDecimal(longTargetRaw);  if (!isFinite(p) || p <= 0) { alert(t("err_target_invalid")); return; } longTarget = p; }
+  if (shortTargetRaw) { const p = parseDecimal(shortTargetRaw); if (!isFinite(p) || p <= 0) { alert(t("err_target_invalid")); return; } shortTarget = p; }
   const type = formType;
   // For pair-trades, force pct mode (price thresholds make no sense on a spread).
   const minMode = (type === "long" || type === "short") ? formAlertMinMode : "pct";
@@ -5175,6 +5257,9 @@ function saveForm() {
     // Beta-Override: Side-spezifisch persistieren, nur für Sides die tatsächlich vorhanden sind
     existing.longBetaOverride  = (eType === "pair" || eType === "long")  ? longBetaOverride  : null;
     existing.shortBetaOverride = (eType === "pair" || eType === "short") ? shortBetaOverride : null;
+    // Zielkurs: Side-spezifisch persistieren
+    existing.longTarget  = (eType === "pair" || eType === "long")  ? longTarget  : null;
+    existing.shortTarget = (eType === "pair" || eType === "short") ? shortTarget : null;
     existing.updated = Date.now();
     // Wenn sich Alarm-Schwellen geändert haben: zugehörige State-Achse(n) auf idle zurück.
     // Sonst hängen "acknowledged"/"triggered"-States von alter Config weiter und blockieren
@@ -5265,7 +5350,7 @@ function saveForm() {
   const newAlertShortPct = (type === "short" || type === "pair") ? alertShortPct : null;
   // Wenn aus Basket-Kontext heraus angelegt: Trade an den Korb binden
   const basketIdForNew = (tradeFormBasketContext && (type === "long" || type === "short")) ? tradeFormBasketContext : null;
-  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, basketId: basketIdForNew, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, longBetaOverride: (type === "pair" || type === "long") ? longBetaOverride : null, shortBetaOverride: (type === "pair" || type === "short") ? shortBetaOverride : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, alertShortPct: newAlertShortPct, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
+  trades.push({ id: "t_" + Date.now() + "_" + Math.floor(Math.random() * 10000), type, name, basketId: basketIdForNew, longTicker: (type === "pair" || type === "long") ? longTicker : null, shortTicker: (type === "pair" || type === "short") ? shortTicker : null, longBetaOverride: (type === "pair" || type === "long") ? longBetaOverride : null, shortBetaOverride: (type === "pair" || type === "short") ? shortBetaOverride : null, longTarget: (type === "pair" || type === "long") ? longTarget : null, shortTarget: (type === "pair" || type === "short") ? shortTarget : null, alertPctMin, alertPctMax, alertPriceMin, alertPriceMax, alertMinMode: minMode, alertMaxMode: maxMode, alertShortPct: newAlertShortPct, created: Date.now(), updated: Date.now(), tranches: [newTranche] });
   markLocalChange(); closeForm(); refreshAll(true);
 }
 
