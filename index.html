@@ -279,6 +279,19 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 [data-layout="desktop"] .tranche-badge { font-size: 11px; }
 [data-layout="desktop"] .target-dot { width: 10px; height: 10px; }
 
+/* Ziel-Punkte: auf Desktop rechts vom Trade/Korb (links neben Bearbeiten-Button).
+   Standard (Mobile): rechte Slots aus, Ziel bleibt im linken Cluster.
+   Desktop: linkes Ziel ausblenden, rechten Slot einblenden. Alarme + Tranchen
+   bleiben unberührt links. */
+.trade-row-target-slot, .basket-target-slot { display: none; }
+[data-layout="desktop"] .trade-row-topstrip .target-pill { display: none; }
+/* Trade mit NUR Ziel (kein Alarm, keine Tranche): Topstrip würde auf Desktop leer
+   bleiben (Ziel ist ja nach rechts gewandert) → ganz ausblenden. */
+[data-layout="desktop"] .trade-row-topstrip:not(:has(.alarm-capsule)):not(:has(.tranche-badge)) { display: none; }
+[data-layout="desktop"] .trade-row-target-slot { display: inline-flex; align-items: center; margin-right: 6px; }
+[data-layout="desktop"] .basket-card-head-left .basket-target-dots { display: none; }
+[data-layout="desktop"] .basket-target-slot { display: inline-flex; align-items: center; margin-right: 6px; }
+
 /* Korb-Zielkurs-Dots: ein Dot pro Trade-mit-Ziel. Jeder leuchtet einzeln blau
    auf, sobald SEIN Trade das Ziel erreicht (Leuchtsystem). */
 .basket-card-head-meta { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -3941,6 +3954,7 @@ function renderOneTradeRow(tr, c) {
         <div class="trade-row-tickers">${tickers}</div>
       </div>
       <div class="trade-row-actions">
+        ${tPill ? `<span class="trade-row-target-slot">${tPill}</span>` : ''}
         <button class="icon" data-act="edit" data-id="${tr.id}" aria-label="${t("btn_edit")}"><span class="btn-icon">✎</span><span class="btn-label">${t("btn_edit")}</span></button>
         <button class="icon danger" data-act="del" data-id="${tr.id}" aria-label="löschen">×</button>
       </div>
@@ -4147,6 +4161,7 @@ function renderBasketCard(basket) {
           ${renderTradeRowTodaySub(c.todayPct)}
         </div>
         <span class="basket-card-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
+        ${targetDotsHtml ? `<span class="basket-target-slot">${targetDotsHtml}</span>` : ''}
         <button class="icon" data-basket-edit="${basket.id}" aria-label="${t("btn_edit")}"><span class="btn-icon">✎</span><span class="btn-label">${t("btn_edit")}</span></button>
         <button class="icon danger" data-basket-del="${basket.id}" aria-label="löschen">×</button>
         <span class="basket-card-arrow">›</span>
