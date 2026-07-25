@@ -258,10 +258,12 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .alarm-capsule.profit { border-color: var(--pos); border-color: color-mix(in srgb, var(--pos) 55%, var(--border)); background: var(--pos-soft); }
 /* Name schrumpft per Ellipsis, damit Hülle + Ziel-Pille auf derselben Zeile bleiben */
 .trade-row-info-line1 .trade-row-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Meta-Zeile links OBEN über dem Namen: Alarm-Hülle + Tranchen-Badge + Ziel-Pille.
-   Hält die rechte Seite (Aktionen) frei und den Namen sauber auf eigener Zeile. */
-.trade-row-meta-top { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 1px; }
-.trade-row-meta-top .alarm-capsule, .trade-row-meta-top .target-pill, .trade-row-meta-top .tranche-badge { margin-left: 0; }
+/* Topstrip: schmaler Streifen ganz oben links ÜBER der ganzen Zeile (über PnL/Name).
+   Bündelt Alarm-Hülle + Tranchen-Badge + Ziel-Pille in der echten oberen linken Ecke
+   der Karte — wie bei den Körben. Nur vorhanden wenn wirklich etwas anzuzeigen ist. */
+.trade-row-topstrip { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 5px; padding-left: 2px; }
+.trade-row-topstrip .alarm-capsule, .trade-row-topstrip .target-pill, .trade-row-topstrip .tranche-badge { margin-left: 0; }
+.trade-row-topstrip .alarm-capsule { font-size: 9px; padding: 2px 5px; }
 /* Korb-Head: Alarm-Hülle links vom Namen (statt rechts), Dots bleiben rechts */
 .basket-card-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
 .basket-card-head-left .alarm-capsule { margin-left: 0; }
@@ -3911,7 +3913,9 @@ function renderOneTradeRow(tr, c) {
   // mitte die Trade-Identifikation (Name + alarm pills + Ticker-Sub-Zeile), rechts
   // Edit/Delete. Vertikale Pixel-Spalten-Konsistenz über mehrere Trades hinweg
   // (tabular-nums-Pflicht in CSS) macht die Liste scanbar wie ein Reuters-Quote.
+  const metaBundle = `${aCapsule}${tBadge}${tPill}`;
   card.innerHTML = `
+    ${metaBundle ? `<div class="trade-row-topstrip">${metaBundle}</div>` : ''}
     <div class="${rowClass}"${tappableAttr}>
       <div class="trade-row-pnl-col">
         <span class="trade-row-pnl ${signClass(c.totalPnlHome)}">${pnlStr}</span>
@@ -3919,7 +3923,6 @@ function renderOneTradeRow(tr, c) {
       </div>
       <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
       <div class="trade-row-info">
-        ${(aCapsule || tBadge || tPill) ? `<div class="trade-row-meta-top">${aCapsule}${tBadge}${tPill}</div>` : ''}
         <div class="trade-row-info-line1">
           <span class="trade-row-name">${escapeHtml(displayName)}</span>
         </div>
