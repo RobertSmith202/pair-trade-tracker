@@ -258,6 +258,13 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .alarm-capsule.profit { border-color: var(--pos); border-color: color-mix(in srgb, var(--pos) 55%, var(--border)); background: var(--pos-soft); }
 /* Name schrumpft per Ellipsis, damit Hülle + Ziel-Pille auf derselben Zeile bleiben */
 .trade-row-info-line1 .trade-row-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Meta-Zeile links OBEN über dem Namen: Alarm-Hülle + Tranchen-Badge + Ziel-Pille.
+   Hält die rechte Seite (Aktionen) frei und den Namen sauber auf eigener Zeile. */
+.trade-row-meta-top { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 1px; }
+.trade-row-meta-top .alarm-capsule, .trade-row-meta-top .target-pill, .trade-row-meta-top .tranche-badge { margin-left: 0; }
+/* Korb-Head: Alarm-Hülle links vom Namen (statt rechts), Dots bleiben rechts */
+.basket-card-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.basket-card-head-left .alarm-capsule { margin-left: 0; }
 
 /* Korb-Zielkurs-Dots: ein Dot pro Trade-mit-Ziel. Jeder leuchtet einzeln blau
    auf, sobald SEIN Trade das Ziel erreicht (Leuchtsystem). */
@@ -3912,8 +3919,9 @@ function renderOneTradeRow(tr, c) {
       </div>
       <span class="trade-row-pct pnl-pct ${signClass(c.pct)}">${pctStr}</span>
       <div class="trade-row-info">
+        ${(aCapsule || tBadge || tPill) ? `<div class="trade-row-meta-top">${aCapsule}${tBadge}${tPill}</div>` : ''}
         <div class="trade-row-info-line1">
-          <span class="trade-row-name">${escapeHtml(displayName)}</span>${tBadge}${aCapsule}${tPill}
+          <span class="trade-row-name">${escapeHtml(displayName)}</span>
         </div>
         <div class="trade-row-tickers">${tickers}</div>
       </div>
@@ -4013,6 +4021,21 @@ function renderBasketCard(basket) {
     else if (s === "acknowledged") cls = "max-acked";
     pillsHtml += `<span class="alarm-pill ${cls}" title="${fmtPct(Math.abs(Number(basket.alertPctMax)))}">🎯</span>`;
   }
+  // Kompakte Alarm-Hülle für den Korb (links vom Namen, spart rechts Platz für die Dots)
+  let basketCapsule = "";
+  {
+    const hasL = hasBasketLossThreshold(basket), hasP = hasBasketProfitThreshold(basket);
+    if (hasL || hasP) {
+      let g = ""; if (hasL) g += "🚨"; if (hasP) g += "🎯";
+      let cls = "neutral";
+      if (states.min === "triggered")      cls = "alert";
+      else if (states.max === "notified")  cls = "profit";
+      const titleParts = [];
+      if (hasL) titleParts.push("🚨 " + fmtPct(-Math.abs(Number(basket.alertPctMin))));
+      if (hasP) titleParts.push("🎯 " + fmtPct(Math.abs(Number(basket.alertPctMax))));
+      basketCapsule = `<span class="alarm-capsule ${cls}" title="${escapeAttr(titleParts.join("  ·  "))}">${g}</span>`;
+    }
+  }
   // --- Erweiterter Inhalt für Grid-View ---
   // (CSS blendet `.basket-card-extra` in List-View aus)
   const notionalStr = c.totalNotionalHome != null ? fmtMoney(c.totalNotionalHome, homeCurrency) : "—";
@@ -4099,8 +4122,8 @@ function renderBasketCard(basket) {
   if (anyBasketTargetReached) card.classList.add("target-reached");
   card.innerHTML = `
     <div class="basket-card-head">
-      <div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}</div>
-      <div class="basket-card-head-meta">${targetDotsHtml}${pillsHtml ? `<div class="basket-card-pills">${pillsHtml}</div>` : ""}</div>
+      <div class="basket-card-head-left">${basketCapsule}<div class="basket-card-name">${escapeHtml(basket.name || t("basket_default_name"))}</div></div>
+      ${targetDotsHtml ? `<div class="basket-card-head-meta">${targetDotsHtml}</div>` : ""}
     </div>
     <div class="basket-card-row">
       <span class="basket-card-count">${t("basket_count_n", { n: c.tradeCount })}</span>
