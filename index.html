@@ -1364,8 +1364,10 @@ html[data-privacy="on"] .ds-status-value {
 body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: grabbing; }
 /* Press-Phase (Finger liegt auf, Lift noch nicht ausgelöst): leichtes Einsinken */
 .trade-card.drag-pressing { transform: scale(0.97); }
-/* Quell-Karte während des Drags: bleibt als gedimmter Platzhalter stehen */
-.trade-card.drag-source { opacity: 0.35; transform: scale(0.97); }
+/* Quell-Karte während des Drags: bleibt als stark gedimmte „Lücke" in der Liste
+   stehen und wandert beim Umsortieren mit an die Hover-Position (iOS-Homescreen-
+   Look: die Lücke zeigt, wo die Karte beim Loslassen landet) */
+.trade-card.drag-source { opacity: 0.15; transform: scale(0.96); }
 /* Ghost: fixed-positionierter Klon, folgt dem Pointer. Der Wrapper trägt die
    trade-list-Klasse + data-view des Quell-Containers, damit alle kontext-
    abhängigen Card-Styles (List- vs. Grid-Look) im Klon weitergelten. Wrapper
@@ -4287,13 +4289,13 @@ function render() {
     for (const b of basketsHere) list.appendChild(renderBasketCard(b));
     const rows = computeRowsFor(standaloneTrades);
     const renderFn = mode === "list" ? renderOneTradeRow : renderOneTradeCard;
-    // Standalone-Trades sind per Drag & Drop in Körbe der Page ziehbar — nur
-    // markieren wenn es überhaupt einen Korb als Ziel gibt, sonst bliebe der
-    // Long-Press-Gestenpfad ohne Funktion aktiv.
-    const canDragToBasket = basketsHere.length > 0;
+    // Karten sind per Drag & Drop ziehbar: zum Umsortieren (alle Pages, sobald
+    // mehr als eine Karte da ist) und in Körbe (Long/Short mit vorhandenen
+    // Körben). Ohne sinnvolles Ziel bleibt der Gestenpfad deaktiviert.
+    const canDrag = basketsHere.length > 0 || rows.length > 1;
     for (const row of rows) {
       const el = renderFn(row.trade, row.c);
-      if (canDragToBasket) el.classList.add("draggable-trade");
+      if (canDrag) el.classList.add("draggable-trade");
       list.appendChild(el);
     }
     // Aggregat zeigt weiterhin ALLE Trades dieser Page (in Korb oder nicht)
@@ -5352,6 +5354,28 @@ function moveTradeToBasket(tradeId, basketId) {
   return true;
 }
 
+// Persistiert die per Drag & Drop umsortierte Karten-Reihenfolge einer Page.
+// Es gibt kein separates Order-Feld: die Anzeige folgt der Reihenfolge im
+// trades-Array, also werden die Page-Trades dort an ihren bisherigen Plätzen
+// in der neuen relativen Reihenfolge abgelegt. Trades anderer Typen (und
+// Korb-Trades) behalten ihre Positionen; die Reihenfolge synct übers Array.
+function applyPageOrder(orderedIds) {
+  const idSet = new Set(orderedIds);
+  const queue = orderedIds.map(id => trades.find(t => t.id === id)).filter(Boolean);
+  if (queue.length !== idSet.size) return false; // DOM und Datenmodell auseinander → lieber nichts tun
+  let changed = false;
+  const result = trades.map(t => {
+    if (!idSet.has(t.id)) return t;
+    const next = queue.shift();
+    if (next !== t) changed = true;
+    return next;
+  });
+  if (!changed) return false;
+  trades = result;
+  markLocalChange();
+  return true;
+}
+
 // Builds a minimal trade-shaped object from the in-flight form values, suitable
 // for passing into computeTrade() so we can preview the trade's current perfPct
 // and live price.
@@ -6247,13 +6271,18 @@ document.getElementById("lock-confirm").addEventListener("input", updateLockUiSt
 document.getElementById("lock-apply-btn").addEventListener("click", applyLockChange);
 setInterval(setAutoStatus, 60000);
 
-// ============ Drag & Drop-Engine: Trade-Karte in einen Korb ziehen ============
+// ============ Drag & Drop-Engine: Umsortieren + in einen Korb ziehen ============
 // Apple-Interaktion: auf Touch hebt ein Long-Press (350ms ohne Bewegung) die Karte
 // mit Feder-Scale an (iOS-Homescreen-Look) und sie folgt dem Finger; mit der Maus
 // startet der Drag nach 6px Bewegung sofort. Ein fixed-positionierter Klon (Ghost)
-// folgt dem Pointer, die Körbe der Page pulsieren als Ziele und wachsen beim
-// Drüberschweben an (iOS-Ordner-Look). Drop über einem Korb saugt die Karte ein
-// (Fly-In + Korb-Feder), Drop daneben schnappt zurück zur Ausgangsposition.
+// folgt dem Pointer. Zwei Drop-Semantiken, wie beim iOS-Homescreen:
+//   • Umsortieren (alle Pages): die Quell-Karte bleibt als gedimmte Lücke in der
+//     Liste und wandert beim Ziehen per insertBefore an die Hover-Position — die
+//     übrigen Karten rutschen FLIP-animiert nach. Loslassen legt die Karte in die
+//     aktuelle Lücke (Ghost federt dorthin) und persistiert die Reihenfolge über
+//     applyPageOrder. Esc bricht ab und stellt die Ausgangsposition wieder her.
+//   • Korb-Drop (Long/Short): Körbe pulsieren als Ziele und wachsen beim
+//     Drüberschweben an (iOS-Ordner-Look); Drop saugt die Karte ein.
 (function setupTradeDragAndDrop() {
   const HOLD_MS = 350;        // Touch: Long-Press-Dauer bis zum Lift
   const HOLD_SLOP_PX = 8;     // Touch: mehr Bewegung vor Ablauf ⇒ User scrollt, kein Drag
@@ -6290,7 +6319,8 @@ setInterval(setAutoStatus, 60000);
     const card = e.target.closest(".trade-card.draggable-trade");
     if (!card) return;
     if (e.target.closest("button")) return; // Edit/Delete/Tranchen-Buttons bleiben Klicks
-    const list = card.closest('.trade-list[data-list="long"], .trade-list[data-list="short"]');
+    // Nur die Page-Listen (pair/long/short) — das Korb-Modal (.basket-trade-list) hat kein data-list
+    const list = card.closest(".trade-list[data-list]");
     if (!list) return;
     const tradeId = card.getAttribute("data-trade-id"); if (!tradeId) return;
 
@@ -6320,7 +6350,9 @@ setInterval(setAutoStatus, 60000);
     const { card, tradeId, list } = press;
     if (!document.body.contains(card)) return;
     const targets = Array.from(list.querySelectorAll(".basket-card[data-basket-id]"));
-    if (targets.length === 0) return;
+    const siblingCount = list.querySelectorAll(".trade-card[data-trade-id]").length - 1;
+    const canReorder = siblingCount > 0;
+    if (targets.length === 0 && !canReorder) return; // kein sinnvolles Drop-Ziel
     const rect = card.getBoundingClientRect();
     // Ghost: Wrapper trägt trade-list-Klasse + data-view des Quell-Containers,
     // damit die kontextabhängigen Card-Styles (List/Grid) im Klon weitergelten.
@@ -6343,6 +6375,11 @@ setInterval(setAutoStatus, 60000);
       hoverBasket: null,
       scroller: scrollContainerFor(list),
       raf: 0,
+      // Umsortieren: Quell-Karte bleibt als Lücke in der Liste und wandert mit
+      sourceEl: card,
+      canReorder,
+      origNext: card.nextElementSibling, // für Esc-Restore der Ausgangsposition
+      reordered: false,
     };
     positionGhost();
     card.classList.remove("drag-pressing");
@@ -6385,6 +6422,59 @@ setInterval(setAutoStatus, 60000);
         try { if (navigator.vibrate) navigator.vibrate(6); } catch {}
       }
     }
+    // Nicht über einem Korb → Lücke an die Hover-Position wandern lassen,
+    // die übrigen Karten rutschen FLIP-animiert nach (iOS-Homescreen-Look)
+    if (!target && ctx.canReorder) maybeShuffle();
+  }
+
+  // Liefert die Karte, VOR der die Quell-Karte aktuell einsortiert gehört
+  // (null = ans Listen-Ende). Lesereihenfolge: oberhalb der Karten-Mitte = davor;
+  // im Desktop-Multi-Column-Grid zählt in derselben Zeile die horizontale Mitte.
+  function computeReorderRef() {
+    const cards = Array.from(ctx.list.querySelectorAll(".trade-card[data-trade-id]")).filter(el => el !== ctx.sourceEl);
+    for (const el of cards) {
+      const r = el.getBoundingClientRect();
+      const sameRow = ctx.y >= r.top && ctx.y <= r.bottom;
+      const before = sameRow ? (ctx.x < r.left + r.width / 2) : (ctx.y < r.top + r.height / 2);
+      if (before) return el;
+    }
+    return null;
+  }
+
+  function maybeShuffle() {
+    const ref = computeReorderRef();
+    // No-op wenn die Lücke schon an der richtigen Stelle sitzt
+    if (ref === ctx.sourceEl.nextElementSibling) return;
+    if (ref === null && ctx.sourceEl === ctx.list.lastElementChild) return;
+    // FLIP: Positionen vorher merken, DOM umhängen, Differenz als Transform
+    // invertieren und weich auf 0 auflösen
+    const cards = Array.from(ctx.list.querySelectorAll(".trade-card[data-trade-id]"));
+    const firstRects = new Map(cards.map(el => [el, el.getBoundingClientRect()]));
+    if (ref) ctx.list.insertBefore(ctx.sourceEl, ref); else ctx.list.appendChild(ctx.sourceEl);
+    ctx.reordered = true;
+    const moved = [];
+    for (const el of cards) {
+      if (el === ctx.sourceEl) continue;
+      const f = firstRects.get(el), l = el.getBoundingClientRect();
+      const dx = f.left - l.left, dy = f.top - l.top;
+      if (dx || dy) { el.style.transition = "none"; el.style.transform = "translate(" + dx + "px," + dy + "px)"; moved.push(el); }
+    }
+    if (moved.length) {
+      void ctx.list.offsetWidth; // ein Reflow für alle invertierten Transforms
+      for (const el of moved) {
+        el.style.transition = "transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1)";
+        el.style.transform = "";
+        el.addEventListener("transitionend", () => { el.style.transition = ""; }, { once: true });
+      }
+      try { if (navigator.vibrate) navigator.vibrate(4); } catch {}
+    }
+  }
+
+  // Räumt alle Shuffle-Inline-Styles ab (z.B. bevor neu gerendert wird)
+  function clearShuffleStyles() {
+    document.querySelectorAll('.trade-list[data-list] .trade-card[data-trade-id]').forEach(el => {
+      el.style.transition = ""; el.style.transform = "";
+    });
   }
 
   // Auto-Scroll wenn der Pointer nahe am oberen/unteren Viewport-Rand steht —
@@ -6417,31 +6507,71 @@ setInterval(setAutoStatus, 60000);
 
   function onDragCancelEvt(e) { if (ctx && e.pointerId === ctx.pointerId) cancelDrag(); }
 
+  // Abbruch (Esc / pointercancel): Ausgangs-Reihenfolge wiederherstellen,
+  // Ghost federt zurück zur (wiederhergestellten) Quell-Position.
   function cancelDrag() {
     if (!ctx) return;
     const c = ctx; ctx = null;
     teardownListeners(c);
     clearDropDecoration();
     suppressNextClick();
-    // Ghost federt zurück zur Quell-Position, dann aufräumen
+    if (c.reordered) {
+      try {
+        if (c.origNext && c.origNext.parentElement === c.list) c.list.insertBefore(c.sourceEl, c.origNext);
+        else if (!c.origNext) c.list.appendChild(c.sourceEl);
+      } catch {}
+      clearShuffleStyles();
+    }
     const g = c.ghost;
     const inner = g.firstElementChild;
     if (inner) { inner.style.animation = "none"; inner.style.transition = "transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)"; inner.style.transform = "scale(1)"; }
+    const back = document.body.contains(c.sourceEl) ? c.sourceEl.getBoundingClientRect() : c.srcRect;
     g.classList.add("drag-ghost-settle");
-    g.style.transform = "translate3d(" + c.srcRect.left + "px, " + c.srcRect.top + "px, 0)";
+    g.style.transform = "translate3d(" + back.left + "px, " + back.top + "px, 0)";
     setTimeout(() => { g.remove(); releaseSource(); }, 300);
+  }
+
+  // Drop ohne Korb-Ziel: Karte landet in der aktuellen Lücke (iOS-Homescreen-
+  // Semantik — Loslassen legt ab, wo die Lücke gerade ist) und die neue
+  // Reihenfolge wird persistiert.
+  function commitReorder(c) {
+    const g = c.ghost;
+    const inner = g.firstElementChild;
+    if (inner) { inner.style.animation = "none"; inner.style.transition = "transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)"; inner.style.transform = "scale(1)"; }
+    const slot = document.body.contains(c.sourceEl) ? c.sourceEl.getBoundingClientRect() : c.srcRect;
+    g.classList.add("drag-ghost-settle");
+    g.style.transform = "translate3d(" + slot.left + "px, " + slot.top + "px, 0)";
+    setTimeout(() => {
+      g.remove();
+      releaseSource();
+      clearShuffleStyles();
+      const orderedIds = Array.from(c.list.querySelectorAll(".trade-card[data-trade-id]")).map(el => el.getAttribute("data-trade-id"));
+      const changed = applyPageOrder(orderedIds);
+      if (changed) {
+        render(); // Karten stehen schon an Ort und Stelle — Render normalisiert nur DOM/Handler
+        try { if (navigator.vibrate) navigator.vibrate(8); } catch {}
+      }
+    }, 290);
   }
 
   function onDragEnd(e) {
     if (!ctx || e.pointerId !== ctx.pointerId) return;
     ctx.x = e.clientX; ctx.y = e.clientY;
     const target = currentDropTarget();
-    if (!target) { cancelDrag(); return; }
+    if (!target) {
+      const c = ctx; ctx = null;
+      teardownListeners(c);
+      clearDropDecoration();
+      suppressNextClick();
+      commitReorder(c);
+      return;
+    }
     const basketId = target.getAttribute("data-basket-id");
     const c = ctx; ctx = null;
     teardownListeners(c);
     clearDropDecoration();
     suppressNextClick();
+    clearShuffleStyles();
     // Fly-In: Ghost schrumpft in die Korb-Mitte (Scale um die eigene Mitte,
     // Translation so gewählt dass Ghost-Mitte = Korb-Mitte)
     const bRect = target.getBoundingClientRect();
