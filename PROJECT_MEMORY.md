@@ -778,6 +778,24 @@ Pro Page wählbar zwischen kompakten Listenzeilen oder ausführlichen Cards mit 
 
 ---
 
+## Telegram-Bot-Dialog: Trades per Chat anlegen (seit Aug 2026)
+
+Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; der Worker versteht sie mit der Claude API (`claude-opus-5`, raw fetch — kein SDK, weil Single-File-Paste ohne Build-Step) und trägt sie nach Bestätigung ins KV-Tradebook ein. Feature-Gate: Secret `ANTHROPIC_API_KEY` — ohne den Key verhält sich der Webhook exakt wie früher (jede Antwort quittiert Alarme).
+
+**Ablauf (von Robert exakt so festgelegt):**
+1. Freitext rein → Claude extrahiert Felder, löst Firmennamen via `search_symbol` (Yahoo-Suche) auf. **Default: Ticker der Heimbörse** (DE→.DE, UK→.L, FR→.PA, NL→.AS, CH→.SW, US→US-Listing), andere Börse nur auf explizite Ansage. **Default-Währung: Notierungswährung der Heimbörse** (`entryNative: true`), explizite Währung nur wenn genannt.
+2. Fehlende Pflichtfelder (Typ, Ticker, Stückzahl, Einstand je Leg) → Bot fragt **so lange nach, bis eine konkrete Antwort kommt**. Ausgang ist binär: Eintrag oder Abbruch.
+3. Alles da → vollständige Zusammenfassung aller Felder. Eintrag **erst nach Bestätigung** („ok" o.ä.). Änderungswünsche nach der Zusammenfassung werden erkannt, eingearbeitet, neu zusammengefasst.
+4. Plausibilität via `get_quote`: Einstand grob abweichend vom Live-Kurs (Diktierfehler) oder Schwellen auf der falschen Seite des Kurses → Nachfrage. Zahlen werden nie geraten.
+
+**Architektur im Worker:** `botProcessMessage()` = Tool-Loop (max. 6 Runden) gegen `POST api.anthropic.com/v1/messages` mit Tools `search_symbol`, `get_quote` und dem terminalen `emit_action` (strict; Aktionen ask/propose/save/cancel/ack_alarms/reply). Worker validiert Drafts selbst (`botValidateDraft`) — unvollständiges propose/save wird als Tool-Error in den Loop zurückgespielt. **`save` trägt immer den GESPEICHERTEN Draft ein** (den zuletzt zusammengefassten Stand), nie den vom Modell mitgeschickten — verhindert Last-Second-Änderungen ohne neue Zusammenfassung. Dialog-State (History max. 24 Nachrichten, Draft, Phase) in KV `bot_state:v1`, TTL 24h. Gleicher Ticker+Typ beim Eintragen → Tranche an bestehenden Trade (Super-Trade-Konvention inkl. Schwellen-Erbregeln). Webhook antwortet Telegram sofort 200, Verarbeitung via `ctx.waitUntil`.
+
+**Alarm-Quittierung bleibt ausfallsicher:** Claude entscheidet die Intention (kurze Bestätigung bei aktiven Alarmen ohne ausstehende Zusammenfassung → ack). Wenn die Claude API down ist, fällt der Webhook auf das Legacy-Verhalten zurück (alles quittieren + Fehlerhinweis) — Quittieren darf nie von Anthropic-Verfügbarkeit abhängen.
+
+**Kosten:** ~1–3 Cent pro Trade-Dialog (Opus 5). `POST /bot-test` (Bearer SYNC_SECRET, `{"text": "..."}`) testet den Dialog ohne Telegram (dry-run, Antwort als HTTP-Response).
+
+---
+
 ## Worker-Endpoints
 
 | Endpoint | Zweck |
@@ -787,7 +805,8 @@ Pro Page wählbar zwischen kompakten Listenzeilen oder ausführlichen Cards mit 
 | `GET /check-squeeze` | Manueller Short-Squeeze-Check (Tages-Cron ruft intern dasselbe auf) |
 | `GET /test-alert` | Sendet Test-Telegram-Nachricht in aktueller Sprache |
 | `GET /setup-webhook` | Registriert Worker-URL als Telegram-Webhook-Target |
-| `POST /telegram-webhook` | Empfängt User-Replies → setzt alle triggered/notified States (min/max/squeeze) auf acknowledged |
+| `POST /telegram-webhook` | Empfängt User-Nachrichten → Bot-Dialog (mit `ANTHROPIC_API_KEY`) bzw. Alarm-Quittierung (Legacy-Pfad ohne Key; bei API-Ausfall Fallback aufs Quittieren) |
+| `POST /bot-test` | Bot-Dialog ohne Telegram testen (Bearer SYNC_SECRET, `{"text": "..."}`, dry-run) |
 
 **Cron-Trigger im Cloudflare-Dashboard — BEIDE müssen aktiv sein:**
 - `*/3 * * * *` für Loss + Profit (3-Min-Intervall)
@@ -805,8 +824,9 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 
 - `TELEGRAM_BOT_TOKEN` (vom BotFather)
 - `TELEGRAM_CHAT_ID` (die Chat-ID zwischen Robert und seinem Bot)
-- `JSONBIN_BIN_ID`
-- `JSONBIN_KEY` (Master Key)
+- `SYNC_SECRET` (32-Zeichen-Random, für App-Sync + /bot-test)
+- `ANTHROPIC_API_KEY` (von console.anthropic.com — aktiviert den Bot-Dialog; ohne den Key läuft der Webhook im Legacy-Modus)
+- `JSONBIN_BIN_ID` / `JSONBIN_KEY` (Legacy, nur noch für Migrations-Fallback)
 
 ---
 

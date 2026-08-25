@@ -17,6 +17,7 @@ Persönlicher Long/Short-Trade-Tracker als Single-File-PWA — Pair-, Long-only-
 - Körbe auf den Long-/Short-Pages mit Aggregat-Performance und eigenen Alarmen — Standalone-Trades lassen sich per Drag & Drop (Apple-Lift-Effekt) in Körbe ziehen
 - Karten auf allen Pages per Drag & Drop umsortierbar — die übrigen Karten machen animiert Platz wie App-Icons auf dem iOS-Homescreen; die Reihenfolge synct zwischen den Geräten
 - Drei Alarm-Typen via Telegram: Verlust-, Gewinn- und Short-Squeeze-Schwellen, edge-getriggert mit Quittierung per Telegram-Reply
+- Trades per Telegram-Chat in freiem Deutsch anlegen (Claude-API-gestützt): Ticker- und Heimbörsen-Auflösung, hartnäckige Rückfragen bei Lücken, Plausibilitätsprüfung gegen Live-Kurse, Eintrag erst nach Bestätigung
 - Zielkurse mit stiller optischer Markierung
 - Cross-Device-Sync (iPhone ↔ Mac) über Cloudflare KV
 - Zwei Layout-Modi (Mobile-PWA / Bloomberg-Style-Desktop), drei Themes, DE/EN, optionale App-Sperre

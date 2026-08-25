@@ -47,6 +47,20 @@ Claude liest dann die Memory-Datei + den aktuellen Code und ist auf dem gleichen
 
 Hat nichts mit Code zu tun. In Telegram an **@BotFather** schreiben → `/mybots` → deinen Bot wählen → "Edit Bot" → entsprechende Option.
 
+### G) Telegram-Bot-Dialog aktivieren: Trades per Chat anlegen (einmalig, Aug 2026)
+
+**Wozu:** Trades in freiem Deutsch an den Bot diktieren (via Wispr Flow) statt sie in der App einzutippen. Der Bot sucht Ticker der Heimbörse, fragt fehlende Angaben nach, fasst zusammen und trägt erst nach deinem „ok" ein.
+
+**Setup-Schritte:**
+
+1. Auf https://console.anthropic.com einen API-Key erstellen (Account → API Keys).
+2. Cloudflare-Dashboard → Worker → Settings → Variables and Secrets → **Add** → Type: **Secret**, Name: **`ANTHROPIC_API_KEY`** (genau so), Value: der Key → Save.
+3. Neuen Worker-Code deployen (Workflow B).
+4. Testen: dem Bot in Telegram schreiben, z.B. „Neuer Long: Apple, 10 Stück zu 180 Dollar, Verlustschwelle 10 Prozent". Er sollte antworten und ggf. nachfragen.
+5. Alternativ ohne Telegram testen: `curl -X POST -H "Authorization: Bearer <SYNC_SECRET>" -H "Content-Type: application/json" -d '{"text":"Long Apple 10 Stück zu 180"}' https://yahoo-finance-proxy.fabian-terhorst.workers.dev/bot-test`
+
+**Deaktivieren:** Secret `ANTHROPIC_API_KEY` löschen → Webhook verhält sich wieder wie früher (jede Antwort quittiert Alarme).
+
 ### D) Cloudflare Secrets ändern (neues Token, neue Bin-ID)
 
 **Beispiele:** JSONBin-Key rotiert, neuer Telegram-Bot.

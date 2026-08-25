@@ -1026,32 +1026,425 @@ async function sendTestAlert(env) {
   return (await sendTelegram(env, msg)) ? "test sent" : "test failed";
 }
 
-async function handleTelegramWebhook(req, env) {
-  let update; try { update = await req.json(); } catch { return textResponse("bad json", 400); }
-  const m = update.message;
-  if (!m || !m.chat || String(m.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return textResponse("ignored");
-  let record, lang = "de";
-  try { const r = await loadTradebook(env); record = r.data; lang = record.lang || "de"; } catch { await sendTelegram(env, workerT(lang, "ack_received")); return textResponse("ok (no record)"); }
-  const states = record.alertStates || {}; let changed = false;
+// Quittiert alle gerade aktiven Alarme (triggered/notified) — die klassische
+// Webhook-Funktion, jetzt als eigenständige Funktion damit sowohl der Legacy-Pfad
+// (ohne ANTHROPIC_API_KEY) als auch der Bot-Dialog sie aufrufen können.
+// Returns Anzahl quittierter Alarm-Achsen.
+async function ackAllActiveAlarms(env, record) {
+  const states = record.alertStates || {}; let changed = false; let count = 0;
   const ackTs = Date.now();
   for (const id of Object.keys(states)) {
     const st = ensureStateShape(states[id]);
     let touched = false;
-    if (st.min?.state === "triggered") {
-      st.min = { state: "acknowledged", lastAlertAt: ackTs };
-      touched = true;
-    }
-    if (st.max?.state === "notified") {
-      st.max = { state: "acknowledged", lastAlertAt: ackTs };
-      touched = true;
-    }
-    if (st.squeeze?.state === "triggered") {
-      st.squeeze = { state: "acknowledged", lastAlertAt: ackTs };
-      touched = true;
-    }
+    if (st.min?.state === "triggered") { st.min = { state: "acknowledged", lastAlertAt: ackTs }; touched = true; count++; }
+    if (st.max?.state === "notified")  { st.max = { state: "acknowledged", lastAlertAt: ackTs }; touched = true; count++; }
+    if (st.squeeze?.state === "triggered") { st.squeeze = { state: "acknowledged", lastAlertAt: ackTs }; touched = true; count++; }
     if (touched) { states[id] = st; changed = true; }
   }
   if (changed) { try { await persistAlarmStates(env, states); } catch {} }
+  return count;
+}
+
+// Liste der aktuell aktiven (unquittierten) Alarme — als Kontext für den Bot.
+function listActiveAlarms(record) {
+  const states = record.alertStates || {};
+  const nameOf = (id) => {
+    const tr = (record.trades || []).find(t => t.id === id);
+    if (tr) return tr.name || tr.longTicker || tr.shortTicker || id;
+    const b = (record.baskets || []).find(x => x.id === id);
+    if (b) return "Korb " + (b.name || id);
+    return id;
+  };
+  const out = [];
+  for (const id of Object.keys(states)) {
+    const st = ensureStateShape(states[id]);
+    if (st.min?.state === "triggered") out.push({ name: nameOf(id), kind: "loss" });
+    if (st.max?.state === "notified")  out.push({ name: nameOf(id), kind: "profit" });
+    if (st.squeeze?.state === "triggered") out.push({ name: nameOf(id), kind: "squeeze" });
+  }
+  return out;
+}
+
+// === Telegram-Bot-Dialog: Trades per Chat anlegen (seit Aug 2026) ==========
+// Freitext (typisch via Wispr-Flow diktiert) → Claude versteht, sucht Ticker der
+// Heimbörse, fragt fehlende Angaben so lange nach bis alles da ist, fasst dann
+// komplett zusammen und trägt erst nach expliziter Bestätigung ("ok") ein.
+// Änderungswünsche nach der Zusammenfassung werden erkannt, eingearbeitet und
+// neu zusammengefasst. Ausgang ist binär: Eintrag oder kein Eintrag.
+// Feature ist nur aktiv wenn Secret ANTHROPIC_API_KEY gesetzt ist — ohne den Key
+// verhält sich der Webhook exakt wie früher (jede Antwort quittiert Alarme).
+const BOT_STATE_KEY = "bot_state:v1";
+const BOT_STATE_TTL_SECONDS = 24 * 3600;   // Dialog-Kontext lebt max. 24h
+const BOT_MAX_HISTORY = 24;                // gespeicherte Chat-Nachrichten (user+bot)
+const BOT_MAX_LLM_ROUNDS = 6;              // Tool-Loop-Deckel pro Webhook-Aufruf
+const CLAUDE_MODEL = "claude-opus-5";
+
+async function botLoadState(env) {
+  try { return (await env.TRADEBOOK_CACHE.get(BOT_STATE_KEY, { type: "json" })) || { history: [], draft: null, phase: "collecting" }; }
+  catch { return { history: [], draft: null, phase: "collecting" }; }
+}
+async function botSaveState(env, state) {
+  state.history = (state.history || []).slice(-BOT_MAX_HISTORY);
+  try { await env.TRADEBOOK_CACHE.put(BOT_STATE_KEY, JSON.stringify(state), { expirationTtl: BOT_STATE_TTL_SECONDS }); } catch {}
+}
+async function botClearState(env) {
+  try { await env.TRADEBOOK_CACHE.delete(BOT_STATE_KEY); } catch {}
+}
+
+// Yahoo-Symbolsuche: fehlertolerant auch bei Diktier-Verschreibern. Liefert
+// die Kandidaten-Listings inkl. Börse, damit Claude die Heimbörse wählen kann.
+async function botSearchSymbol(query) {
+  const u = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0&enableFuzzyQuery=true`;
+  const r = await fetch(u, { headers: { "User-Agent": YH_UA, "Accept": "application/json" } });
+  if (!r.ok) return { error: "yahoo search http " + r.status };
+  const j = await r.json();
+  const quotes = (j.quotes || []).filter(q => q.symbol && (q.quoteType === "EQUITY" || q.quoteType === "ETF"));
+  return {
+    results: quotes.map(q => ({
+      symbol: q.symbol,
+      name: q.longname || q.shortname || null,
+      exchange: q.exchDisp || q.exchange || null,
+      type: q.quoteType
+    }))
+  };
+}
+
+// Live-Kurs für Plausibilitätsprüfungen (Einstand vs. aktueller Kurs, Schwellen-Logik)
+async function botGetQuote(symbol) {
+  try {
+    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`, { headers: { "User-Agent": "Mozilla/5.0 PairTradeTracker" } });
+    if (!r.ok) return { error: "yahoo http " + r.status };
+    const m = (await r.json())?.chart?.result?.[0]?.meta;
+    if (!m?.regularMarketPrice) return { error: "no price for " + symbol };
+    return { symbol, price: m.regularMarketPrice, currency: m.currency || null, exchange: m.exchangeName || null };
+  } catch (e) { return { error: e.message }; }
+}
+
+// Draft-Felder-Schema für emit_action (strict) — alle Felder Pflicht im Schema,
+// fehlende Infos als null. entryCurrency null = native Währung der Heimbörse
+// (Roberts Default), sonst expliziter Ccy-Code wenn er eine andere nennt.
+const BOT_DRAFT_SCHEMA = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  properties: {
+    type:          { type: ["string", "null"], enum: ["pair", "long", "short", null] },
+    name:          { type: ["string", "null"] },
+    longTicker:    { type: ["string", "null"] },
+    shortTicker:   { type: ["string", "null"] },
+    longQty:       { type: ["number", "null"] },
+    longEntry:     { type: ["number", "null"] },
+    shortQty:      { type: ["number", "null"] },
+    shortEntry:    { type: ["number", "null"] },
+    entryCurrency: { type: ["string", "null"], description: "null = Notierungswährung der Börse (Default). Nur setzen wenn der User explizit eine andere Währung nennt." },
+    lossPct:       { type: ["number", "null"], description: "Verlust-Schwelle in % (positive Zahl)" },
+    lossPrice:     { type: ["number", "null"], description: "Verlust-Schwelle als Kurs (nur long/short)" },
+    profitPct:     { type: ["number", "null"] },
+    profitPrice:   { type: ["number", "null"] },
+    squeezePct:    { type: ["number", "null"], description: "Short-Squeeze-Schwelle in % (nur short/pair)" },
+    longTarget:    { type: ["number", "null"], description: "Zielkurs Long (stille Markierung)" },
+    shortTarget:   { type: ["number", "null"] }
+  },
+  required: ["type", "name", "longTicker", "shortTicker", "longQty", "longEntry", "shortQty", "shortEntry", "entryCurrency", "lossPct", "lossPrice", "profitPct", "profitPrice", "squeezePct", "longTarget", "shortTarget"]
+};
+
+const BOT_TOOLS = [
+  {
+    name: "search_symbol",
+    description: "Sucht Aktien/ETFs bei Yahoo Finance per Firmenname oder Ticker (fehlertolerant). Liefert Kandidaten mit Symbol, Name und Börse.",
+    input_schema: { type: "object", additionalProperties: false, properties: { query: { type: "string" } }, required: ["query"] }
+  },
+  {
+    name: "get_quote",
+    description: "Holt aktuellen Kurs, Währung und Börse für ein Yahoo-Symbol. Für Plausibilitätsprüfungen (Einstand, Schwellen, Zielkurse) nutzen.",
+    input_schema: { type: "object", additionalProperties: false, properties: { symbol: { type: "string" } }, required: ["symbol"] }
+  },
+  {
+    name: "emit_action",
+    description: "MUSS als letzter Schritt jeder Antwort aufgerufen werden. Beendet den Zug mit genau einer Aktion Richtung User.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        action: { type: "string", enum: ["ask", "propose", "save", "cancel", "ack_alarms", "reply"] },
+        text: { type: "string", description: "Nachricht an den User. Bei propose: die vollständige Zusammenfassung aller Felder plus Hinweis, mit 'ok' zu bestätigen oder Änderungen zu nennen." },
+        draft: BOT_DRAFT_SCHEMA
+      },
+      required: ["action", "text", "draft"]
+    }
+  }
+];
+
+// Pflichtfeld-Validierung, worker-seitig — Claude darf 'propose'/'save' nur mit
+// vollständigem Draft; sonst wird der Fehler in den Tool-Loop zurückgespielt
+// und Claude fragt stattdessen nach.
+function botValidateDraft(d) {
+  const missing = [];
+  if (!d || typeof d !== "object") return ["kompletter Draft"];
+  const t = d.type;
+  if (t !== "pair" && t !== "long" && t !== "short") missing.push("type (pair/long/short)");
+  const needLong = t === "pair" || t === "long";
+  const needShort = t === "pair" || t === "short";
+  if (needLong) {
+    if (!d.longTicker) missing.push("longTicker");
+    if (!(d.longQty > 0)) missing.push("longQty");
+    if (!(d.longEntry > 0)) missing.push("longEntry");
+  }
+  if (needShort) {
+    if (!d.shortTicker) missing.push("shortTicker");
+    if (!(d.shortQty > 0)) missing.push("shortQty");
+    if (!(d.shortEntry > 0)) missing.push("shortEntry");
+  }
+  return missing;
+}
+
+// Baut aus dem bestätigten Draft einen Trade im App-Datenmodell und schreibt ihn
+// ins Tradebook. Existiert bereits ein Standalone-Trade mit gleichem Ticker+Typ,
+// wird stattdessen eine Tranche angehängt (Super-Trade-Konvention der App:
+// Schwellen/Ziele nur übernehmen wenn der bestehende Trade dort leer ist).
+async function botSaveTrade(env, draft) {
+  const now = Date.now();
+  const t = draft.type;
+  const needLong = t === "pair" || t === "long";
+  const needShort = t === "pair" || t === "short";
+  const entryNative = draft.entryCurrency == null;
+  const entryCcy = entryNative ? null : String(draft.entryCurrency).toUpperCase();
+  const tranche = {
+    id: "tr_" + now + "_" + Math.floor(Math.random() * 10000),
+    longQty: needLong ? draft.longQty : 0,
+    longEntry: needLong ? draft.longEntry : 0,
+    longEntryNative: needLong ? entryNative : false,
+    longEntryCcy: needLong ? entryCcy : null,
+    shortQty: needShort ? draft.shortQty : 0,
+    shortEntry: needShort ? draft.shortEntry : 0,
+    shortEntryNative: needShort ? entryNative : false,
+    shortEntryCcy: needShort ? entryCcy : null,
+    created: now
+  };
+  const lossPct = draft.lossPct != null ? -Math.abs(draft.lossPct) : null;
+  const profitPct = draft.profitPct != null ? Math.abs(draft.profitPct) : null;
+  const minMode = (t !== "pair" && draft.lossPrice != null && draft.lossPct == null) ? "price" : "pct";
+  const maxMode = (t !== "pair" && draft.profitPrice != null && draft.profitPct == null) ? "price" : "pct";
+  const squeeze = (t === "short" || t === "pair") && draft.squeezePct != null ? Math.abs(draft.squeezePct) : null;
+
+  const fresh = (await loadTradebook(env)).data || {};
+  const trades = Array.isArray(fresh.trades) ? fresh.trades : [];
+  let matching = null;
+  if (t === "long")  matching = trades.find(x => tradeType(x) === "long"  && x.longTicker === draft.longTicker && !x.basketId);
+  if (t === "short") matching = trades.find(x => tradeType(x) === "short" && x.shortTicker === draft.shortTicker && !x.basketId);
+  if (t === "pair")  matching = trades.find(x => tradeType(x) === "pair"  && x.longTicker === draft.longTicker && x.shortTicker === draft.shortTicker);
+
+  let resultInfo;
+  if (matching) {
+    matching.tranches = (Array.isArray(matching.tranches) ? matching.tranches : []).concat([tranche]);
+    const hasMin = (matching.alertPctMin != null && matching.alertPctMin !== "") || (matching.alertPriceMin != null && matching.alertPriceMin !== "");
+    const hasMax = (matching.alertPctMax != null && matching.alertPctMax !== "") || (matching.alertPriceMax != null && matching.alertPriceMax !== "");
+    if (!hasMin && (lossPct != null || draft.lossPrice != null)) { matching.alertPctMin = lossPct; matching.alertPriceMin = draft.lossPrice ?? null; matching.alertMinMode = minMode; }
+    if (!hasMax && (profitPct != null || draft.profitPrice != null)) { matching.alertPctMax = profitPct; matching.alertPriceMax = draft.profitPrice ?? null; matching.alertMaxMode = maxMode; }
+    if (squeeze != null && (matching.alertShortPct == null || matching.alertShortPct === "")) matching.alertShortPct = squeeze;
+    if (draft.longTarget != null && matching.longTarget == null) matching.longTarget = draft.longTarget;
+    if (draft.shortTarget != null && matching.shortTarget == null) matching.shortTarget = draft.shortTarget;
+    matching.updated = now;
+    resultInfo = { merged: true, trancheCount: matching.tranches.length };
+  } else {
+    trades.push({
+      id: "t_" + now + "_" + Math.floor(Math.random() * 10000),
+      type: t, name: draft.name || null, basketId: null,
+      longTicker: needLong ? draft.longTicker : null,
+      shortTicker: needShort ? draft.shortTicker : null,
+      longBetaOverride: null, shortBetaOverride: null,
+      longTarget: needLong ? (draft.longTarget ?? null) : null,
+      shortTarget: needShort ? (draft.shortTarget ?? null) : null,
+      alertPctMin: lossPct, alertPctMax: profitPct,
+      alertPriceMin: (t !== "pair") ? (draft.lossPrice ?? null) : null,
+      alertPriceMax: (t !== "pair") ? (draft.profitPrice ?? null) : null,
+      alertMinMode: minMode, alertMaxMode: maxMode,
+      alertShortPct: squeeze,
+      created: now, updated: now,
+      tranches: [tranche]
+    });
+    resultInfo = { merged: false };
+  }
+  fresh.trades = trades;
+  fresh.lastModified = now;
+  await saveTradebook(env, fresh);
+  return resultInfo;
+}
+
+function botSystemPrompt(record, state) {
+  const tradesCompact = (record.trades || []).map(tr => {
+    const ty = tradeType(tr);
+    const tick = ty === "long" ? tr.longTicker : ty === "short" ? tr.shortTicker : (tr.longTicker + "/" + tr.shortTicker);
+    return `- ${tr.name || tick} [${ty}] ${tick}${tr.basketId ? " (im Korb)" : ""}`;
+  }).join("\n") || "- (keine)";
+  const alarms = listActiveAlarms(record);
+  const alarmsCompact = alarms.length ? alarms.map(a => `- ${a.name}: ${a.kind}`).join("\n") : "- (keine)";
+  return `Du bist der Telegram-Assistent von Roberts "Pair Trade Tracker" (private Trading-App). Robert diktiert dir Trades in freiem Deutsch (Diktier-Verschreiber sind normal — interpretiere wohlwollend). Deine Aufgabe: alle Angaben einsammeln, dann eintragen lassen.
+
+REGELN FÜR TICKER UND BÖRSE:
+- Firmennamen per search_symbol auflösen. Default ist IMMER der Ticker der HEIMBÖRSE des Unternehmens (deutsches Unternehmen → Xetra/.DE, UK → .L, Frankreich → .PA, Niederlande → .AS, Schweiz → .SW, Italien → .MI, Spanien → .MC, US → NYSE/NASDAQ-Listing ohne Suffix). Nur wenn Robert explizit eine andere Börse nennt, diese nehmen.
+- Bei Mehrdeutigkeit (mehrere plausible Unternehmen) kurz nachfragen mit nummerierten Optionen — nie raten.
+- entryCurrency bleibt null (= Notierungswährung der Heimbörse, Roberts Default), außer Robert nennt explizit eine andere Währung.
+
+REGELN FÜR ZAHLEN:
+- Zahlen NIE raten oder korrigieren. Bei fehlenden Pflichtangaben so lange nachfragen, bis Robert eine konkrete Antwort gibt — freundlich hartnäckig, eine gezielte Frage pro Nachricht. Es gibt nur zwei Ausgänge: vollständiger Eintrag oder Abbruch (cancel nur wenn Robert explizit abbrechen will).
+- Plausibilität mit get_quote prüfen: weicht der genannte Einstand grob vom aktuellen Kurs ab (z.B. Faktor 10 — typischer Diktierfehler), nachfragen. Verlust-Schwelle als Kurs muss bei Long UNTER, bei Short ÜBER dem aktuellen Kurs liegen (sonst würde sie sofort feuern) — bei Verstoß nachfragen.
+
+PFLICHTFELDER: type (pair/long/short); je nach Typ Ticker, Stückzahl und Einstandskurs pro Leg. Optional (nicht nachbohren, nur aufnehmen wenn genannt): Verlust-/Gewinn-Schwelle (% oder Kurs; bei Pair nur %), Squeeze-Schwelle (nur short/pair), Zielkurs, Name.
+
+ABLAUF:
+1. Solange Pflichtangaben fehlen → action "ask".
+2. Alles da → action "propose": vollständige Zusammenfassung ALLER Felder (Typ, Ticker+Börse, Stückzahl, Einstand+Währung, alle Schwellen, Zielkurs) + Hinweis: mit "ok" bestätigen oder Änderungen nennen.
+3. Robert bestätigt ("ok", "ja", "passt", "go" o.ä.) NACH einer Zusammenfassung → action "save" (der Worker trägt den gespeicherten Draft ein — nichts mehr ändern).
+4. Robert will nach der Zusammenfassung etwas ändern → Änderung in den Draft einarbeiten → erneut "propose" mit neuer kompletter Zusammenfassung.
+5. Robert will abbrechen → action "cancel".
+6. Nachricht ist eine Alarm-Quittierung (kurze Bestätigung während aktive Alarme laufen und KEINE Zusammenfassung aussteht, oder Worte wie "quittiert") → action "ack_alarms".
+7. Alles andere (Statusfrage, Smalltalk) → action "reply" (Statusfragen zu Kursen per get_quote beantworten).
+
+WICHTIG: Beende JEDE Antwort mit genau einem emit_action-Aufruf. Bei "ask"/"propose" immer den aktuellen Draft-Zwischenstand mitgeben (bekannte Felder gefüllt, Rest null). Antworte auf ${record.lang === "en" ? "Englisch" : "Deutsch"}, kompakt und ohne Floskeln (Telegram-Chat).
+
+AKTUELLER DIALOG-STATUS: phase=${state.phase}${state.draft ? ", gespeicherter Draft: " + JSON.stringify(state.draft) : ", kein Draft"}
+
+BESTEHENDE TRADES (für Kontext/Statusfragen; gleicher Ticker+Typ wird beim Eintragen automatisch als Tranche zusammengeführt):
+${tradesCompact}
+
+AKTIVE ALARME:
+${alarmsCompact}`;
+}
+
+async function claudeCall(env, system, messages) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": "server-side-fallback-2026-07-01",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 8000,
+      fallbacks: "default",
+      system,
+      messages,
+      tools: BOT_TOOLS
+    })
+  });
+  if (!r.ok) throw new Error("anthropic http " + r.status + ": " + (await r.text()).slice(0, 200));
+  return r.json();
+}
+
+// Kern des Bot-Dialogs: ein User-Text rein, genau eine Telegram-Antwort raus.
+// Tool-Loop: Claude darf search_symbol/get_quote mehrfach nutzen und MUSS mit
+// emit_action enden. propose/save werden worker-seitig validiert; bei Lücken
+// wird der Fehler in den Loop zurückgespielt (Claude fragt dann nach).
+async function botProcessMessage(env, userText, opts = {}) {
+  const { data: record } = await loadTradebook(env);
+  const state = await botLoadState(env);
+  const system = botSystemPrompt(record, state);
+  const messages = [...(state.history || []), { role: "user", content: userText }];
+  let replyText = null;
+
+  for (let round = 0; round < BOT_MAX_LLM_ROUNDS; round++) {
+    const resp = await claudeCall(env, system, messages);
+    if (resp.stop_reason === "refusal") { replyText = "⚠️ Anfrage konnte nicht verarbeitet werden — bitte anders formulieren."; break; }
+    if (resp.stop_reason !== "tool_use") {
+      // Modell hat ohne emit_action geantwortet → Text übernehmen als Fallback
+      replyText = (resp.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim() || "…";
+      break;
+    }
+    const toolResults = [];
+    let terminal = null;
+    for (const block of resp.content) {
+      if (block.type !== "tool_use") continue;
+      if (block.name === "search_symbol") {
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(await botSearchSymbol(block.input.query)) });
+      } else if (block.name === "get_quote") {
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(await botGetQuote(block.input.symbol)) });
+      } else if (block.name === "emit_action") {
+        const a = block.input;
+        if (a.action === "propose") {
+          const missing = botValidateDraft(a.draft);
+          if (missing.length) {
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Draft unvollständig — fehlende Pflichtfelder: " + missing.join(", ") + ". Frage stattdessen nach (action: ask)." });
+            continue;
+          }
+          state.draft = a.draft; state.phase = "awaiting_confirm";
+          terminal = a.text;
+        } else if (a.action === "save") {
+          if (state.phase !== "awaiting_confirm" || !state.draft) {
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Es liegt keine bestätigte Zusammenfassung vor. Erst propose mit vollständigem Draft, dann auf Bestätigung warten." });
+            continue;
+          }
+          // Eintragen — es gilt der GESPEICHERTE Draft (der zuletzt zusammengefasste Stand)
+          try {
+            const info = await botSaveTrade(env, state.draft);
+            state.draft = null; state.phase = "collecting"; state.history = [];
+            await botSaveState(env, state);
+            const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
+            terminal = "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix + (a.text && a.text !== "✅" ? "\n" + a.text : "");
+          } catch (e) {
+            terminal = "❌ Eintragen fehlgeschlagen: " + e.message + "\nDer Entwurf bleibt erhalten — nochmal 'ok' senden zum erneuten Versuch.";
+          }
+        } else if (a.action === "cancel") {
+          await botClearState(env);
+          state.draft = null; state.phase = "collecting"; state.history = [];
+          terminal = a.text || "Abgebrochen — nichts eingetragen.";
+        } else if (a.action === "ack_alarms") {
+          const n = await ackAllActiveAlarms(env, record);
+          terminal = n > 0 ? workerT(record.lang || "de", "ack_received") : (a.text || "Keine aktiven Alarme.");
+        } else { // ask | reply
+          if (a.action === "ask" && a.draft) state.draft = a.draft;
+          if (a.action === "ask") state.phase = "collecting";
+          terminal = a.text;
+        }
+      }
+    }
+    if (terminal != null) { replyText = terminal; break; }
+    // Loop fortsetzen: Assistant-Content + Tool-Results anhängen
+    messages.push({ role: "assistant", content: resp.content });
+    messages.push({ role: "user", content: toolResults });
+  }
+
+  if (replyText == null) replyText = "⚠️ Zu viele Verarbeitungsschritte — bitte die Angabe kompakter formulieren.";
+  // Verlauf fortschreiben (nur Text-Ebene, Tool-Zwischenschritte bleiben ephemer)
+  state.history = [...(state.history || []), { role: "user", content: userText }, { role: "assistant", content: replyText }];
+  await botSaveState(env, state);
+  if (!opts.dryRun) await sendTelegram(env, replyText);
+  return replyText;
+}
+
+async function handleTelegramWebhook(req, env, ctx) {
+  let update; try { update = await req.json(); } catch { return textResponse("bad json", 400); }
+  const m = update.message;
+  if (!m || !m.chat || String(m.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return textResponse("ignored");
+
+  // Bot-Dialog nur mit konfiguriertem ANTHROPIC_API_KEY + Text-Nachricht.
+  // Verarbeitung async via waitUntil — Telegram will schnell ein 200 sehen.
+  if (env.ANTHROPIC_API_KEY && typeof m.text === "string" && m.text.trim()) {
+    const text = m.text.trim();
+    ctx.waitUntil((async () => {
+      try {
+        await botProcessMessage(env, text);
+      } catch (e) {
+        // Claude/API nicht erreichbar → Alarm-Quittierung darf NIE davon abhängen:
+        // Fallback auf Legacy-Verhalten (alles quittieren) wenn Alarme aktiv sind.
+        console.error("bot error:", e.message);
+        try {
+          const { data: record } = await loadTradebook(env);
+          const n = await ackAllActiveAlarms(env, record);
+          const note = "⚠️ Bot momentan nicht erreichbar (" + e.message.slice(0, 80) + ")";
+          await sendTelegram(env, n > 0 ? workerT(record.lang || "de", "ack_received") + "\n" + note : note);
+        } catch {}
+      }
+    })());
+    return textResponse("ok");
+  }
+
+  // Legacy-Pfad (kein API-Key): jede Antwort quittiert alle aktiven Alarme
+  let record, lang = "de";
+  try { const r = await loadTradebook(env); record = r.data; lang = record.lang || "de"; } catch { await sendTelegram(env, workerT(lang, "ack_received")); return textResponse("ok (no record)"); }
+  await ackAllActiveAlarms(env, record);
   await sendTelegram(env, workerT(lang, "ack_received"));
   return textResponse("ok");
 }
@@ -1070,7 +1463,7 @@ export default {
     if (url.pathname === "/" || url.pathname === "") {
       const s = url.searchParams.get("symbol");
       if (s) return yahooProxy(s);
-      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /profile?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST)");
+      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /profile?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST), /bot-test (POST)");
     }
     if (url.pathname === "/profile") {
       const s = url.searchParams.get("symbol");
@@ -1081,7 +1474,18 @@ export default {
     if (url.pathname === "/check-squeeze") { try { return jsonResponse(await runShortSqueezeCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/test-alert") return textResponse(await sendTestAlert(env));
     if (url.pathname === "/setup-webhook") return setupWebhook(req, env);
-    if (url.pathname === "/telegram-webhook" && req.method === "POST") return handleTelegramWebhook(req, env);
+    if (url.pathname === "/telegram-webhook" && req.method === "POST") return handleTelegramWebhook(req, env, ctx);
+    // Bot-Dialog testen ohne Telegram (Bearer SYNC_SECRET): POST /bot-test {"text": "..."}
+    // Antwort kommt als HTTP-Response zurück statt als Telegram-Nachricht (dry-run).
+    if (url.pathname === "/bot-test" && req.method === "POST") {
+      const auth = checkSyncAuth(req, env);
+      if (!auth.ok) return jsonResponse({ error: auth.msg }, 401);
+      if (!env.ANTHROPIC_API_KEY) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 400);
+      let body; try { body = await req.json(); } catch { return jsonResponse({ error: "invalid JSON body" }, 400); }
+      if (!body || typeof body.text !== "string" || !body.text.trim()) return jsonResponse({ error: "missing text" }, 400);
+      try { return jsonResponse({ reply: await botProcessMessage(env, body.text.trim(), { dryRun: true }) }); }
+      catch (e) { return jsonResponse({ error: e.message }, 500); }
+    }
     // Sync-Endpoints für Frontend (ersetzt direkten JSONBin-Zugriff, seit Mai 2026)
     if (url.pathname === "/tradebook" && req.method === "GET")  return handleTradebookGet(req, env);
     if (url.pathname === "/tradebook" && req.method === "POST") return handleTradebookPost(req, env);
