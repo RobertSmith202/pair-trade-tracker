@@ -2,13 +2,15 @@
 
 > Diese Datei beschreibt den User-Workflow für Robert. Für technischen Kontext (Architektur, Design-Entscheidungen, Konventionen) siehe `PROJECT_MEMORY.md`.
 
-## Schritt 1 — Neuen Cowork-Chat starten
+## Schritt 1 — Claude-Code-Session starten (seit Aug 2026 der Standard-Weg)
 
-Sag der neuen Claude-Session als erste Nachricht:
+Claude Code arbeitet direkt auf dem lokalen Klon **`~/git/pair-trade-tracker`** auf dem Mac und **committet + pusht selbstständig** (GitHub-Zugang läuft über `gh`, angemeldet als RobertSmith202). Du musst weder Dateien hochladen noch manuell in GitHub editieren.
 
-> "Hier ist mein Repo: **github.com/RobertSmith202/pair-trade-tracker**. Lies bitte zuerst `PROJECT_MEMORY.md`, dann schau dir den aktuellen Code an. Ich will: [BESCHREIBUNG DER ÄNDERUNG]."
+Sag der neuen Session einfach:
 
-Claude liest dann die Memory-Datei + den aktuellen Code und ist auf dem gleichen Stand wie am Ende der letzten Session. Spart 15-20 Minuten Kontext-Aufbau pro Session.
+> "Arbeite an meinem Pair-Trade-Tracker (`~/git/pair-trade-tracker`). Lies zuerst `PROJECT_MEMORY.md`. Ich will: [BESCHREIBUNG DER ÄNDERUNG]."
+
+Claude liest dann die Memory-Datei + den aktuellen Code und ist auf dem gleichen Stand wie am Ende der letzten Session.
 
 ## Schritt 2 — Je nach Art der Änderung
 
@@ -18,11 +20,9 @@ Claude liest dann die Memory-Datei + den aktuellen Code und ist auf dem gleichen
 
 **Workflow:**
 
-1. Claude schlägt geänderte `index.html` vor
-2. Du gehst in GitHub auf die Datei → Stift-Icon (Edit) → Änderungen einfügen oder die ganze Datei austauschen (Add file → Upload files → gleicher Name überschreibt)
-3. Commit
-4. Cloudflare Pages deployed automatisch in 30-60 Sek (im Pages-Dashboard sichtbar welcher Commit live ist)
-5. Auf iPhone/Mac PWA neu laden → fertig
+1. Claude ändert `index.html` (und ggf. Doku-Dateien), committet und pusht
+2. Cloudflare Pages deployed automatisch in 30-60 Sek (im Pages-Dashboard sichtbar welcher Commit live ist)
+3. Auf iPhone/Mac PWA neu laden → fertig. Du machst nichts außer neu laden.
 
 **Sonderfall localStorage:** Wenn du Datenstruktur änderst (z.B. neues Feld pro Trade), entweder Migration im Code einbauen oder bei dir lokal Settings zurücksetzen. Frag Claude explizit danach.
 
@@ -32,12 +32,12 @@ Claude liest dann die Memory-Datei + den aktuellen Code und ist auf dem gleichen
 
 **Workflow:**
 
-1. Claude schlägt geänderte `cloudflare-worker.js` vor
-2. Du commitest in GitHub
-3. **ZUSÄTZLICH:** Cloudflare-Dashboard → Worker → "Edit Code" → alles markieren (Cmd+A) + löschen → neuen Code aus GitHub einfügen → "Save and Deploy"
+1. Claude ändert `cloudflare-worker.js`, committet und pusht (GitHub bleibt Source of Truth)
+2. Claude schickt dir die **komplette neue Datei** direkt im Chat
+3. **DU:** Cloudflare-Dashboard → Worker → "Edit Code" → alles markieren (Cmd+A) + löschen → neuen Code einfügen → "Save and Deploy"
 4. Testen: `/test-alert` aufrufen, sollte Telegram-Nachricht kommen
 
-**Wichtig:** Schritt 3 nie vergessen, sonst läuft Cloudflare auf alter Version während GitHub neue hat (Drift).
+**Wichtig:** Schritt 3 nie vergessen, sonst läuft Cloudflare auf alter Version während GitHub neue hat (Drift). Das ist der einzige verbliebene manuelle Schritt im ganzen Workflow.
 
 ### C) Telegram-Bot-Identität / Beschreibung / Avatar
 
@@ -140,7 +140,9 @@ Nach jeder Änderung:
 
 ## Schritt 4 — Bei Bugs: Rollback
 
-GitHub ermöglicht Rollback ohne Code-Verständnis:
+**Einfachster Weg:** der nächsten Claude-Session sagen „mach den letzten Commit rückgängig" — sie revertet und pusht, Pages deployed automatisch.
+
+**Manuell** ermöglicht GitHub Rollback ohne Code-Verständnis:
 
 - Repo öffnen → oben Tab **"Commits"** (oder einfach auf den letzten Commit-Eintrag klicken)
 - Den vorletzten guten Commit finden
@@ -159,7 +161,7 @@ Drei Wege je nach Schwere:
 
 3. **HTML = nur GitHub**, Rest läuft automatisch.
 
-4. **PROJECT_MEMORY.md aktuell halten.** Wenn substanzielle Architektur-Änderung passiert (neuer Endpoint, neues Sync-Feld, etc.) Memory-Datei entsprechend updaten. Auch das geht über GitHub-Edit.
+4. **ALLE Doku-Dateien aktuell halten.** Bei jeder substanziellen Änderung updated Claude im selben Commit auch `PROJECT_MEMORY.md`, diese Datei und die README, falls betroffen (Roberts explizite Anforderung seit Aug 2026: alle Files im Repo müssen immer up to date sein).
 
 5. **Secrets gehören nie ins Repo.** Telegram-Token, JSONBin-Master-Key etc. immer nur in Cloudflare-Secrets bzw. App-Settings (localStorage). Niemals in eine Datei schreiben die nach GitHub geht.
 

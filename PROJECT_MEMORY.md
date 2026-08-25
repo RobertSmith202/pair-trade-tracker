@@ -187,7 +187,7 @@ Implementiert in `freezeDurationMs(totalWrongAttempts)`. Zähler `wrongAttempts`
 
 ### Bekannte Grenzen / explizit dokumentierte Schwächen
 
-Da das Repo privat ist, hier transparent die Schwachstellen:
+Hier transparent die Schwachstellen (bewusst auch im inzwischen öffentlichen Repo dokumentiert — sie beschreiben nur, was ein Angreifer mit physischem Geräte-Zugriff ohnehin sieht, keine Fernangriffs-Vektoren):
 
 1. **Pure UI-Sperre, keine Datenverschlüsselung.** Trades liegen unverschlüsselt in `localStorage`. Wer Safari-Developer-Tools öffnet (Mac angeschlossen + Web-Inspector), kommt direkt an die Daten ran, ohne den Lock-Screen passieren zu müssen.
 
@@ -884,8 +884,9 @@ Beim Hinzufügen neuer UI-Strings: in DE und EN einpflegen. DE als Fallback wenn
 - Schreibt Deutsch, versteht aber EN-Begriffe in Code (Variablen, etc.).
 - Setup ist: iPhone als primäres Mobile-Gerät, Mac als Desktop. Beide nutzen die selbe Cloudflare-Pages-URL.
 - Telegram-Alarms müssen zuverlässig sein — das ist der Hauptgrund für das ganze Setup, nicht nur die Live-Anzeige.
-- Robert pullt die fertigen Dateien aus dem `outputs`-Ordner und committed sie selbst auf GitHub. Manuelle GitHub-Bearbeitung außerhalb der Cowork-Sessions findet nicht statt.
-- Repo ist privat — wir können in Dokumentation und Code-Kommentaren transparent über Sicherheits-Grenzen sein, ohne diese einem Angreifer zu offenbaren.
+- **Workflow seit Aug 2026:** Claude Code arbeitet direkt auf dem lokalen Klon `~/git/pair-trade-tracker` (Mac) und committet + pusht selbstständig (via `gh`, Account RobertSmith202). Robert macht nur noch: PWA neu laden (HTML-Änderungen) bzw. Worker-Code ins Cloudflare-Dashboard pasten (Worker-Änderungen — Claude schickt die komplette Datei im Chat). Der frühere Weg (Dateien aus `outputs`-Ordner manuell über die GitHub-Web-UI committen) ist Geschichte.
+- **Alle Repo-Dateien müssen immer up to date sein** (Roberts explizite Anforderung): Bei jeder Änderung gehören betroffene Doku-Files (`PROJECT_MEMORY.md`, `HOW_TO_CHANGE.md`, `README.md`) mit in denselben Commit.
+- Repo ist seit Aug 2026 **öffentlich** (github.com/RobertSmith202/pair-trade-tracker). Konsequenzen: niemals Secrets, Chat-IDs oder persönliche Daten in Dateien schreiben, die ins Repo gehen. Die transparent dokumentierten Sicherheits-Grenzen der App-Sperre bleiben trotzdem drin — sie beschreiben nur, was ein Angreifer mit Geräte-Zugriff ohnehin sieht, und verraten nichts, was Fernangriffe ermöglicht.
 
 ---
 
@@ -893,7 +894,7 @@ Beim Hinzufügen neuer UI-Strings: in DE und EN einpflegen. DE als Fallback wenn
 
 Du bist jetzt informiert genug um Änderungen vorzunehmen. Empfohlenes Vorgehen:
 
-1. Den aktuellen Stand des Codes via WebFetch oder Upload anschauen (Robert lädt typischerweise `index.html`, `cloudflare-worker.js` und diese `PROJECT_MEMORY.md` hoch)
+1. Den aktuellen Stand des Codes im lokalen Klon `~/git/pair-trade-tracker` anschauen (vorher `git pull`, falls die Session älter ist) — Uploads oder WebFetch sind nicht mehr nötig
 2. Bei Architektur-Änderungen: prüfe ob bestehende Konventionen (State-Machine, Pfadunabhängigkeit, Tranche-Modell, Trade-Typ-Isolation, Pct/Preis-Mode, Lock-Boot-Reihenfolge, **Layout-Mode-Branching in scrollToPage, max-width-Constraint auf `.page > *`**) tangiert werden
 3. Bei API-Contract-Änderungen zwischen App und Worker: beide Seiten gleichzeitig anpassen, Worker zuerst deployen
 4. Bei neuen sensiblen Daten (z.B. weitere Credentials): überlege, ob sie an Worker/Bot exponiert sein dürfen. Lock-Settings und alles Lock-bezogene bleibt rein clientseitig.
