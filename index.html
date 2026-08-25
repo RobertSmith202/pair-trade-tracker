@@ -1352,6 +1352,9 @@ html[data-privacy="on"] .ds-status-value {
 .ds-action-privacy { padding: 12px 12px; font-size: 14px; margin-top: 2px; }
 #ds-privacy.active { color: var(--info); border-color: var(--info); background: rgba(21,101,192,0.08); }
 
+/* App-Versions-Anzeige (Menü-Sheet + Desktop-Sidebar-Footer) */
+.app-version-line { margin-top: 8px; font-size: 10px; color: var(--muted); text-align: center; opacity: 0.7; font-variant-numeric: tabular-nums; }
+
 /* ============ Watchlist-Page ============ */
 .watch-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
 .watch-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; }
@@ -1535,6 +1538,7 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
   <div class="ds-spacer"></div>
   <div class="ds-footer">
     <button class="ds-action ds-action-ghost" id="ds-settings" data-i18n="ds_settings_btn" type="button">⚙ Einstellungen</button>
+    <div class="app-version-line">v<span class="app-version-value"></span></div>
   </div>
 </aside>
 
@@ -1940,6 +1944,7 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
     <button id="m-clear" class="danger" data-i18n="menu_clear_all">Alle Trades löschen</button>
     <h4></h4>
     <button id="m-close" data-i18n="btn_close">Schließen</button>
+    <div class="app-version-line">App-Version: <span class="app-version-value"></span></div>
   </div>
 </div>
 
@@ -2738,6 +2743,10 @@ let currentBasketId = null;          // Welcher Basket aktuell im Basket-Modal s
 let tradeFormBasketContext = null;   // Wenn gesetzt: nächstes openForm() bindet Trade an diesen Basket
 let syncDebounce = null;
 
+// Sichtbare App-Version (Menü + Sidebar) — bei jeder HTML-Änderung hochzählen.
+// Zweck: zweifelsfrei erkennen, ob eine PWA noch eine alte Version aus dem
+// Cache lädt (der Sync-Clobber-Vorfall Aug 2026 war genau das, unentdeckbar).
+const APP_VERSION = "2026-08-26.1";
 const PAGES = ["pair", "long", "short", "watch", "total"];
 let currentPage = "pair";
 let formType = "pair";
@@ -6515,6 +6524,7 @@ document.getElementById("lock-new").addEventListener("input", updateLockUiState)
 document.getElementById("lock-confirm").addEventListener("input", updateLockUiState);
 document.getElementById("lock-apply-btn").addEventListener("click", applyLockChange);
 setInterval(setAutoStatus, 60000);
+document.querySelectorAll(".app-version-value").forEach(el => { el.textContent = APP_VERSION; });
 
 // ============ Drag & Drop-Engine: Umsortieren + in einen Korb ziehen ============
 // Apple-Interaktion: auf Touch hebt ein Long-Press (350ms ohne Bewegung) die Karte
