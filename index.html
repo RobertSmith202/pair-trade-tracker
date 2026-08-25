@@ -2723,6 +2723,10 @@ let trades = [];
 let baskets = []; // Long-/Short-Körbe; Trade.basketId verweist hierauf. Pair-Trades haben keine Körbe.
 let watchlist = [];   // Watchlist-Einträge: { id, ticker, name, side: "long"|"short", levelAbove, levelBelow, created, updated }
 let watchStates = {}; // Einmal-Alarm-States pro Eintrag: { above: {state, lastAlertAt}, below: {...} } — schreibt primär der Worker
+// Merge-Sync v2: lokal gelöschte IDs (Trades/Baskets/Watchlist) bis zum nächsten
+// erfolgreichen Push sammeln. Der Worker mergt per ID — ohne explizite Lösch-IDs
+// würde ein gelöschter Eintrag vom Server-Stand wieder auferstehen.
+let deletedIds = [];
 let alertStates = {};
 let localLastModified = 0;
 let syncSettings = loadSyncSettings();
@@ -3383,11 +3387,13 @@ function migrateTrades() {
 }
 
 function loadStorage() {
-  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; baskets = Array.isArray(p.baskets) ? p.baskets : []; alertStates = p.alertStates || {}; watchlist = Array.isArray(p.watchlist) ? p.watchlist : []; watchStates = p.watchStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; baskets = Array.isArray(p.baskets) ? p.baskets : []; alertStates = p.alertStates || {}; watchlist = Array.isArray(p.watchlist) ? p.watchlist : []; watchStates = p.watchStates || {}; deletedIds = Array.isArray(p.deletedIds) ? p.deletedIds : []; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
   try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; baskets = []; watchlist = []; watchStates = {}; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
   trades = []; baskets = []; alertStates = {}; watchlist = []; watchStates = {}; localLastModified = 0;
 }
-function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, baskets, alertStates, watchlist, watchStates, lastModified: localLastModified })); }
+function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, baskets, alertStates, watchlist, watchStates, deletedIds, lastModified: localLastModified })); }
+// Lokale Löschung fürs Merge-Protokoll vormerken (Cap gegen unbegrenztes Wachstum)
+function recordDeletion(id) { if (id && !deletedIds.includes(id)) { deletedIds.push(id); if (deletedIds.length > 300) deletedIds = deletedIds.slice(-300); } }
 function markLocalChange() { localLastModified = Date.now(); persistLocal(); scheduleSyncPush(); }
 
 function fmtMoney(n, c) { if (n == null || !isFinite(n)) return "—"; try { return new Intl.NumberFormat("de-DE", { style: "currency", currency: c || homeCurrency, maximumFractionDigits: 2 }).format(n); } catch { return n.toFixed(2) + " " + (c || homeCurrency); } }
@@ -3603,6 +3609,14 @@ async function syncPull() {
       alertStates = remote.alertStates || {};
       watchlist = Array.isArray(remote.watchlist) ? remote.watchlist : [];
       watchStates = remote.watchStates || {};
+      // Noch nicht gepushte lokale Löschungen respektieren — sonst erscheinen
+      // gerade gelöschte Einträge bis zum nächsten Push wieder in der UI
+      if (deletedIds.length) {
+        const dset = new Set(deletedIds);
+        trades = trades.filter(x => !dset.has(x.id));
+        baskets = baskets.filter(x => !dset.has(x.id));
+        watchlist = watchlist.filter(x => !dset.has(x.id));
+      }
       localLastModified = remoteMod;
       migrateTrades();
       persistLocal(); render();
@@ -3628,7 +3642,11 @@ async function syncPush() {
     let remoteStates = alertStates;
     let remoteWatchStates = watchStates;
     try { const remote = await tradebookPull(); remoteStates = remote.alertStates || alertStates; remoteWatchStates = remote.watchStates || watchStates; } catch {}
-    await tradebookPush({ trades, baskets, alertStates: remoteStates, watchlist, watchStates: remoteWatchStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
+    // Merge-Sync v2: Worker führt per ID zusammen — fehlende Einträge sind keine
+    // Löschung mehr (Fix für "App überschreibt Bot-Einträge"), gelöscht wird nur
+    // was explizit in _deletedIds steht.
+    await tradebookPush({ trades, baskets, alertStates: remoteStates, watchlist, watchStates: remoteWatchStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile", _mergeV2: true, _deletedIds: deletedIds });
+    deletedIds = [];
     alertStates = remoteStates;
     watchStates = remoteWatchStates;
     persistLocal();
@@ -5385,6 +5403,7 @@ function deleteBasket(basketId) {
   baskets = baskets.filter(x => x.id !== basketId);
   // Alarm-State des Baskets löschen
   if (alertStates[basketId]) delete alertStates[basketId];
+  recordDeletion(basketId);
   markLocalChange();
   closeBasketModal();
   render();
@@ -5422,6 +5441,7 @@ function moveTradeToBasket(tradeId, basketId) {
     matching.updated = Date.now();
     trades = trades.filter(x => x.id !== tr.id);
     if (alertStates[tr.id]) delete alertStates[tr.id];
+    recordDeletion(tr.id);
     b.updated = Date.now();
     markLocalChange(); render();
     setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 150);
@@ -5573,6 +5593,7 @@ function deleteWatchEntry(id) {
   if (!confirm(t("watch_delete_confirm", { name: w.name || w.ticker }))) return;
   watchlist = watchlist.filter(x => x.id !== id);
   if (watchStates[id]) delete watchStates[id];
+  recordDeletion(id);
   markLocalChange();
   render();
 }
@@ -5832,6 +5853,7 @@ function deleteTrade(id) {
   if (!confirm(t("card_delete_confirm", { name: dispName }))) return;
   trades = trades.filter(x => x.id !== id);
   if (alertStates[id]) delete alertStates[id];
+  recordDeletion(id);
   markLocalChange(); render();
 }
 function deleteTranche(tradeId, trancheId) {
@@ -5840,7 +5862,7 @@ function deleteTranche(tradeId, trancheId) {
   if (!confirm(t("tranche_delete_confirm"))) return;
   tr.tranches = tr.tranches.filter(t => t.id !== trancheId);
   tr.updated = Date.now();
-  if (tr.tranches.length === 0) { trades = trades.filter(x => x.id !== tradeId); if (alertStates[tradeId]) delete alertStates[tradeId]; }
+  if (tr.tranches.length === 0) { trades = trades.filter(x => x.id !== tradeId); if (alertStates[tradeId]) delete alertStates[tradeId]; recordDeletion(tradeId); }
   markLocalChange(); refreshAll(true);
 }
 

@@ -676,6 +676,18 @@ Yahoo's `defaultKeyStatistics` füllt `shortPercentOfFloat` zuverlässig nur fü
 
 **Worker-Endpoint zum manuellen Testen:** `GET /check-squeeze` (analog zu `/check`).
 
+### Merge-Sync v2 (seit Aug 2026) — Fix für Bot-Einträge-Clobbering
+
+**Vorfall:** Der alte Sync war Last-Write-Wins übers KOMPLETTE Buch. Der Bot schrieb Watchlist-Einträge serverseitig; danach pushte eine App mit neuerem `lastModified` (aber ohne die Bot-Einträge, weil nie gepullt) ihr ganzes Buch — die Bot-Einträge waren weg, auf allen Geräten.
+
+**Fix:** Neue Clients senden `_mergeV2: true` + `_deletedIds` im Push; der Worker (`mergeBooks` in `handleTradebookPost`) führt dann feldweise zusammen:
+- `trades`/`baskets`/`watchlist`: **Union per ID** — fehlende Einträge sind KEINE Löschung mehr. Pro Eintrag gewinnt das neuere `updated`. Die **Array-Reihenfolge** (Drag&Drop-Sortierung) kommt von der Seite mit dem neueren `lastModified`, die andere Seite steuert nur fehlende Einträge bei (hinten angehängt).
+- **Löschen nur noch explizit:** Die App sammelt gelöschte IDs in `deletedIds` (localStorage, Cap 300; `recordDeletion()` in deleteTrade/deleteTranche/deleteBasket/deleteWatchEntry/moveTradeToBasket-Merge), schickt sie als `_deletedIds` mit und leert die Liste nach erfolgreichem Push. `syncPull` filtert noch nicht gepushte Löschungen aus dem adoptierten Remote-Stand (sonst UI-Wiederauferstehung bis zum Push).
+- States: Union, Client-Stand gewinnt für mitgeschickte IDs; `_deletedIds` räumen auch alertStates/watchStates ab.
+- `lastModified` des Merge-Ergebnisses = `max(server, incoming, now)` → alle Clients konvergieren beim nächsten Pull auf den gemergten Stand.
+
+**Rückwärtskompatibilität:** Pushes OHNE `_mergeV2` (alte HTML-Versionen) bleiben LWW — deren Löschungen sind implizit (fehlender Eintrag) und dürfen nicht als „fehlt nur" fehlinterpretiert werden. Deployment-Reihenfolge wie immer Worker zuerst; Übergangsphase alter Worker + neue HTML ist unschädlich (weiter LWW, `_mergeV2`-Felder landen als harmlose Extra-Keys im Record und werden vom neuen Worker beim ersten Merge entfernt).
+
 ### Sync-Migration: JSONBin → Cloudflare KV (Mai 2026)
 
 **Auslöser:** JSONBin Free-Tier-Quota (10k Requests/Monat) wurde wiederholt überschritten, dabei stoppte der Worker-Alarm-Cron stillschweigend. Robert verpasste einen Loss-Alarm der hätte feuern müssen. Architektur-Single-Point-of-Failure JSONBin wurde komplett entfernt — Worker-eigenes Cloudflare-KV ist seit Mai 2026 die alleinige Wahrheits-Quelle für Trade-Daten.

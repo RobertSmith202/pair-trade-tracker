@@ -459,6 +459,51 @@ async function handleTradebookGet(req, env) {
   }
 }
 
+// === Merge-Sync v2 (seit Aug 2026) =========================================
+// Hintergrund: Der alte Sync war Last-Write-Wins übers KOMPLETTE Buch. Folge:
+// Eine App mit veraltetem lokalen Stand konnte per Push serverseitige Einträge
+// stillschweigend löschen — konkret passiert mit per Bot angelegten Watchlist-
+// Einträgen (App pushte ihre leere Watchlist drüber). Fix: Clients senden
+// `_mergeV2: true` + `_deletedIds` — der Worker führt dann feldweise zusammen:
+//   • trades/baskets/watchlist: Union per ID; pro Eintrag gewinnt das neuere
+//     `updated`. Die ARRAY-REIHENFOLGE (Drag&Drop-Sortierung!) kommt von der
+//     Seite mit dem neueren lastModified; die andere Seite steuert nur fehlende
+//     Einträge bei (hinten angehängt).
+//   • Löschen läuft NUR noch über explizite _deletedIds (App sammelt sie beim
+//     Löschen und leert die Liste nach erfolgreichem Push) — fehlende Einträge
+//     im Push sind KEINE Löschung mehr.
+//   • States: Union, Client-Stand gewinnt für IDs die er mitschickt.
+// Alte Clients ohne _mergeV2 bekommen das bisherige LWW-Verhalten (sonst würden
+// deren echte Löschungen als "fehlt nur" fehlinterpretiert und auferstehen).
+function mergeBooks(server, incoming) {
+  const del = new Set(Array.isArray(incoming._deletedIds) ? incoming._deletedIds : []);
+  const incomingNewer = (incoming.lastModified || 0) >= (server.lastModified || 0);
+  const mergeArr = (srvArr, incArr) => {
+    const srv = Array.isArray(srvArr) ? srvArr : [];
+    const inc = Array.isArray(incArr) ? incArr : [];
+    const [base, other] = incomingNewer ? [inc, srv] : [srv, inc];
+    const map = new Map();
+    for (const x of base) { if (x && x.id && !del.has(x.id)) map.set(x.id, x); }
+    for (const x of other) {
+      if (!x || !x.id || del.has(x.id)) continue;
+      const prev = map.get(x.id);
+      if (!prev) { map.set(x.id, x); continue; }               // fehlte auf der Base-Seite → retten
+      if ((x.updated || 0) > (prev.updated || 0)) map.set(x.id, x); // inhaltlich neuer gewinnt
+    }
+    return [...map.values()];
+  };
+  const merged = { ...server, ...incoming };
+  merged.trades    = mergeArr(server.trades, incoming.trades);
+  merged.baskets   = mergeArr(server.baskets, incoming.baskets);
+  merged.watchlist = mergeArr(server.watchlist, incoming.watchlist);
+  merged.alertStates = { ...(server.alertStates || {}), ...(incoming.alertStates || {}) };
+  merged.watchStates = { ...(server.watchStates || {}), ...(incoming.watchStates || {}) };
+  for (const id of del) { delete merged.alertStates[id]; delete merged.watchStates[id]; }
+  merged.lastModified = Math.max(server.lastModified || 0, incoming.lastModified || 0, Date.now());
+  delete merged._deletedIds; delete merged._mergeV2;
+  return merged;
+}
+
 // POST /tradebook — Frontend pushed hier her statt zu JSONBin.
 async function handleTradebookPost(req, env) {
   const auth = checkSyncAuth(req, env);
@@ -471,8 +516,13 @@ async function handleTradebookPost(req, env) {
     return jsonResponse({ error: "body must be an object" }, 400);
   }
   try {
-    const result = await saveTradebook(env, body);
-    return jsonResponse({ ok: true, source: result.source });
+    let toSave = body;
+    if (body._mergeV2) {
+      const server = (await loadTradebook(env)).data || {};
+      toSave = mergeBooks(server, body);
+    }
+    const result = await saveTradebook(env, toSave);
+    return jsonResponse({ ok: true, source: result.source, merged: !!body._mergeV2, lastModified: toSave.lastModified });
   } catch (e) {
     return jsonResponse({ error: e.message }, 500);
   }
