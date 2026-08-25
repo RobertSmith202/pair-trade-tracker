@@ -45,6 +45,10 @@ const WORKER_STRINGS = {
     profit_ack_prompt:"→ Antworte mit beliebigem Text, um den Gewinn-Alarm zu bestätigen (Wiederholung alle 30 Min)",
     squeeze_ack_prompt:"→ Antworte mit beliebigem Text, um den Squeeze-Alarm zu quittieren (Wiederholung 1× pro Tag)",
     ack_received:"✅ Alarm bestätigt",
+    watch_title:"📡 WATCHLIST",
+    watch_above:"{side} {ticker} hat {level} {ccy} überschritten (aktuell {price} {ccy})",
+    watch_below:"{side} {ticker} hat {level} {ccy} unterschritten (aktuell {price} {ccy})",
+    watch_side_long:"Long-Kandidat", watch_side_short:"Short-Kandidat",
     test_alert:"🧪 Test-Alarm", test_body:"Dies ist ein Test. Antworte um zu bestätigen.",
     fallback_warning_title:"⚠ JSONBin nicht erreichbar — Worker arbeitet aus KV-Cache",
     fallback_warning_body:"Alarme für existierende Trades laufen weiter mit dem letzten bekannten Stand ({age} Min alt). Neue Trades oder geänderte Schwellen sind nicht sichtbar bis JSONBin wieder erreichbar ist. Fehler: {err}"
@@ -62,6 +66,10 @@ const WORKER_STRINGS = {
     profit_ack_prompt:"→ Reply with any text to acknowledge the profit alert (repeats every 30 min)",
     squeeze_ack_prompt:"→ Reply with any text to acknowledge the squeeze alert (repeats 1× per day)",
     ack_received:"✅ Alert acknowledged",
+    watch_title:"📡 WATCHLIST",
+    watch_above:"{side} {ticker} has broken above {level} {ccy} (now {price} {ccy})",
+    watch_below:"{side} {ticker} has broken below {level} {ccy} (now {price} {ccy})",
+    watch_side_long:"Long candidate", watch_side_short:"Short candidate",
     test_alert:"🧪 Test alert", test_body:"This is a test. Reply to acknowledge.",
     fallback_warning_title:"⚠ JSONBin unreachable — worker running from KV cache",
     fallback_warning_body:"Alarms for existing trades continue with the last known snapshot ({age} min old). New trades or threshold changes are not visible until JSONBin is reachable again. Error: {err}"
@@ -382,7 +390,7 @@ function alarmAckWins(mine, theirs) {
     squeeze: pick(mine?.squeeze, theirs.squeeze)
   };
 }
-async function persistAlarmStates(env, computedStates) {
+async function persistAlarmStates(env, computedStates, computedWatchStates = null) {
   const fresh = (await loadTradebook(env)).data || {};
   const freshStates = fresh.alertStates || {};
   // Gültige IDs = Trades + Baskets im FRISCHEN Record. States ohne zugehörige
@@ -401,7 +409,25 @@ async function persistAlarmStates(env, computedStates) {
     if (!validIds.has(id)) continue; // gelöschter Trade → State verwerfen
     merged[id] = alarmAckWins(computedStates[id], freshStates[id]);
   }
-  await saveTradebook(env, { ...fresh, alertStates: merged });
+  const rec = { ...fresh, alertStates: merged };
+  // Watch-States (separates Dict, kein Ack-Konzept): gleiche Merge-Semantik —
+  // frischer Record ist Basis, Cron-Änderungen überlagern, gelöschte Einträge fliegen raus.
+  if (computedWatchStates) {
+    const freshWatch = fresh.watchStates || {};
+    const validWatchIds = new Set(Array.isArray(fresh.watchlist) ? fresh.watchlist.map(w => w.id) : []);
+    const mergedWatch = {};
+    for (const id of Object.keys(freshWatch)) if (validWatchIds.has(id)) mergedWatch[id] = freshWatch[id];
+    for (const id of Object.keys(computedWatchStates)) if (validWatchIds.has(id)) mergedWatch[id] = computedWatchStates[id];
+    rec.watchStates = mergedWatch;
+  }
+  await saveTradebook(env, rec);
+}
+
+// Watch-State-Shape: pro Eintrag zwei unabhängige Einmal-Achsen (above/below).
+function ensureWatchShape(st) {
+  const empty = { state: "idle", lastAlertAt: 0 };
+  if (!st || typeof st !== "object") return { above: { ...empty }, below: { ...empty } };
+  return { above: st.above || { ...empty }, below: st.below || { ...empty } };
 }
 
 // Auth-Check für Frontend-Sync-Endpoints. Erwartet Authorization: Bearer <SYNC_SECRET>.
@@ -992,7 +1018,50 @@ async function runAlarmCheck(env) {
     if (stChanged) { states[bId] = st; stateChanged = true; }
   }
 
-  if (stateChanged) await persistAlarmStates(env, states);
+  // --- Watchlist: Über-/Unterschreitungsgrenzen (seit Aug 2026) ---
+  // Läuft im selben Cron-Takt wie die Trade-Alarme (bei Robert: minütlich zu
+  // Handelszeiten). Einmalige Nachricht pro Kreuzen, edge-getriggert: notified
+  // bleibt stehen bis der Kurs die Grenze wieder verlässt (auto-re-arm), dann
+  // kann das nächste Kreuzen wieder genau eine Nachricht auslösen. Kein Repeat,
+  // keine Quittierung — Watch-States leben separat in record.watchStates.
+  const watchArr = Array.isArray(record.watchlist) ? record.watchlist : [];
+  const wStates = record.watchStates || {};
+  let watchChanged = false;
+  for (const w of watchArr) {
+    if (!w.ticker) continue;
+    const hasAbove = w.levelAbove != null && w.levelAbove !== "";
+    const hasBelow = w.levelBelow != null && w.levelBelow !== "";
+    if (!hasAbove && !hasBelow) continue;
+    let live;
+    try { live = await fetchPriceInternal(w.ticker); }
+    catch (e) { results.push({ id: w.id, kind: "watch", error: e.message }); continue; }
+    const st = ensureWatchShape(wStates[w.id]);
+    const sideLabel = workerT(lang, w.side === "short" ? "watch_side_short" : "watch_side_long");
+    const label = w.name ? (w.name + " (" + w.ticker + ")") : w.ticker;
+    const msgParams = (level) => ({ side: sideLabel, ticker: label, level: Number(level).toFixed(2), price: live.price.toFixed(2), ccy: live.currency || "" });
+    let stChanged = false;
+    if (hasAbove) {
+      const breached = live.price >= Number(w.levelAbove);
+      if (breached && st.above.state === "idle") {
+        await sendTelegram(env, workerT(lang, "watch_title") + "\n\n" + workerT(lang, "watch_above", msgParams(w.levelAbove)));
+        st.above = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id: w.id, kind: "watch-above", action: "notified" });
+      } else if (!breached && st.above.state !== "idle") {
+        st.above = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id: w.id, kind: "watch-above", action: "rearmed" });
+      }
+    }
+    if (hasBelow) {
+      const breached = live.price <= Number(w.levelBelow);
+      if (breached && st.below.state === "idle") {
+        await sendTelegram(env, workerT(lang, "watch_title") + "\n\n" + workerT(lang, "watch_below", msgParams(w.levelBelow)));
+        st.below = { state: "notified", lastAlertAt: now }; stChanged = true; results.push({ id: w.id, kind: "watch-below", action: "notified" });
+      } else if (!breached && st.below.state !== "idle") {
+        st.below = { state: "idle", lastAlertAt: 0 }; stChanged = true; results.push({ id: w.id, kind: "watch-below", action: "rearmed" });
+      }
+    }
+    if (stChanged) { wStates[w.id] = st; watchChanged = true; }
+  }
+
+  if (stateChanged || watchChanged) await persistAlarmStates(env, states, watchChanged ? wStates : null);
   return { ok: true, results };
 }
 

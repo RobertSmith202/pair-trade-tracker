@@ -19,6 +19,7 @@ Persönlicher Long/Short-Trade-Tracker als Single-File-PWA — Pair-, Long-only-
 - Drei Alarm-Typen via Telegram: Verlust-, Gewinn- und Short-Squeeze-Schwellen, edge-getriggert mit Quittierung per Telegram-Reply
 - Trades per Telegram-Chat in freiem Deutsch anlegen (Claude-API-gestützt): Ticker- und Heimbörsen-Auflösung, hartnäckige Rückfragen bei Lücken, Plausibilitätsprüfung gegen Live-Kurse, Eintrag erst nach Bestätigung
 - Zielkurse mit stiller optischer Markierung
+- Watchlist-Page für Long-/Short-Kandidaten mit Über-/Unterschreitungsgrenzen — einmalige Telegram-Meldung beim Kreuzen einer Grenze, automatisches Re-Arm
 - Cross-Device-Sync (iPhone ↔ Mac) über Cloudflare KV
 - Zwei Layout-Modi (Mobile-PWA / Bloomberg-Style-Desktop), drei Themes, DE/EN, optionale App-Sperre
 

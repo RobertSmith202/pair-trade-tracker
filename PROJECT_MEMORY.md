@@ -586,6 +586,15 @@ Die aktuelle Per-Page-Form gewann, weil sie die discoverable-ste und kontextuell
 - Trade aus Korb entfernen: nur via Edit → `basketId` auf null setzen. Für das RAUSziehen aus einem Korb gibt es weiterhin keinen UI-Shortcut (Drag & Drop geht nur in den Korb hinein).
 - Korb löschen: zeigt `confirm()` mit Hinweis dass die enthaltenen Trades zu Standalones werden (deren `basketId` wird auf null gesetzt). Trades selbst werden nicht gelöscht.
 
+### Watchlist mit Über-/Unterschreitungsgrenzen (seit Aug 2026)
+
+Eigene Page **zwischen Shorts und Gesamt** (Roberts Platzierungswunsch; `PAGES = ["pair","long","short","watch","total"]`, Ziffern-Shortcuts jetzt 1–5, Gesamt rutschte von 4 auf 5). Einträge: `{ id: "w_…", ticker, name, side: "long"|"short" (Kandidat-Typ), levelAbove, levelBelow }` — Grenzen in der Notierungswährung des Tickers (analog Preis-Schwellen, kein FX).
+
+- **Datenhaltung:** `watchlist`-Array + separates `watchStates`-Dict (NICHT in `alertStates` — sonst würde `persistAlarmStates` sie als Zombies prunen und der Telegram-Ack würde sie quittieren). Beide müssen in allen vier Storage-Pfaden mitgeführt werden (`loadStorage`, `persistLocal`, `syncPush`, `syncPull`) — gleiche Stolperfalle wie bei `baskets`.
+- **Worker-Check:** hängt am Ende von `runAlarmCheck` → läuft im selben Cron-Takt wie die Trade-Alarme (bei Robert minütlich zu Handelszeiten, inkl. Trading-Hours-Gate). **Einmalige Nachricht, edge-getriggert:** `idle` + Grenze gekreuzt → eine Telegram-Nachricht („📡 WATCHLIST / Short-Kandidat AAPL hat 250,00 USD überschritten (aktuell …)"), State `notified`; Kurs verlässt die Grenze wieder → auto-re-arm auf `idle`. Kein Repeat, keine Quittierung. `ensureWatchShape` = `{above, below}`-Achsen.
+- **Frontend:** `renderWatchList()` (Cards mit Kandidaten-Badge, Live-Kurs, Grenzen-Chips; ausgelöste Grenze leuchtet blau mit ✓), Form `#watch-form` (Ticker, Name, Seite, beide Grenzen; Grenzen-Änderung beim Edit re-armt die betroffene Achse). Watchlist-Ticker werden in `refreshAll` mitgefetcht. Kein Aggregat auf der Page (keine Positionen).
+- **Alte Clients:** Worker/HTML ohne Watchlist-Felder ignorieren sie; Deployment-Reihenfolge wie immer Worker zuerst — ein alter Worker würde beim Cron-Save die `watchStates` schlicht nicht anfassen (aber auch keine Nachrichten schicken).
+
 ### Zwei-Schwellen-Alarm: Verlust + Gewinn
 
 - **Verlust-Schwelle (`alertPctMin`):** Negativwert, intern `-Math.abs(input)`. User gibt im UI nur positive Zahl ein (iOS hat kein Minus auf dem Ziffern-Keyboard). Telegram-Repeat alle 3 Min bis quittiert.

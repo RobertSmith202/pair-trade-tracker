@@ -1352,6 +1352,25 @@ html[data-privacy="on"] .ds-status-value {
 .ds-action-privacy { padding: 12px 12px; font-size: 14px; margin-top: 2px; }
 #ds-privacy.active { color: var(--info); border-color: var(--info); background: rgba(21,101,192,0.08); }
 
+/* ============ Watchlist-Page ============ */
+.watch-list { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; }
+.watch-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; }
+.watch-card.long  { border-left: 4px solid var(--pos); }
+.watch-card.short { border-left: 4px solid var(--neg); }
+.watch-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }
+.watch-side { font-size: 10px; font-weight: 800; letter-spacing: 0.3px; padding: 3px 7px; border-radius: 4px; flex-shrink: 0; text-transform: uppercase; }
+.watch-side.long  { background: var(--pos-soft); color: var(--pos); }
+.watch-side.short { background: var(--neg-soft); color: var(--neg); }
+.watch-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.watch-ticker { font-size: 12px; color: var(--muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.watch-card-row { display: flex; align-items: center; gap: 10px; }
+.watch-price { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 90px; }
+.watch-levels { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; }
+.watch-level { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 3px 8px; border-radius: 5px; border: 1px solid var(--border); color: var(--muted); }
+.watch-level.hit { color: var(--target); border-color: var(--target-edge); background: var(--target-soft); }
+.watch-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+[data-layout="desktop"] .watch-card { padding: 14px 16px; }
+
 /* ============ Drag & Drop: Standalone-Trade in einen Korb ziehen ============ */
 /* Ziehbare Karten: Textauswahl + iOS-Callout aus, sonst kämpft der Long-Press
    gegen die System-Textmarkierung. Eigene transition-Liste inkl. transform,
@@ -1504,7 +1523,8 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
     <button class="ds-nav-btn" data-tab="pair"  type="button"><span class="ds-nav-glyph">⇄</span><span class="ds-nav-label" data-i18n="page_pairs">Paare</span><kbd class="ds-nav-kbd">1</kbd></button>
     <button class="ds-nav-btn" data-tab="long"  type="button"><span class="ds-nav-glyph ds-up">▲</span><span class="ds-nav-label" data-i18n="page_longs">Longs</span><kbd class="ds-nav-kbd">2</kbd></button>
     <button class="ds-nav-btn" data-tab="short" type="button"><span class="ds-nav-glyph ds-down">▼</span><span class="ds-nav-label" data-i18n="page_shorts">Shorts</span><kbd class="ds-nav-kbd">3</kbd></button>
-    <button class="ds-nav-btn" data-tab="total" type="button"><span class="ds-nav-glyph">∑</span><span class="ds-nav-label" data-i18n="page_total">Gesamt</span><kbd class="ds-nav-kbd">4</kbd></button>
+    <button class="ds-nav-btn" data-tab="watch" type="button"><span class="ds-nav-glyph">◎</span><span class="ds-nav-label" data-i18n="page_watch">Watchlist</span><kbd class="ds-nav-kbd">4</kbd></button>
+    <button class="ds-nav-btn" data-tab="total" type="button"><span class="ds-nav-glyph">∑</span><span class="ds-nav-label" data-i18n="page_total">Gesamt</span><kbd class="ds-nav-kbd">5</kbd></button>
   </nav>
   <div class="ds-divider"></div>
   <div class="ds-actions">
@@ -1628,6 +1648,31 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
   <div class="form-actions"><button id="bf-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="bf-save" data-i18n="btn_save">Speichern</button></div>
 </div>
 
+<!-- Watchlist-Form: Eintrag mit Long/Short-Kandidat-Seite + Über-/Unterschreitungsgrenze -->
+<div class="form-card" id="watch-form">
+  <h3 id="watch-form-title" data-i18n="watch_form_title_new">Neuer Watchlist-Eintrag</h3>
+  <div class="field-row">
+    <div class="field"><label data-i18n="watch_form_ticker">Ticker</label><input id="wf-ticker" type="text" autocomplete="off" autocapitalize="characters" placeholder="z.B. AAPL oder SAP.DE"></div>
+    <div class="field"><label data-i18n="watch_form_name">Name (optional)</label><input id="wf-name" type="text" autocomplete="off" data-i18n-placeholder="watch_form_name_ph" placeholder="z.B. Apple"></div>
+  </div>
+  <div class="field">
+    <label data-i18n="watch_form_side">Kandidat für</label>
+    <div class="type-row">
+      <button type="button" class="type-radio watch-side-radio" data-wside="long" data-i18n="watch_side_long">Long-Kandidat</button>
+      <button type="button" class="type-radio watch-side-radio" data-wside="short" data-i18n="watch_side_short">Short-Kandidat</button>
+    </div>
+  </div>
+  <div class="form-section alarm">
+    <h4 data-i18n="watch_form_levels_title">📡 Kurs-Grenzen</h4>
+    <div class="field-row">
+      <div class="field"><label data-i18n="watch_form_above">Überschreitung bei (Kurs ≥)</label><input id="wf-above" type="text" inputmode="decimal" autocomplete="off" placeholder="z.B. 250"></div>
+      <div class="field"><label data-i18n="watch_form_below">Unterschreitung bei (Kurs ≤)</label><input id="wf-below" type="text" inputmode="decimal" autocomplete="off" placeholder="z.B. 200"></div>
+    </div>
+    <div class="help" data-i18n="watch_form_levels_help"></div>
+  </div>
+  <div class="form-actions"><button id="wf-cancel" data-i18n="btn_cancel">Abbrechen</button><button class="primary" id="wf-save" data-i18n="btn_save">Speichern</button></div>
+</div>
+
 <!-- Basket-Modal: Sub-Page eines Korbs mit allen enthaltenen Trades -->
 <div class="basket-modal" id="basket-modal" aria-hidden="true">
   <div class="basket-modal-head">
@@ -1703,6 +1748,13 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
     </div>
     <div class="basket-actions"><button class="btn-new-basket" data-basket-new="short" data-i18n="btn_new_basket" type="button">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="short"></div>
+  </section>
+  <section class="page" data-page="watch">
+    <div class="page-head">
+      <div class="page-title" data-i18n="page_watch">Watchlist</div>
+    </div>
+    <div class="basket-actions"><button class="btn-new-basket" id="btn-new-watch" data-i18n="btn_new_watch" type="button">+ Neuer Watchlist-Eintrag</button></div>
+    <div class="watch-list" id="watch-list"></div>
   </section>
   <section class="page" data-page="total">
     <div class="page-title" data-i18n="page_total">Gesamt</div>
@@ -1873,6 +1925,7 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
   <div class="page-dot active" data-dot="pair"></div>
   <div class="page-dot" data-dot="long"></div>
   <div class="page-dot" data-dot="short"></div>
+  <div class="page-dot" data-dot="watch"></div>
   <div class="page-dot" data-dot="total"></div>
 </div>
 
@@ -2014,6 +2067,7 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
         <option value="pair" data-i18n="page_pairs">Paare</option>
         <option value="long" data-i18n="page_longs">Longs</option>
         <option value="short" data-i18n="page_shorts">Shorts</option>
+        <option value="watch" data-i18n="page_watch">Watchlist</option>
         <option value="total" data-i18n="page_total">Gesamt</option>
       </select>
     </div>
@@ -2063,7 +2117,8 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
         <div class="shortcut-row"><span class="shortcut-keys"><kbd>1</kbd></span><span class="shortcut-desc" data-i18n="page_pairs">Paare</span></div>
         <div class="shortcut-row"><span class="shortcut-keys"><kbd>2</kbd></span><span class="shortcut-desc" data-i18n="page_longs">Longs</span></div>
         <div class="shortcut-row"><span class="shortcut-keys"><kbd>3</kbd></span><span class="shortcut-desc" data-i18n="page_shorts">Shorts</span></div>
-        <div class="shortcut-row"><span class="shortcut-keys"><kbd>4</kbd></span><span class="shortcut-desc" data-i18n="page_total">Gesamt</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>4</kbd></span><span class="shortcut-desc" data-i18n="page_watch">Watchlist</span></div>
+        <div class="shortcut-row"><span class="shortcut-keys"><kbd>5</kbd></span><span class="shortcut-desc" data-i18n="page_total">Gesamt</span></div>
       </section>
       <section class="shortcut-section">
         <h4 data-i18n="shortcut_general_section">Allgemein</h4>
@@ -2086,7 +2141,7 @@ const STRINGS = {
     shortcut_arrows: "Page zurück / weiter",
     shortcut_help: "Diese Hilfe öffnen / schließen",
     shortcut_esc: "Modal / Form schließen",
-    shortcut_note: "Pfeiltasten und Ziffern-Shortcuts funktionieren nur wenn kein Eingabefeld fokussiert ist. <kbd>1</kbd>–<kbd>4</kbd> bewusst ohne Modifier, damit's nicht mit macOS-Screenshots (⌘⇧3/4) oder Browser-Tabs kollidiert.",
+    shortcut_note: "Pfeiltasten und Ziffern-Shortcuts funktionieren nur wenn kein Eingabefeld fokussiert ist. <kbd>1</kbd>–<kbd>5</kbd> bewusst ohne Modifier, damit's nicht mit macOS-Screenshots (⌘⇧3/4) oder Browser-Tabs kollidiert.",
     agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
     agg_notional_current: "aktuell {amt}",
     agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
@@ -2236,6 +2291,19 @@ const STRINGS = {
     scale_small: "Klein", scale_medium: "Mittel", scale_large: "Groß", scale_xl: "Extra-Groß",
     ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Einstellungen",
     privacy_hide: "Beträge verbergen", privacy_show: "Beträge zeigen",
+    page_watch: "Watchlist",
+    btn_new_watch: "+ Neuer Watchlist-Eintrag",
+    watch_form_title_new: "Neuer Watchlist-Eintrag", watch_form_title_edit: "Watchlist-Eintrag bearbeiten",
+    watch_form_ticker: "Ticker", watch_form_name: "Name (optional)", watch_form_name_ph: "z.B. Apple",
+    watch_form_side: "Kandidat für",
+    watch_side_long: "Long-Kandidat", watch_side_short: "Short-Kandidat",
+    watch_form_levels_title: "📡 Kurs-Grenzen",
+    watch_form_above: "Überschreitung bei (Kurs ≥)", watch_form_below: "Unterschreitung bei (Kurs ≤)",
+    watch_form_levels_help: "In der Notierungswährung des Tickers. Beim Kreuzen einer Grenze kommt EINE Telegram-Nachricht (keine Wiederholung, keine Quittierung). Verlässt der Kurs die Grenze wieder, ist sie automatisch neu scharf.",
+    watch_empty: "Noch keine Watchlist-Einträge. Lege Kandidaten mit Kurs-Grenzen an — der Worker meldet einmalig per Telegram, wenn eine Grenze über- oder unterschritten wird.",
+    watch_delete_confirm: "Watchlist-Eintrag „{name}“ löschen?",
+    err_watch_ticker_required: "Ticker fehlt.",
+    err_watch_level_invalid: "Kurs-Grenze: ungültige Zahl. Nur positive Werte, z.B. 250",
     settings_start_page: "Standard-Page", settings_start_page_label: "Standard-Page",
     settings_start_page_info: "Welche Page beim App-Start angezeigt wird. Pro Gerät gespeichert (nicht synced).",
     settings_home_ccy: "Heimat-Währung", settings_home_ccy_label: "ISO-Code (EUR, USD, GBP, CHF, ...)",
@@ -2309,7 +2377,7 @@ const STRINGS = {
     shortcut_arrows: "Previous / next page",
     shortcut_help: "Open / close this help",
     shortcut_esc: "Close modal / form",
-    shortcut_note: "Arrow keys and digit shortcuts only fire when no input is focused. <kbd>1</kbd>–<kbd>4</kbd> deliberately without modifier to avoid conflicts with macOS screenshots (⌘⇧3/4) and browser tabs.",
+    shortcut_note: "Arrow keys and digit shortcuts only fire when no input is focused. <kbd>1</kbd>–<kbd>5</kbd> deliberately without modifier to avoid conflicts with macOS screenshots (⌘⇧3/4) and browser tabs.",
     agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
     agg_notional_current: "now {amt}",
     agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
@@ -2459,6 +2527,19 @@ const STRINGS = {
     scale_small: "Small", scale_medium: "Medium", scale_large: "Large", scale_xl: "Extra-large",
     ds_status_label: "Status", ds_autorefresh_label: "Auto", ds_sync_label: "Sync", ds_settings_btn: "⚙ Settings",
     privacy_hide: "Hide amounts", privacy_show: "Show amounts",
+    page_watch: "Watchlist",
+    btn_new_watch: "+ New watchlist entry",
+    watch_form_title_new: "New watchlist entry", watch_form_title_edit: "Edit watchlist entry",
+    watch_form_ticker: "Ticker", watch_form_name: "Name (optional)", watch_form_name_ph: "e.g. Apple",
+    watch_form_side: "Candidate for",
+    watch_side_long: "Long candidate", watch_side_short: "Short candidate",
+    watch_form_levels_title: "📡 Price levels",
+    watch_form_above: "Break above (price ≥)", watch_form_below: "Break below (price ≤)",
+    watch_form_levels_help: "In the ticker's quote currency. Crossing a level sends ONE Telegram message (no repeat, no acknowledgement). Once the price leaves the level again, it re-arms automatically.",
+    watch_empty: "No watchlist entries yet. Add candidates with price levels — the worker sends a one-time Telegram message when a level is crossed.",
+    watch_delete_confirm: "Delete watchlist entry „{name}“?",
+    err_watch_ticker_required: "Ticker is required.",
+    err_watch_level_invalid: "Price level: invalid number. Positive values only, e.g. 250",
     settings_start_page: "Default page", settings_start_page_label: "Default page",
     settings_start_page_info: "Which page is shown on app start. Stored per device (not synced).",
     settings_home_ccy: "Home currency", settings_home_ccy_label: "ISO code (EUR, USD, GBP, CHF, ...)",
@@ -2640,6 +2721,8 @@ const lastTotalPnlForFlashByAgg = { pair: null, long: null, short: null, total: 
 
 let trades = [];
 let baskets = []; // Long-/Short-Körbe; Trade.basketId verweist hierauf. Pair-Trades haben keine Körbe.
+let watchlist = [];   // Watchlist-Einträge: { id, ticker, name, side: "long"|"short", levelAbove, levelBelow, created, updated }
+let watchStates = {}; // Einmal-Alarm-States pro Eintrag: { above: {state, lastAlertAt}, below: {...} } — schreibt primär der Worker
 let alertStates = {};
 let localLastModified = 0;
 let syncSettings = loadSyncSettings();
@@ -2651,7 +2734,7 @@ let currentBasketId = null;          // Welcher Basket aktuell im Basket-Modal s
 let tradeFormBasketContext = null;   // Wenn gesetzt: nächstes openForm() bindet Trade an diesen Basket
 let syncDebounce = null;
 
-const PAGES = ["pair", "long", "short", "total"];
+const PAGES = ["pair", "long", "short", "watch", "total"];
 let currentPage = "pair";
 let formType = "pair";
 let formAlertMinMode = "pct"; // "pct" | "price"  (per current form session)
@@ -3300,11 +3383,11 @@ function migrateTrades() {
 }
 
 function loadStorage() {
-  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; baskets = Array.isArray(p.baskets) ? p.baskets : []; alertStates = p.alertStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
-  try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; baskets = []; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
-  trades = []; baskets = []; alertStates = {}; localLastModified = 0;
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p.trades) ? p.trades : []; baskets = Array.isArray(p.baskets) ? p.baskets : []; alertStates = p.alertStates || {}; watchlist = Array.isArray(p.watchlist) ? p.watchlist : []; watchStates = p.watchStates || {}; localLastModified = p.lastModified || 0; if (migrateTrades()) persistLocal(); return; } } catch {}
+  try { const raw = localStorage.getItem(STORAGE_KEY_OLD); if (raw) { const p = JSON.parse(raw); trades = Array.isArray(p) ? p : []; baskets = []; watchlist = []; watchStates = {}; localLastModified = Date.now(); migrateTrades(); persistLocal(); return; } } catch {}
+  trades = []; baskets = []; alertStates = {}; watchlist = []; watchStates = {}; localLastModified = 0;
 }
-function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, baskets, alertStates, lastModified: localLastModified })); }
+function persistLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify({ trades, baskets, alertStates, watchlist, watchStates, lastModified: localLastModified })); }
 function markLocalChange() { localLastModified = Date.now(); persistLocal(); scheduleSyncPush(); }
 
 function fmtMoney(n, c) { if (n == null || !isFinite(n)) return "—"; try { return new Intl.NumberFormat("de-DE", { style: "currency", currency: c || homeCurrency, maximumFractionDigits: 2 }).format(n); } catch { return n.toFixed(2) + " " + (c || homeCurrency); } }
@@ -3518,6 +3601,8 @@ async function syncPull() {
       trades = Array.isArray(remote.trades) ? remote.trades : [];
       baskets = Array.isArray(remote.baskets) ? remote.baskets : [];
       alertStates = remote.alertStates || {};
+      watchlist = Array.isArray(remote.watchlist) ? remote.watchlist : [];
+      watchStates = remote.watchStates || {};
       localLastModified = remoteMod;
       migrateTrades();
       persistLocal(); render();
@@ -3525,8 +3610,10 @@ async function syncPull() {
       return { ok: true, updated: true };
     } else if (remoteMod === localLastModified) {
       const remoteStates = remote.alertStates || {};
-      if (JSON.stringify(remoteStates) !== JSON.stringify(alertStates)) {
+      const remoteWatchStates = remote.watchStates || {};
+      if (JSON.stringify(remoteStates) !== JSON.stringify(alertStates) || JSON.stringify(remoteWatchStates) !== JSON.stringify(watchStates)) {
         alertStates = remoteStates;
+        watchStates = remoteWatchStates;
         persistLocal(); render();
       }
     }
@@ -3539,9 +3626,11 @@ async function syncPush() {
   setSyncStatus("loading", t("status_push"));
   try {
     let remoteStates = alertStates;
-    try { const remote = await tradebookPull(); remoteStates = remote.alertStates || alertStates; } catch {}
-    await tradebookPush({ trades, baskets, alertStates: remoteStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
+    let remoteWatchStates = watchStates;
+    try { const remote = await tradebookPull(); remoteStates = remote.alertStates || alertStates; remoteWatchStates = remote.watchStates || watchStates; } catch {}
+    await tradebookPush({ trades, baskets, alertStates: remoteStates, watchlist, watchStates: remoteWatchStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile" });
     alertStates = remoteStates;
+    watchStates = remoteWatchStates;
     persistLocal();
     setSyncStatus("ok", t("status_sync_pushed", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
     return { ok: true };
@@ -4302,6 +4391,7 @@ function render() {
     const aggRows = computeRowsFor(pageTrades);
     updatePageAggregate(pageKey, aggRows);
   }
+  renderWatchList();
   const totalRows = computeRowsFor(trades);
   updatePageAggregate("total", totalRows);
   updateTotalBreakdown();
@@ -4902,6 +4992,7 @@ async function refreshAll(force = false) {
   if (!priceSettings.workerUrl) { status.className = "status err"; status.textContent = t("status_no_worker_url"); return; }
   const tickers = new Set();
   trades.forEach(tr => { if (hasLong(tr)) tickers.add(tr.longTicker.toUpperCase()); if (hasShort(tr)) tickers.add(tr.shortTicker.toUpperCase()); });
+  watchlist.forEach(w => { if (w.ticker) tickers.add(w.ticker.toUpperCase()); });
   const arr = [...tickers]; let errCount = 0;
   for (const tk of arr) { const r = await fetchPrice(tk, force); if (r.error) errCount++; }
   await ensureFxRatesForTrades();
@@ -4916,7 +5007,7 @@ async function refreshAll(force = false) {
 
 function applyFormTypeUI(type) {
   formType = type;
-  document.querySelectorAll(".type-radio").forEach(r => { r.classList.toggle("active", r.getAttribute("data-type") === type); });
+  document.querySelectorAll(".type-radio:not(.watch-side-radio)").forEach(r => { r.classList.toggle("active", r.getAttribute("data-type") === type); });
   const longSec = document.getElementById("form-long-section");
   const shortSec = document.getElementById("form-short-section");
   longSec.style.display = (type === "pair" || type === "long") ? "block" : "none";
@@ -5374,6 +5465,116 @@ function applyPageOrder(orderedIds) {
   trades = result;
   markLocalChange();
   return true;
+}
+
+// === Watchlist: Kandidaten mit Über-/Unterschreitungsgrenzen ===============
+// Eigene Page zwischen Shorts und Gesamt. Der Worker prüft die Grenzen im
+// selben Cron-Takt wie die Trade-Alarme und schickt beim Kreuzen EINE
+// Telegram-Nachricht (edge-getriggert, re-armt sich wenn der Kurs die Grenze
+// wieder verlässt — kein Repeat, keine Quittierung nötig).
+let editingWatchId = null;
+let watchFormSide = "long";
+
+function watchStateOf(id) {
+  const empty = { state: "idle", lastAlertAt: 0 };
+  const st = watchStates[id];
+  if (!st || typeof st !== "object") return { above: { ...empty }, below: { ...empty } };
+  return { above: st.above || { ...empty }, below: st.below || { ...empty } };
+}
+
+function renderWatchList() {
+  const list = document.getElementById("watch-list"); if (!list) return;
+  list.innerHTML = "";
+  if (watchlist.length === 0) {
+    list.innerHTML = `<div class="empty">${t("watch_empty")}</div>`;
+    return;
+  }
+  for (const w of watchlist) {
+    const card = document.createElement("div");
+    card.className = "watch-card " + (w.side === "short" ? "short" : "long");
+    const lp = w.ticker ? PRICE_CACHE.get(w.ticker.toUpperCase()) : null;
+    const px = lp && !lp.error ? lp.price : null;
+    const ccy = lp && !lp.error ? (lp.currency || "") : "";
+    const st = watchStateOf(w.id);
+    const lvl = (val, dir) => {
+      if (val == null || val === "") return "";
+      const hit = dir === "above" ? (st.above.state === "notified") : (st.below.state === "notified");
+      const arrow = dir === "above" ? "▲" : "▼";
+      return `<span class="watch-level${hit ? " hit" : ""}" title="${t(dir === "above" ? "watch_form_above" : "watch_form_below")}">${arrow} ${fmtNum(Number(val), 2)}${hit ? " ✓" : ""}</span>`;
+    };
+    card.innerHTML = `
+      <div class="watch-card-head">
+        <span class="watch-side ${w.side === "short" ? "short" : "long"}">${t(w.side === "short" ? "watch_side_short" : "watch_side_long")}</span>
+        <span class="watch-name">${escapeHtml(w.name || w.ticker || "")}</span>
+        <span class="watch-ticker">${escapeHtml(w.ticker || "")}</span>
+      </div>
+      <div class="watch-card-row">
+        <span class="watch-price">${px != null ? fmtNum(px, 2) + " " + escapeHtml(ccy) : "—"}</span>
+        <div class="watch-levels">${lvl(w.levelAbove, "above")}${lvl(w.levelBelow, "below")}</div>
+        <div class="watch-actions">
+          <button class="icon" data-watch-edit="${w.id}" aria-label="${t("btn_edit")}"><span class="btn-icon">✎</span><span class="btn-label">${t("btn_edit")}</span></button>
+          <button class="icon danger" data-watch-del="${w.id}" aria-label="löschen">×</button>
+        </div>
+      </div>`;
+    card.querySelector("[data-watch-edit]").addEventListener("click", () => openWatchForm(w.id));
+    card.querySelector("[data-watch-del]").addEventListener("click", () => deleteWatchEntry(w.id));
+    list.appendChild(card);
+  }
+}
+
+function applyWatchSideUI(side) {
+  watchFormSide = side === "short" ? "short" : "long";
+  document.querySelectorAll(".watch-side-radio").forEach(r => r.classList.toggle("active", r.getAttribute("data-wside") === watchFormSide));
+}
+
+function openWatchForm(id = null) {
+  editingWatchId = id;
+  const w = id ? watchlist.find(x => x.id === id) : null;
+  document.getElementById("watch-form-title").textContent = t(id ? "watch_form_title_edit" : "watch_form_title_new");
+  document.getElementById("wf-ticker").value = w ? (w.ticker || "") : "";
+  document.getElementById("wf-name").value = w ? (w.name || "") : "";
+  document.getElementById("wf-above").value = w && w.levelAbove != null ? String(w.levelAbove).replace(".", ",") : "";
+  document.getElementById("wf-below").value = w && w.levelBelow != null ? String(w.levelBelow).replace(".", ",") : "";
+  applyWatchSideUI(w ? w.side : "long");
+  document.getElementById("watch-form").classList.add("open");
+}
+function closeWatchForm() { document.getElementById("watch-form").classList.remove("open"); editingWatchId = null; }
+
+function saveWatchForm() {
+  const ticker = document.getElementById("wf-ticker").value.trim().toUpperCase();
+  if (!ticker) { alert(t("err_watch_ticker_required")); return; }
+  const name = document.getElementById("wf-name").value.trim() || null;
+  const aboveRaw = document.getElementById("wf-above").value.trim();
+  const belowRaw = document.getElementById("wf-below").value.trim();
+  let levelAbove = null, levelBelow = null;
+  if (aboveRaw) { const p = parseDecimal(aboveRaw); if (!isFinite(p) || p <= 0) { alert(t("err_watch_level_invalid")); return; } levelAbove = p; }
+  if (belowRaw) { const p = parseDecimal(belowRaw); if (!isFinite(p) || p <= 0) { alert(t("err_watch_level_invalid")); return; } levelBelow = p; }
+  const now = Date.now();
+  if (editingWatchId) {
+    const w = watchlist.find(x => x.id === editingWatchId); if (!w) { closeWatchForm(); return; }
+    // Geänderte Grenze (oder anderer Ticker) re-armt ihre Alarm-Achse — die
+    // einmalige Nachricht soll für die neue Grenze wieder feuern können.
+    const st = watchStateOf(w.id);
+    if (String(w.levelAbove ?? "") !== String(levelAbove ?? "") || w.ticker !== ticker) st.above = { state: "idle", lastAlertAt: 0 };
+    if (String(w.levelBelow ?? "") !== String(levelBelow ?? "") || w.ticker !== ticker) st.below = { state: "idle", lastAlertAt: 0 };
+    watchStates[w.id] = st;
+    w.ticker = ticker; w.name = name; w.side = watchFormSide; w.levelAbove = levelAbove; w.levelBelow = levelBelow; w.updated = now;
+  } else {
+    watchlist.push({ id: "w_" + now + "_" + Math.floor(Math.random() * 10000), ticker, name, side: watchFormSide, levelAbove, levelBelow, created: now, updated: now });
+  }
+  markLocalChange();
+  closeWatchForm();
+  render();          // sofort anzeigen — refreshAll kann bei fehlender Worker-URL früh abbrechen
+  refreshAll(true);  // Kurs für den (ggf. neuen) Ticker nachladen
+}
+
+function deleteWatchEntry(id) {
+  const w = watchlist.find(x => x.id === id); if (!w) return;
+  if (!confirm(t("watch_delete_confirm", { name: w.name || w.ticker }))) return;
+  watchlist = watchlist.filter(x => x.id !== id);
+  if (watchStates[id]) delete watchStates[id];
+  markLocalChange();
+  render();
 }
 
 // Builds a minimal trade-shaped object from the in-flight form values, suitable
@@ -5843,6 +6044,10 @@ document.getElementById("f-save").addEventListener("click", saveForm);
 // Basket-Form-Buttons
 document.getElementById("bf-cancel").addEventListener("click", closeBasketForm);
 document.getElementById("bf-save").addEventListener("click", saveBasketForm);
+document.getElementById("btn-new-watch").addEventListener("click", () => openWatchForm(null));
+document.getElementById("wf-cancel").addEventListener("click", closeWatchForm);
+document.getElementById("wf-save").addEventListener("click", saveWatchForm);
+document.querySelectorAll(".watch-side-radio").forEach(r => r.addEventListener("click", () => applyWatchSideUI(r.getAttribute("data-wside"))));
 
 // Per-Page „+ Neuer Korb"-Buttons (direkt auf der Long-/Short-Page)
 document.querySelectorAll("[data-basket-new]").forEach(btn => {
@@ -6054,6 +6259,8 @@ document.querySelectorAll(".scale-card[data-scale-choice]").forEach(card => {
         return;
       }
       // Fallthrough: erst Form, dann Basket-Modal, dann Settings (analog Reihenfolge im UI)
+      const watchFormEl = document.getElementById("watch-form");
+      if (watchFormEl && watchFormEl.classList.contains("open")) { e.preventDefault(); closeWatchForm(); return; }
       const formOpen = document.querySelector(".form-card.open");
       if (formOpen) { e.preventDefault(); closeForm(); return; }
       const basketForm = document.getElementById("basket-form");
@@ -6075,7 +6282,7 @@ document.querySelectorAll(".scale-card[data-scale-choice]").forEach(card => {
     // Plain 1..4 → direkter Page-Sprung. Ohne Modifier um OS-Konflikte zu vermeiden
     // (Cmd+Shift+3/4 = macOS Screenshot, Cmd+1..n = Browser-Tabs).
     if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !isTypingTarget(e.target)) {
-      const map = { "1": "pair", "2": "long", "3": "short", "4": "total" };
+      const map = { "1": "pair", "2": "long", "3": "short", "4": "watch", "5": "total" };
       const tp = map[e.key];
       if (tp && !isAnyOverlayOpen()) {
         e.preventDefault();
