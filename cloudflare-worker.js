@@ -1160,8 +1160,8 @@ const BOT_MAX_LLM_ROUNDS = 6;              // Tool-Loop-Deckel pro Webhook-Aufru
 const CLAUDE_MODEL = "claude-haiku-4-5";
 
 async function botLoadState(env) {
-  try { return (await env.TRADEBOOK_CACHE.get(BOT_STATE_KEY, { type: "json" })) || { history: [], draft: null, phase: "collecting" }; }
-  catch { return { history: [], draft: null, phase: "collecting" }; }
+  try { return (await env.TRADEBOOK_CACHE.get(BOT_STATE_KEY, { type: "json" })) || { history: [], draft: null, watchDraft: null, phase: "collecting" }; }
+  catch { return { history: [], draft: null, watchDraft: null, phase: "collecting" }; }
 }
 async function botSaveState(env, state) {
   state.history = (state.history || []).slice(-BOT_MAX_HISTORY);
@@ -1227,6 +1227,21 @@ const BOT_DRAFT_SCHEMA = {
   required: ["type", "name", "longTicker", "shortTicker", "longQty", "longEntry", "shortQty", "shortEntry", "entryCurrency", "lossPct", "lossPrice", "profitPct", "profitPrice", "squeezePct", "longTarget", "shortTarget"]
 };
 
+// Watchlist-Entwurf für emit_action: Kandidat mit Kurs-Grenzen. remove=true
+// löscht den Eintrag mit diesem Ticker (nach Bestätigung).
+const BOT_WATCH_SCHEMA = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  properties: {
+    ticker:     { type: ["string", "null"] },
+    name:       { type: ["string", "null"] },
+    side:       { type: ["string", "null"], description: "long | short — Kandidat-Typ, Pflicht" },
+    levelAbove: { type: ["number", "null"], description: "Überschreitungsgrenze (Kurs ≥), in Notierungswährung des Tickers" },
+    levelBelow: { type: ["number", "null"], description: "Unterschreitungsgrenze (Kurs ≤)" },
+    remove:     { type: ["boolean", "null"], description: "true = Eintrag mit diesem Ticker von der Watchlist löschen" }
+  }
+};
+
 const BOT_TOOLS = [
   {
     name: "search_symbol",
@@ -1247,7 +1262,8 @@ const BOT_TOOLS = [
       properties: {
         action: { type: "string", enum: ["ask", "propose", "save", "cancel", "ack_alarms", "reply"] },
         text: { type: "string", description: "Nachricht an den User. Bei propose: die vollständige Zusammenfassung aller Felder plus Hinweis, mit 'ok' zu bestätigen oder Änderungen zu nennen." },
-        draft: BOT_DRAFT_SCHEMA
+        draft: BOT_DRAFT_SCHEMA,
+        watch: BOT_WATCH_SCHEMA
       },
       required: ["action", "text", "draft"]
     }
@@ -1275,6 +1291,62 @@ function botValidateDraft(d) {
     if (!(d.shortEntry > 0)) missing.push("shortEntry");
   }
   return missing;
+}
+
+// Watchlist-Entwurf validieren (worker-seitig, analog botValidateDraft).
+function botValidateWatch(w) {
+  const missing = [];
+  if (!w || typeof w !== "object") return ["kompletter Watchlist-Entwurf"];
+  if (!w.ticker) missing.push("ticker");
+  if (w.remove) return missing; // Löschen braucht nur den Ticker
+  if (w.side !== "long" && w.side !== "short") missing.push("side (long/short)");
+  if (w.levelAbove == null && w.levelBelow == null) missing.push("mindestens eine Grenze (levelAbove/levelBelow)");
+  return missing;
+}
+
+// Watchlist-Eintrag anlegen/aktualisieren/löschen. Gleicher Ticker = Update
+// (geänderte Grenzen re-armen ihre Alarm-Achse), remove=true = löschen.
+async function botSaveWatch(env, w) {
+  const now = Date.now();
+  const fresh = (await loadTradebook(env)).data || {};
+  const list = Array.isArray(fresh.watchlist) ? fresh.watchlist : [];
+  const wStates = fresh.watchStates || {};
+  const tick = String(w.ticker).toUpperCase();
+  const existing = list.find(x => (x.ticker || "").toUpperCase() === tick);
+  let info;
+  if (w.remove) {
+    if (!existing) return { notFound: true };
+    fresh.watchlist = list.filter(x => x !== existing);
+    if (wStates[existing.id]) delete wStates[existing.id];
+    info = { removed: true };
+  } else if (existing) {
+    const st = ensureWatchShape(wStates[existing.id]);
+    if (w.levelAbove != null && String(existing.levelAbove ?? "") !== String(w.levelAbove)) st.above = { state: "idle", lastAlertAt: 0 };
+    if (w.levelBelow != null && String(existing.levelBelow ?? "") !== String(w.levelBelow)) st.below = { state: "idle", lastAlertAt: 0 };
+    wStates[existing.id] = st;
+    if (w.levelAbove != null) existing.levelAbove = w.levelAbove;
+    if (w.levelBelow != null) existing.levelBelow = w.levelBelow;
+    if (w.side === "long" || w.side === "short") existing.side = w.side;
+    if (w.name) existing.name = w.name;
+    existing.updated = now;
+    fresh.watchlist = list;
+    info = { updated: true };
+  } else {
+    list.push({ id: "w_" + now + "_" + Math.floor(Math.random() * 10000), ticker: tick, name: w.name || null, side: w.side, levelAbove: w.levelAbove ?? null, levelBelow: w.levelBelow ?? null, created: now, updated: now });
+    fresh.watchlist = list;
+    info = { created: true };
+  }
+  fresh.watchStates = wStates;
+  fresh.lastModified = now;
+  await saveTradebook(env, fresh);
+  return info;
+}
+
+function botWatchResultText(info) {
+  if (info.notFound) return "⚠️ Kein Watchlist-Eintrag mit diesem Ticker gefunden.";
+  if (info.removed) return "🗑 Watchlist-Eintrag gelöscht — verschwindet beim nächsten Sync aus der App.";
+  if (info.updated) return "✅ Watchlist-Eintrag aktualisiert — geänderte Grenzen sind wieder scharf.";
+  return "✅ Auf die Watchlist gesetzt — erscheint beim nächsten Sync in der App.";
 }
 
 // Baut aus dem bestätigten Draft einen Trade im App-Datenmodell und schreibt ihn
@@ -1358,6 +1430,9 @@ function botSystemPrompt(record, state) {
   }).join("\n") || "- (keine)";
   const alarms = listActiveAlarms(record);
   const alarmsCompact = alarms.length ? alarms.map(a => `- ${a.name}: ${a.kind}`).join("\n") : "- (keine)";
+  const watchCompact = (Array.isArray(record.watchlist) ? record.watchlist : []).map(w =>
+    `- ${w.name || w.ticker} [${w.side}] ${w.ticker}${w.levelAbove != null ? " ≥" + w.levelAbove : ""}${w.levelBelow != null ? " ≤" + w.levelBelow : ""}`
+  ).join("\n") || "- (leer)";
   return `Du bist der Telegram-Assistent von Roberts "Pair Trade Tracker" (private Trading-App). Robert diktiert dir Trades in freiem Deutsch (Diktier-Verschreiber sind normal — interpretiere wohlwollend). Deine Aufgabe: alle Angaben einsammeln, dann eintragen lassen.
 
 REGELN FÜR TICKER UND BÖRSE:
@@ -1372,6 +1447,12 @@ REGELN FÜR ZAHLEN:
 
 PFLICHTFELDER: type (pair/long/short); je nach Typ Ticker, Stückzahl und Einstandskurs pro Leg. Optional (nicht nachbohren, nur aufnehmen wenn genannt): Verlust-/Gewinn-Schwelle (% oder Kurs; bei Pair nur %), Squeeze-Schwelle (nur short/pair), Zielkurs, Name.
 
+WATCHLIST (zweiter Eintrags-Typ neben Trades):
+- Robert kann Kandidaten beobachten lassen: "setz X auf die Watchlist", "beobachte X als Short-Kandidat, meld dich bei 250" o.ä. → gleicher Ablauf wie bei Trades, aber mit dem watch-Feld von emit_action statt draft.
+- Pflicht: ticker (Heimbörsen-Regel wie oben), side (long/short — wenn unklar, nachfragen) und MINDESTENS eine Grenze: levelAbove (Meldung bei Kurs ≥) und/oder levelBelow (Meldung bei Kurs ≤), in der Notierungswährung des Tickers. Beide Grenzen zusammen = Korridor.
+- Die Meldung beim Kreuzen ist einmalig (kein Repeat, re-armt automatisch) — das kannst du in der Zusammenfassung kurz erwähnen.
+- Gleicher Ticker schon auf der Watchlist → propose als Update (nur genannte Felder ändern sich). Löschen ("nimm X von der Watchlist") → watch mit ticker + remove:true, ebenfalls erst propose ("Eintrag X löschen — ok?"), dann save.
+
 ABLAUF:
 1. Solange Pflichtangaben fehlen → action "ask".
 2. Alles da → action "propose": vollständige Zusammenfassung ALLER Felder (Typ, Ticker+Börse, Stückzahl, Einstand+Währung, alle Schwellen, Zielkurs) + Hinweis: mit "ok" bestätigen oder Änderungen nennen.
@@ -1383,10 +1464,13 @@ ABLAUF:
 
 WICHTIG: Beende JEDE Antwort mit genau einem emit_action-Aufruf. Bei "ask"/"propose" immer den aktuellen Draft-Zwischenstand mitgeben (bekannte Felder gefüllt, Rest null). Antworte auf ${record.lang === "en" ? "Englisch" : "Deutsch"}, kompakt und ohne Floskeln (Telegram-Chat).
 
-AKTUELLER DIALOG-STATUS: phase=${state.phase}${state.draft ? ", gespeicherter Draft: " + JSON.stringify(state.draft) : ", kein Draft"}
+AKTUELLER DIALOG-STATUS: phase=${state.phase}${state.draft ? ", gespeicherter Trade-Draft: " + JSON.stringify(state.draft) : ""}${state.watchDraft ? ", gespeicherter Watch-Draft: " + JSON.stringify(state.watchDraft) : ""}${!state.draft && !state.watchDraft ? ", kein Draft" : ""}
 
 BESTEHENDE TRADES (für Kontext/Statusfragen; gleicher Ticker+Typ wird beim Eintragen automatisch als Tranche zusammengeführt):
 ${tradesCompact}
+
+WATCHLIST AKTUELL:
+${watchCompact}
 
 AKTIVE ALARME:
 ${alarmsCompact}`;
@@ -1442,31 +1526,48 @@ async function botProcessMessage(env, userText, opts = {}) {
       } else if (block.name === "emit_action") {
         const a = block.input;
         if (a.action === "propose") {
-          const missing = botValidateDraft(a.draft);
-          if (missing.length) {
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Draft unvollständig — fehlende Pflichtfelder: " + missing.join(", ") + ". Frage stattdessen nach (action: ask)." });
-            continue;
+          // Zwei Entwurfs-Typen: Trade (draft) oder Watchlist-Eintrag (watch)
+          if (a.watch && a.watch.ticker) {
+            const missing = botValidateWatch(a.watch);
+            if (missing.length) {
+              toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Watchlist-Entwurf unvollständig — fehlend: " + missing.join(", ") + ". Frage stattdessen nach (action: ask)." });
+              continue;
+            }
+            state.watchDraft = a.watch; state.draft = null; state.phase = "awaiting_confirm";
+            terminal = a.text;
+          } else {
+            const missing = botValidateDraft(a.draft);
+            if (missing.length) {
+              toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Draft unvollständig — fehlende Pflichtfelder: " + missing.join(", ") + ". Frage stattdessen nach (action: ask)." });
+              continue;
+            }
+            state.draft = a.draft; state.watchDraft = null; state.phase = "awaiting_confirm";
+            terminal = a.text;
           }
-          state.draft = a.draft; state.phase = "awaiting_confirm";
-          terminal = a.text;
         } else if (a.action === "save") {
-          if (state.phase !== "awaiting_confirm" || !state.draft) {
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Es liegt keine bestätigte Zusammenfassung vor. Erst propose mit vollständigem Draft, dann auf Bestätigung warten." });
+          if (state.phase !== "awaiting_confirm" || (!state.draft && !state.watchDraft)) {
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Es liegt keine bestätigte Zusammenfassung vor. Erst propose mit vollständigem Entwurf, dann auf Bestätigung warten." });
             continue;
           }
-          // Eintragen — es gilt der GESPEICHERTE Draft (der zuletzt zusammengefasste Stand)
+          // Eintragen — es gilt der GESPEICHERTE Entwurf (der zuletzt zusammengefasste Stand)
           try {
-            const info = await botSaveTrade(env, state.draft);
-            state.draft = null; state.phase = "collecting"; state.history = [];
+            let doneText;
+            if (state.watchDraft) {
+              doneText = botWatchResultText(await botSaveWatch(env, state.watchDraft));
+            } else {
+              const info = await botSaveTrade(env, state.draft);
+              const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
+              doneText = "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix;
+            }
+            state.draft = null; state.watchDraft = null; state.phase = "collecting"; state.history = [];
             await botSaveState(env, state);
-            const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
-            terminal = "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix + (a.text && a.text !== "✅" ? "\n" + a.text : "");
+            terminal = doneText + (a.text && a.text !== "✅" ? "\n" + a.text : "");
           } catch (e) {
             terminal = "❌ Eintragen fehlgeschlagen: " + e.message + "\nDer Entwurf bleibt erhalten — nochmal 'ok' senden zum erneuten Versuch.";
           }
         } else if (a.action === "cancel") {
           await botClearState(env);
-          state.draft = null; state.phase = "collecting"; state.history = [];
+          state.draft = null; state.watchDraft = null; state.phase = "collecting"; state.history = [];
           terminal = a.text || "Abgebrochen — nichts eingetragen.";
         } else if (a.action === "ack_alarms") {
           const n = await ackAllActiveAlarms(env, record);
@@ -1511,19 +1612,24 @@ async function handleTelegramWebhook(req, env, ctx) {
         if (BOT_ACK_WORDS.has(normed)) {
           const state = await botLoadState(env);
           const { data: record } = await loadTradebook(env);
-          if (state.phase === "awaiting_confirm" && state.draft) {
-            const draft = state.draft;
+          if (state.phase === "awaiting_confirm" && (state.draft || state.watchDraft)) {
             try {
-              const info = await botSaveTrade(env, draft);
+              let doneText;
+              if (state.watchDraft) {
+                doneText = botWatchResultText(await botSaveWatch(env, state.watchDraft));
+              } else {
+                const info = await botSaveTrade(env, state.draft);
+                const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
+                doneText = "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix;
+              }
               await botClearState(env);
-              const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
-              await sendTelegram(env, "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix);
+              await sendTelegram(env, doneText);
             } catch (e2) {
               await sendTelegram(env, "❌ Eintragen fehlgeschlagen: " + e2.message + "\nDer Entwurf bleibt erhalten — nochmal 'ok' senden zum erneuten Versuch.");
             }
             return;
           }
-          const dialogActive = (state.history && state.history.length > 0) || state.draft;
+          const dialogActive = (state.history && state.history.length > 0) || state.draft || state.watchDraft;
           if (!dialogActive && listActiveAlarms(record).length > 0) {
             await ackAllActiveAlarms(env, record);
             await sendTelegram(env, workerT(record.lang || "de", "ack_received"));
