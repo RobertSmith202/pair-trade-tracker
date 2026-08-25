@@ -1085,7 +1085,10 @@ const BOT_STATE_KEY = "bot_state:v1";
 const BOT_STATE_TTL_SECONDS = 24 * 3600;   // Dialog-Kontext lebt max. 24h
 const BOT_MAX_HISTORY = 24;                // gespeicherte Chat-Nachrichten (user+bot)
 const BOT_MAX_LLM_ROUNDS = 6;              // Tool-Loop-Deckel pro Webhook-Aufruf
-const CLAUDE_MODEL = "claude-opus-5";
+// Haiku statt Opus: ~1/5 der Kosten (~2–5 Cent pro kompletter Trade-Eintragung).
+// Roberts explizite Wahl (Aug 2026). Falls das Verstehen mal zu schwach wird:
+// hier auf "claude-opus-5" zurückstellen und Worker neu deployen.
+const CLAUDE_MODEL = "claude-haiku-4-5";
 
 async function botLoadState(env) {
   try { return (await env.TRADEBOOK_CACHE.get(BOT_STATE_KEY, { type: "json" })) || { history: [], draft: null, phase: "collecting" }; }

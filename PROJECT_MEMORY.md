@@ -780,7 +780,7 @@ Pro Page wählbar zwischen kompakten Listenzeilen oder ausführlichen Cards mit 
 
 ## Telegram-Bot-Dialog: Trades per Chat anlegen (seit Aug 2026)
 
-Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; der Worker versteht sie mit der Claude API (`claude-opus-5`, raw fetch — kein SDK, weil Single-File-Paste ohne Build-Step) und trägt sie nach Bestätigung ins KV-Tradebook ein. Feature-Gate: Secret `ANTHROPIC_API_KEY` — ohne den Key verhält sich der Webhook exakt wie früher (jede Antwort quittiert Alarme).
+Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; der Worker versteht sie mit der Claude API (`claude-haiku-4-5` — Roberts explizite Kosten-Wahl statt Opus, ~2–5 Cent pro Trade-Eintragung; raw fetch — kein SDK, weil Single-File-Paste ohne Build-Step) und trägt sie nach Bestätigung ins KV-Tradebook ein. Feature-Gate: Secret `ANTHROPIC_API_KEY` — ohne den Key verhält sich der Webhook exakt wie früher (jede Antwort quittiert Alarme).
 
 **Ablauf (von Robert exakt so festgelegt):**
 1. Freitext rein → Claude extrahiert Felder, löst Firmennamen via `search_symbol` (Yahoo-Suche) auf. **Default: Ticker der Heimbörse** (DE→.DE, UK→.L, FR→.PA, NL→.AS, CH→.SW, US→US-Listing), andere Börse nur auf explizite Ansage. **Default-Währung: Notierungswährung der Heimbörse** (`entryNative: true`), explizite Währung nur wenn genannt.
@@ -792,7 +792,7 @@ Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; d
 
 **Alarm-Quittierung bleibt ausfallsicher:** Claude entscheidet die Intention (kurze Bestätigung bei aktiven Alarmen ohne ausstehende Zusammenfassung → ack). Wenn die Claude API down ist, fällt der Webhook auf das Legacy-Verhalten zurück (alles quittieren + Fehlerhinweis) — Quittieren darf nie von Anthropic-Verfügbarkeit abhängen.
 
-**Kosten:** ~1–3 Cent pro Trade-Dialog (Opus 5). **Kosten-Kurzschluss:** Eindeutige Ein-Wort-Bestätigungen (`BOT_ACK_WORDS`: ok/ja/passt/quittiert/👍 …) verarbeitet der Worker ohne Claude-Aufruf — Zusammenfassung bestätigen (deterministisches Eintragen des gespeicherten Drafts) und Alarm-Quittierung (nur wenn kein Dialog aktiv ist, sonst könnte „ja" die Antwort auf eine Bot-Frage sein) sind damit kostenlos. Ausgehende Alarm-Nachrichten kosten grundsätzlich nichts (kein Claude im Alarm-Pfad). `POST /bot-test` (Bearer SYNC_SECRET, `{"text": "..."}`) testet den Dialog ohne Telegram (dry-run, Antwort als HTTP-Response).
+**Kosten:** ~2–5 Cent pro kompletter Trade-Eintragung (Haiku 4.5; mit Opus 5 wären es ~10–25 Cent). **Kosten-Kurzschluss:** Eindeutige Ein-Wort-Bestätigungen (`BOT_ACK_WORDS`: ok/ja/passt/quittiert/👍 …) verarbeitet der Worker ohne Claude-Aufruf — Zusammenfassung bestätigen (deterministisches Eintragen des gespeicherten Drafts) und Alarm-Quittierung (nur wenn kein Dialog aktiv ist, sonst könnte „ja" die Antwort auf eine Bot-Frage sein) sind damit kostenlos. Ausgehende Alarm-Nachrichten kosten grundsätzlich nichts (kein Claude im Alarm-Pfad). `POST /bot-test` (Bearer SYNC_SECRET, `{"text": "..."}`) testet den Dialog ohne Telegram (dry-run, Antwort als HTTP-Response).
 
 ---
 
