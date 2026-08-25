@@ -3595,6 +3595,7 @@ async function tradebookPull() {
 async function tradebookPush(payload) {
   const res = await fetch(tradebookEndpointUrl(), { method: "POST", headers: tradebookHeaders(), body: JSON.stringify(payload) });
   if (!res.ok) { const txt = await res.text().catch(() => ""); throw new Error("HTTP " + res.status + (txt ? ": " + txt.slice(0, 80) : "")); }
+  try { return await res.json(); } catch { return null; }
 }
 
 async function syncPull() {
@@ -3645,10 +3646,25 @@ async function syncPush() {
     // Merge-Sync v2: Worker führt per ID zusammen — fehlende Einträge sind keine
     // Löschung mehr (Fix für "App überschreibt Bot-Einträge"), gelöscht wird nur
     // was explizit in _deletedIds steht.
-    await tradebookPush({ trades, baskets, alertStates: remoteStates, watchlist, watchStates: remoteWatchStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile", _mergeV2: true, _deletedIds: deletedIds });
+    const pushResp = await tradebookPush({ trades, baskets, alertStates: remoteStates, watchlist, watchStates: remoteWatchStates, lastModified: localLastModified, lang: currentLang || "de", _device: "mobile", _mergeV2: true, _deletedIds: deletedIds });
     deletedIds = [];
-    alertStates = remoteStates;
-    watchStates = remoteWatchStates;
+    // Der Worker antwortet mit dem MERGE-ERGEBNIS → direkt übernehmen. Damit
+    // konvergiert die App in einem Zyklus auf die Server-Wahrheit (inkl. vom Bot
+    // geretteter Einträge), unabhängig von lastModified-Vergleichen beim Pull.
+    if (pushResp && pushResp.data && typeof pushResp.data === "object") {
+      const d = pushResp.data;
+      trades = Array.isArray(d.trades) ? d.trades : trades;
+      baskets = Array.isArray(d.baskets) ? d.baskets : baskets;
+      watchlist = Array.isArray(d.watchlist) ? d.watchlist : watchlist;
+      alertStates = d.alertStates || remoteStates;
+      watchStates = d.watchStates || remoteWatchStates;
+      localLastModified = d.lastModified || localLastModified;
+      migrateTrades();
+      render();
+    } else {
+      alertStates = remoteStates;
+      watchStates = remoteWatchStates;
+    }
     persistLocal();
     setSyncStatus("ok", t("status_sync_pushed", { time: new Date().toLocaleTimeString("de-DE", {hour:"2-digit",minute:"2-digit"}) }));
     return { ok: true };

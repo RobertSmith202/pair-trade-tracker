@@ -30,6 +30,9 @@ function isFastCron(cronStr) {
 const TRADING_START_HOUR = 9;
 const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
+// Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
+// damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
+const WORKER_VERSION = "2026-08-26.1";
 
 const WORKER_STRINGS = {
   de: {
@@ -522,9 +525,38 @@ async function handleTradebookPost(req, env) {
       toSave = mergeBooks(server, body);
     }
     const result = await saveTradebook(env, toSave);
-    return jsonResponse({ ok: true, source: result.source, merged: !!body._mergeV2, lastModified: toSave.lastModified });
+    // Bei Merge-Clients: das Merge-ERGEBNIS zurückgeben — die App übernimmt es
+    // direkt und konvergiert damit in einem einzigen Push/Antwort-Zyklus auf die
+    // Server-Wahrheit (robust auch gegen Geräteuhr-Abweichungen, die den
+    // lastModified-Vergleich beim Pull austricksen könnten).
+    return jsonResponse({ ok: true, source: result.source, merged: !!body._mergeV2, lastModified: toSave.lastModified, data: body._mergeV2 ? toSave : undefined });
   } catch (e) {
     return jsonResponse({ error: e.message }, 500);
+  }
+}
+
+// GET /sync-info — öffentliche Diagnose OHNE Inhalte: nur Zähler, Zeitstempel
+// und Worker-Version. Beantwortet die zwei Dauerfragen "welche Version läuft?"
+// und "was hält der Server gerade?" ohne SYNC_SECRET.
+async function handleSyncInfo(env) {
+  try {
+    const { data, source } = await loadTradebook(env);
+    return jsonResponse({
+      version: WORKER_VERSION,
+      source,
+      lastModified: data.lastModified || 0,
+      ageSeconds: data.lastModified ? Math.round((Date.now() - data.lastModified) / 1000) : null,
+      counts: {
+        trades: Array.isArray(data.trades) ? data.trades.length : 0,
+        baskets: Array.isArray(data.baskets) ? data.baskets.length : 0,
+        watchlist: Array.isArray(data.watchlist) ? data.watchlist.length : 0,
+        alertStates: data.alertStates ? Object.keys(data.alertStates).length : 0,
+        watchStates: data.watchStates ? Object.keys(data.watchStates).length : 0
+      },
+      withinTradingHours: isWithinTradingHours()
+    });
+  } catch (e) {
+    return jsonResponse({ version: WORKER_VERSION, error: e.message }, 500);
   }
 }
 
@@ -1725,13 +1757,14 @@ export default {
     if (url.pathname === "/" || url.pathname === "") {
       const s = url.searchParams.get("symbol");
       if (s) return yahooProxy(s);
-      return textResponse("Pair Trade Tracker Worker — endpoints: /?symbol=, /profile?symbol=, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST), /bot-test (POST)");
+      return textResponse("Pair Trade Tracker Worker v" + WORKER_VERSION + " — endpoints: /?symbol=, /profile?symbol=, /sync-info, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST), /bot-test (POST)");
     }
     if (url.pathname === "/profile") {
       const s = url.searchParams.get("symbol");
       if (!s) return jsonResponse({ error: "missing symbol" }, 400);
       return handleProfile(s, env);
     }
+    if (url.pathname === "/sync-info") return handleSyncInfo(env);
     if (url.pathname === "/check") { try { return jsonResponse(await runAlarmCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/check-squeeze") { try { return jsonResponse(await runShortSqueezeCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/test-alert") return textResponse(await sendTestAlert(env));
