@@ -1135,7 +1135,7 @@ const BOT_DRAFT_SCHEMA = {
   type: ["object", "null"],
   additionalProperties: false,
   properties: {
-    type:          { type: ["string", "null"], enum: ["pair", "long", "short", null] },
+    type:          { type: ["string", "null"], description: "pair | long | short" },
     name:          { type: ["string", "null"] },
     longTicker:    { type: ["string", "null"] },
     shortTicker:   { type: ["string", "null"] },
@@ -1168,8 +1168,7 @@ const BOT_TOOLS = [
   },
   {
     name: "emit_action",
-    description: "MUSS als letzter Schritt jeder Antwort aufgerufen werden. Beendet den Zug mit genau einer Aktion Richtung User.",
-    strict: true,
+    description: "MUSS als letzter Schritt jeder Antwort aufgerufen werden. Beendet den Zug mit genau einer Aktion Richtung User. Alle draft-Felder immer mitgeben, unbekannte als null.",
     input_schema: {
       type: "object",
       additionalProperties: false,
@@ -1326,19 +1325,17 @@ async function claudeCall(env, system, messages) {
     headers: {
       "x-api-key": env.ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
-      "anthropic-beta": "server-side-fallback-2026-07-01",
       "content-type": "application/json"
     },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
       max_tokens: 8000,
-      fallbacks: "default",
       system,
       messages,
       tools: BOT_TOOLS
     })
   });
-  if (!r.ok) throw new Error("anthropic http " + r.status + ": " + (await r.text()).slice(0, 200));
+  if (!r.ok) throw new Error("anthropic http " + r.status + ": " + (await r.text()).slice(0, 400));
   return r.json();
 }
 
@@ -1469,7 +1466,7 @@ async function handleTelegramWebhook(req, env, ctx) {
         try {
           const { data: record } = await loadTradebook(env);
           const n = await ackAllActiveAlarms(env, record);
-          const note = "⚠️ Bot momentan nicht erreichbar (" + e.message.slice(0, 80) + ")";
+          const note = "⚠️ Bot momentan nicht erreichbar (" + e.message.slice(0, 300) + ")";
           await sendTelegram(env, n > 0 ? workerT(record.lang || "de", "ack_received") + "\n" + note : note);
         } catch {}
       }
