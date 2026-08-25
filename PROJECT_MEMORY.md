@@ -792,7 +792,7 @@ Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; d
 
 **Alarm-Quittierung bleibt ausfallsicher:** Claude entscheidet die Intention (kurze Bestätigung bei aktiven Alarmen ohne ausstehende Zusammenfassung → ack). Wenn die Claude API down ist, fällt der Webhook auf das Legacy-Verhalten zurück (alles quittieren + Fehlerhinweis) — Quittieren darf nie von Anthropic-Verfügbarkeit abhängen.
 
-**Kosten:** ~1–3 Cent pro Trade-Dialog (Opus 5). `POST /bot-test` (Bearer SYNC_SECRET, `{"text": "..."}`) testet den Dialog ohne Telegram (dry-run, Antwort als HTTP-Response).
+**Kosten:** ~1–3 Cent pro Trade-Dialog (Opus 5). **Kosten-Kurzschluss:** Eindeutige Ein-Wort-Bestätigungen (`BOT_ACK_WORDS`: ok/ja/passt/quittiert/👍 …) verarbeitet der Worker ohne Claude-Aufruf — Zusammenfassung bestätigen (deterministisches Eintragen des gespeicherten Drafts) und Alarm-Quittierung (nur wenn kein Dialog aktiv ist, sonst könnte „ja" die Antwort auf eine Bot-Frage sein) sind damit kostenlos. Ausgehende Alarm-Nachrichten kosten grundsätzlich nichts (kein Claude im Alarm-Pfad). `POST /bot-test` (Bearer SYNC_SECRET, `{"text": "..."}`) testet den Dialog ohne Telegram (dry-run, Antwort als HTTP-Response).
 
 ---
 

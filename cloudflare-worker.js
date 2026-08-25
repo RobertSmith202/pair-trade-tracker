@@ -1073,6 +1073,14 @@ function listActiveAlarms(record) {
 // neu zusammengefasst. Ausgang ist binär: Eintrag oder kein Eintrag.
 // Feature ist nur aktiv wenn Secret ANTHROPIC_API_KEY gesetzt ist — ohne den Key
 // verhält sich der Webhook exakt wie früher (jede Antwort quittiert Alarme).
+// Eindeutige Kurz-Bestätigungen, die der Worker OHNE Claude-Aufruf verarbeitet
+// (Kosten-Kurzschluss): Zusammenfassung bestätigen bzw. Alarme quittieren.
+// Nur exakte Ein-Wort-Treffer nach Normalisierung — alles Längere geht an Claude.
+const BOT_ACK_WORDS = new Set([
+  "ok", "okay", "okey", "k", "ja", "jo", "jup", "jep", "yes", "passt", "go",
+  "danke", "thx", "thanks", "quittiert", "bestätigt", "bestätigen", "erledigt", "done",
+  "👍", "✅", "👌"
+]);
 const BOT_STATE_KEY = "bot_state:v1";
 const BOT_STATE_TTL_SECONDS = 24 * 3600;   // Dialog-Kontext lebt max. 24h
 const BOT_MAX_HISTORY = 24;                // gespeicherte Chat-Nachrichten (user+bot)
@@ -1425,6 +1433,34 @@ async function handleTelegramWebhook(req, env, ctx) {
     const text = m.text.trim();
     ctx.waitUntil((async () => {
       try {
+        // Kosten-Kurzschluss: eindeutige Kurz-Bestätigungen brauchen kein Claude.
+        // 1. Zusammenfassung steht aus + "ok" → Draft deterministisch eintragen.
+        // 2. Kein Dialog aktiv + aktive Alarme + "ok" → Alarme quittieren.
+        // Alles andere (inkl. "ja" als Antwort auf eine Bot-Frage) geht an Claude.
+        const normed = text.toLowerCase().replace(/[\s!.,:;()]+/g, "");
+        if (BOT_ACK_WORDS.has(normed)) {
+          const state = await botLoadState(env);
+          const { data: record } = await loadTradebook(env);
+          if (state.phase === "awaiting_confirm" && state.draft) {
+            const draft = state.draft;
+            try {
+              const info = await botSaveTrade(env, draft);
+              await botClearState(env);
+              const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
+              await sendTelegram(env, "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix);
+            } catch (e2) {
+              await sendTelegram(env, "❌ Eintragen fehlgeschlagen: " + e2.message + "\nDer Entwurf bleibt erhalten — nochmal 'ok' senden zum erneuten Versuch.");
+            }
+            return;
+          }
+          const dialogActive = (state.history && state.history.length > 0) || state.draft;
+          if (!dialogActive && listActiveAlarms(record).length > 0) {
+            await ackAllActiveAlarms(env, record);
+            await sendTelegram(env, workerT(record.lang || "de", "ack_received"));
+            return;
+          }
+          // weder ausstehende Zusammenfassung noch Alarm-Kontext → normal weiterreichen
+        }
         await botProcessMessage(env, text);
       } catch (e) {
         // Claude/API nicht erreichbar → Alarm-Quittierung darf NIE davon abhängen:
