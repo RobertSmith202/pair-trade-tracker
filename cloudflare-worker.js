@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.1";
+const WORKER_VERSION = "2026-08-26.2";
 
 const WORKER_STRINGS = {
   de: {
@@ -1242,8 +1242,16 @@ const BOT_MAX_LLM_ROUNDS = 6;              // Tool-Loop-Deckel pro Webhook-Aufru
 const CLAUDE_MODEL = "claude-haiku-4-5";
 
 async function botLoadState(env) {
-  try { return (await env.TRADEBOOK_CACHE.get(BOT_STATE_KEY, { type: "json" })) || { history: [], draft: null, watchDraft: null, phase: "collecting" }; }
-  catch { return { history: [], draft: null, watchDraft: null, phase: "collecting" }; }
+  let st;
+  try { st = (await env.TRADEBOOK_CACHE.get(BOT_STATE_KEY, { type: "json" })) || {}; } catch { st = {}; }
+  // Normalisieren auf Array-Form (mehrere Entwürfe pro Bestätigung, seit v.2);
+  // alte Einzel-Felder aus vorherigen Worker-Versionen werden migriert.
+  return {
+    history: Array.isArray(st.history) ? st.history : [],
+    drafts: Array.isArray(st.drafts) ? st.drafts : (st.draft ? [st.draft] : []),
+    watchDrafts: Array.isArray(st.watchDrafts) ? st.watchDrafts : (st.watchDraft ? [st.watchDraft] : []),
+    phase: st.phase || "collecting"
+  };
 }
 async function botSaveState(env, state) {
   state.history = (state.history || []).slice(-BOT_MAX_HISTORY);
@@ -1285,44 +1293,40 @@ async function botGetQuote(symbol) {
 // Draft-Felder-Schema für emit_action (strict) — alle Felder Pflicht im Schema,
 // fehlende Infos als null. entryCurrency null = native Währung der Heimbörse
 // (Roberts Default), sonst expliziter Ccy-Code wenn er eine andere nennt.
-const BOT_DRAFT_SCHEMA = {
-  type: ["object", "null"],
-  additionalProperties: false,
-  properties: {
-    type:          { type: ["string", "null"], description: "pair | long | short" },
-    name:          { type: ["string", "null"] },
-    longTicker:    { type: ["string", "null"] },
-    shortTicker:   { type: ["string", "null"] },
-    longQty:       { type: ["number", "null"] },
-    longEntry:     { type: ["number", "null"] },
-    shortQty:      { type: ["number", "null"] },
-    shortEntry:    { type: ["number", "null"] },
-    entryCurrency: { type: ["string", "null"], description: "null = Notierungswährung der Börse (Default). Nur setzen wenn der User explizit eine andere Währung nennt." },
-    lossPct:       { type: ["number", "null"], description: "Verlust-Schwelle in % (positive Zahl)" },
-    lossPrice:     { type: ["number", "null"], description: "Verlust-Schwelle als Kurs (nur long/short)" },
-    profitPct:     { type: ["number", "null"] },
-    profitPrice:   { type: ["number", "null"] },
-    squeezePct:    { type: ["number", "null"], description: "Short-Squeeze-Schwelle in % (nur short/pair)" },
-    longTarget:    { type: ["number", "null"], description: "Zielkurs Long (stille Markierung)" },
-    shortTarget:   { type: ["number", "null"] }
-  },
-  required: ["type", "name", "longTicker", "shortTicker", "longQty", "longEntry", "shortQty", "shortEntry", "entryCurrency", "lossPct", "lossPrice", "profitPct", "profitPrice", "squeezePct", "longTarget", "shortTarget"]
+const BOT_DRAFT_PROPS = {
+  type:          { type: ["string", "null"], description: "pair | long | short" },
+  name:          { type: ["string", "null"] },
+  longTicker:    { type: ["string", "null"] },
+  shortTicker:   { type: ["string", "null"] },
+  longQty:       { type: ["number", "null"] },
+  longEntry:     { type: ["number", "null"] },
+  shortQty:      { type: ["number", "null"] },
+  shortEntry:    { type: ["number", "null"] },
+  entryCurrency: { type: ["string", "null"], description: "null = Notierungswährung der Börse (Default). Nur setzen wenn der User explizit eine andere Währung nennt." },
+  lossPct:       { type: ["number", "null"], description: "Verlust-Schwelle in % (positive Zahl)" },
+  lossPrice:     { type: ["number", "null"], description: "Verlust-Schwelle als Kurs (nur long/short)" },
+  profitPct:     { type: ["number", "null"] },
+  profitPrice:   { type: ["number", "null"] },
+  squeezePct:    { type: ["number", "null"], description: "Short-Squeeze-Schwelle in % (nur short/pair)" },
+  longTarget:    { type: ["number", "null"], description: "Zielkurs Long (stille Markierung)" },
+  shortTarget:   { type: ["number", "null"] }
 };
+const BOT_DRAFT_REQUIRED = ["type", "name", "longTicker", "shortTicker", "longQty", "longEntry", "shortQty", "shortEntry", "entryCurrency", "lossPct", "lossPrice", "profitPct", "profitPrice", "squeezePct", "longTarget", "shortTarget"];
+const BOT_DRAFT_SCHEMA = { type: ["object", "null"], additionalProperties: false, properties: BOT_DRAFT_PROPS, required: BOT_DRAFT_REQUIRED };
+const BOT_DRAFT_ITEM   = { type: "object", additionalProperties: false, properties: BOT_DRAFT_PROPS, required: BOT_DRAFT_REQUIRED };
 
 // Watchlist-Entwurf für emit_action: Kandidat mit Kurs-Grenzen. remove=true
 // löscht den Eintrag mit diesem Ticker (nach Bestätigung).
-const BOT_WATCH_SCHEMA = {
-  type: ["object", "null"],
-  additionalProperties: false,
-  properties: {
-    ticker:     { type: ["string", "null"] },
-    name:       { type: ["string", "null"] },
-    side:       { type: ["string", "null"], description: "long | short — Kandidat-Typ, Pflicht" },
-    levelAbove: { type: ["number", "null"], description: "Überschreitungsgrenze (Kurs ≥), in Notierungswährung des Tickers" },
-    levelBelow: { type: ["number", "null"], description: "Unterschreitungsgrenze (Kurs ≤)" },
-    remove:     { type: ["boolean", "null"], description: "true = Eintrag mit diesem Ticker von der Watchlist löschen" }
-  }
+const BOT_WATCH_PROPS = {
+  ticker:     { type: ["string", "null"] },
+  name:       { type: ["string", "null"] },
+  side:       { type: ["string", "null"], description: "long | short — Kandidat-Typ, Pflicht" },
+  levelAbove: { type: ["number", "null"], description: "Überschreitungsgrenze (Kurs ≥), in Notierungswährung des Tickers" },
+  levelBelow: { type: ["number", "null"], description: "Unterschreitungsgrenze (Kurs ≤)" },
+  remove:     { type: ["boolean", "null"], description: "true = Eintrag mit diesem Ticker von der Watchlist löschen" }
 };
+const BOT_WATCH_SCHEMA = { type: ["object", "null"], additionalProperties: false, properties: BOT_WATCH_PROPS };
+const BOT_WATCH_ITEM   = { type: "object", additionalProperties: false, properties: BOT_WATCH_PROPS };
 
 const BOT_TOOLS = [
   {
@@ -1343,9 +1347,11 @@ const BOT_TOOLS = [
       additionalProperties: false,
       properties: {
         action: { type: "string", enum: ["ask", "propose", "save", "cancel", "ack_alarms", "reply"] },
-        text: { type: "string", description: "Nachricht an den User. Bei propose: die vollständige Zusammenfassung aller Felder plus Hinweis, mit 'ok' zu bestätigen oder Änderungen zu nennen." },
+        text: { type: "string", description: "Nachricht an den User. Bei propose: die vollständige (bei mehreren Einträgen nummerierte) Zusammenfassung aller Felder plus Hinweis, mit 'ok' zu bestätigen oder Änderungen zu nennen." },
         draft: BOT_DRAFT_SCHEMA,
-        watch: BOT_WATCH_SCHEMA
+        drafts: { type: ["array", "null"], items: BOT_DRAFT_ITEM, description: "Mehrere Trades aus EINER Nachricht — statt draft" },
+        watch: BOT_WATCH_SCHEMA,
+        watchList: { type: ["array", "null"], items: BOT_WATCH_ITEM, description: "Mehrere Watchlist-Einträge aus EINER Nachricht — statt watch" }
       },
       required: ["action", "text", "draft"]
     }
@@ -1424,11 +1430,33 @@ async function botSaveWatch(env, w) {
   return info;
 }
 
-function botWatchResultText(info) {
-  if (info.notFound) return "⚠️ Kein Watchlist-Eintrag mit diesem Ticker gefunden.";
-  if (info.removed) return "🗑 Watchlist-Eintrag gelöscht — verschwindet beim nächsten Sync aus der App.";
-  if (info.updated) return "✅ Watchlist-Eintrag aktualisiert — geänderte Grenzen sind wieder scharf.";
-  return "✅ Auf die Watchlist gesetzt — erscheint beim nächsten Sync in der App.";
+function botWatchResultText(w, info) {
+  const t = (w.ticker || "?").toUpperCase();
+  if (info.notFound) return "⚠️ " + t + ": kein Watchlist-Eintrag gefunden";
+  if (info.removed) return "🗑 " + t + " von der Watchlist gelöscht";
+  if (info.updated) return "✅ " + t + ": Watchlist-Eintrag aktualisiert (geänderte Grenzen wieder scharf)";
+  return "✅ " + t + " auf die Watchlist gesetzt";
+}
+
+function botTradeLabel(d) {
+  const tick = d.type === "long" ? d.longTicker : d.type === "short" ? d.shortTicker : (d.longTicker + "/" + d.shortTicker);
+  return d.name || tick || "?";
+}
+
+// Trägt ALLE bestätigten Entwürfe (Trades + Watchlist) ein und liefert den
+// Ergebnis-Text. Gemeinsamer Pfad für emit_action "save" und den kostenlosen
+// "ok"-Kurzschluss im Webhook. Wirft bei Fehlern (Aufrufer behält den State).
+async function botCommitDrafts(env, state) {
+  const parts = [];
+  for (const d of (state.drafts || [])) {
+    const info = await botSaveTrade(env, d);
+    parts.push("✅ " + botTradeLabel(d) + " eingetragen" + (info.merged ? " (als Tranche " + info.trancheCount + " zusammengeführt)" : ""));
+  }
+  for (const w of (state.watchDrafts || [])) {
+    parts.push(botWatchResultText(w, await botSaveWatch(env, w)));
+  }
+  parts.push("Erscheint beim nächsten Sync in der App.");
+  return parts.join("\n");
 }
 
 // Baut aus dem bestätigten Draft einen Trade im App-Datenmodell und schreibt ihn
@@ -1535,18 +1563,20 @@ WATCHLIST (zweiter Eintrags-Typ neben Trades):
 - Die Meldung beim Kreuzen ist einmalig (kein Repeat, re-armt automatisch) — das kannst du in der Zusammenfassung kurz erwähnen.
 - Gleicher Ticker schon auf der Watchlist → propose als Update (nur genannte Felder ändern sich). Löschen ("nimm X von der Watchlist") → watch mit ticker + remove:true, ebenfalls erst propose ("Eintrag X löschen — ok?"), dann save.
 
+MEHRERE EINTRÄGE IN EINER NACHRICHT: Nennt Robert mehrere Trades und/oder Watchlist-Kandidaten auf einmal ("setz Apple bei 250 und Tesla bei 300 auf die Watchlist"), ALLE erfassen: mehrere Trades ins Array "drafts", mehrere Watchlist-Einträge ins Array "watchList" (auch gemischt in einem propose möglich). Die Zusammenfassung dann nummeriert (①②③…), EIN "ok" bestätigt alles. Fehlt bei einzelnen Einträgen etwas, gezielt nur das nachfragen — die vollständigen Einträge dabei nicht vergessen (im ask-Zwischenstand mitführen).
+
 ABLAUF:
 1. Solange Pflichtangaben fehlen → action "ask".
-2. Alles da → action "propose": vollständige Zusammenfassung ALLER Felder (Typ, Ticker+Börse, Stückzahl, Einstand+Währung, alle Schwellen, Zielkurs) + Hinweis: mit "ok" bestätigen oder Änderungen nennen.
-3. Robert bestätigt ("ok", "ja", "passt", "go" o.ä.) NACH einer Zusammenfassung → action "save" (der Worker trägt den gespeicherten Draft ein — nichts mehr ändern).
-4. Robert will nach der Zusammenfassung etwas ändern → Änderung in den Draft einarbeiten → erneut "propose" mit neuer kompletter Zusammenfassung.
+2. Alles da → action "propose": vollständige Zusammenfassung ALLER Felder (Typ, Ticker+Börse, Stückzahl, Einstand+Währung, alle Schwellen, Zielkurs); bei mehreren Einträgen nummeriert. + Hinweis: mit "ok" bestätigen oder Änderungen nennen.
+3. Robert bestätigt ("ok", "ja", "passt", "go" o.ä.) NACH einer Zusammenfassung → action "save" (der Worker trägt die gespeicherten Entwürfe ein — nichts mehr ändern).
+4. Robert will nach der Zusammenfassung etwas ändern → Änderung einarbeiten → erneut "propose" mit neuer kompletter Zusammenfassung (alle Einträge, nicht nur der geänderte).
 5. Robert will abbrechen → action "cancel".
 6. Nachricht ist eine Alarm-Quittierung (kurze Bestätigung während aktive Alarme laufen und KEINE Zusammenfassung aussteht, oder Worte wie "quittiert") → action "ack_alarms".
 7. Alles andere (Statusfrage, Smalltalk) → action "reply" (Statusfragen zu Kursen per get_quote beantworten).
 
 WICHTIG: Beende JEDE Antwort mit genau einem emit_action-Aufruf. Bei "ask"/"propose" immer den aktuellen Draft-Zwischenstand mitgeben (bekannte Felder gefüllt, Rest null). Antworte auf ${record.lang === "en" ? "Englisch" : "Deutsch"}, kompakt und ohne Floskeln (Telegram-Chat).
 
-AKTUELLER DIALOG-STATUS: phase=${state.phase}${state.draft ? ", gespeicherter Trade-Draft: " + JSON.stringify(state.draft) : ""}${state.watchDraft ? ", gespeicherter Watch-Draft: " + JSON.stringify(state.watchDraft) : ""}${!state.draft && !state.watchDraft ? ", kein Draft" : ""}
+AKTUELLER DIALOG-STATUS: phase=${state.phase}${state.drafts.length ? ", gespeicherte Trade-Entwürfe: " + JSON.stringify(state.drafts) : ""}${state.watchDrafts.length ? ", gespeicherte Watch-Entwürfe: " + JSON.stringify(state.watchDrafts) : ""}${!state.drafts.length && !state.watchDrafts.length ? ", keine Entwürfe" : ""}
 
 BESTEHENDE TRADES (für Kontext/Statusfragen; gleicher Ticker+Typ wird beim Eintragen automatisch als Tranche zusammengeführt):
 ${tradesCompact}
@@ -1607,55 +1637,47 @@ async function botProcessMessage(env, userText, opts = {}) {
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(await botGetQuote(block.input.symbol)) });
       } else if (block.name === "emit_action") {
         const a = block.input;
+        // Entwürfe aus der Aktion einsammeln — Einzel-Felder (draft/watch) und
+        // Mehrfach-Arrays (drafts/watchList) werden gleich behandelt.
+        const tradeItems = (Array.isArray(a.drafts) && a.drafts.length) ? a.drafts : ((a.draft && a.draft.type) ? [a.draft] : []);
+        const watchItems = (Array.isArray(a.watchList) && a.watchList.length) ? a.watchList : ((a.watch && a.watch.ticker) ? [a.watch] : []);
         if (a.action === "propose") {
-          // Zwei Entwurfs-Typen: Trade (draft) oder Watchlist-Eintrag (watch)
-          if (a.watch && a.watch.ticker) {
-            const missing = botValidateWatch(a.watch);
-            if (missing.length) {
-              toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Watchlist-Entwurf unvollständig — fehlend: " + missing.join(", ") + ". Frage stattdessen nach (action: ask)." });
-              continue;
-            }
-            state.watchDraft = a.watch; state.draft = null; state.phase = "awaiting_confirm";
-            terminal = a.text;
-          } else {
-            const missing = botValidateDraft(a.draft);
-            if (missing.length) {
-              toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Draft unvollständig — fehlende Pflichtfelder: " + missing.join(", ") + ". Frage stattdessen nach (action: ask)." });
-              continue;
-            }
-            state.draft = a.draft; state.watchDraft = null; state.phase = "awaiting_confirm";
-            terminal = a.text;
-          }
-        } else if (a.action === "save") {
-          if (state.phase !== "awaiting_confirm" || (!state.draft && !state.watchDraft)) {
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Es liegt keine bestätigte Zusammenfassung vor. Erst propose mit vollständigem Entwurf, dann auf Bestätigung warten." });
+          if (tradeItems.length === 0 && watchItems.length === 0) {
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "propose ohne Entwurf — draft/drafts oder watch/watchList mitgeben, oder stattdessen fragen (action: ask)." });
             continue;
           }
-          // Eintragen — es gilt der GESPEICHERTE Entwurf (der zuletzt zusammengefasste Stand)
+          const problems = [];
+          tradeItems.forEach((d, i) => { const m = botValidateDraft(d); if (m.length) problems.push("Trade " + (i + 1) + ": " + m.join(", ")); });
+          watchItems.forEach((w, i) => { const m = botValidateWatch(w); if (m.length) problems.push("Watch " + (i + 1) + ": " + m.join(", ")); });
+          if (problems.length) {
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Entwürfe unvollständig — " + problems.join(" | ") + ". Frage gezielt nach (action: ask)." });
+            continue;
+          }
+          state.drafts = tradeItems; state.watchDrafts = watchItems; state.phase = "awaiting_confirm";
+          terminal = a.text;
+        } else if (a.action === "save") {
+          if (state.phase !== "awaiting_confirm" || (state.drafts.length === 0 && state.watchDrafts.length === 0)) {
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "Es liegt keine bestätigte Zusammenfassung vor. Erst propose mit vollständigen Entwürfen, dann auf Bestätigung warten." });
+            continue;
+          }
+          // Eintragen — es gelten die GESPEICHERTEN Entwürfe (der zuletzt zusammengefasste Stand)
           try {
-            let doneText;
-            if (state.watchDraft) {
-              doneText = botWatchResultText(await botSaveWatch(env, state.watchDraft));
-            } else {
-              const info = await botSaveTrade(env, state.draft);
-              const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
-              doneText = "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix;
-            }
-            state.draft = null; state.watchDraft = null; state.phase = "collecting"; state.history = [];
+            const doneText = await botCommitDrafts(env, state);
+            state.drafts = []; state.watchDrafts = []; state.phase = "collecting"; state.history = [];
             await botSaveState(env, state);
             terminal = doneText + (a.text && a.text !== "✅" ? "\n" + a.text : "");
           } catch (e) {
-            terminal = "❌ Eintragen fehlgeschlagen: " + e.message + "\nDer Entwurf bleibt erhalten — nochmal 'ok' senden zum erneuten Versuch.";
+            terminal = "❌ Eintragen fehlgeschlagen: " + e.message + "\nDie Entwürfe bleiben erhalten — nochmal 'ok' senden zum erneuten Versuch.";
           }
         } else if (a.action === "cancel") {
           await botClearState(env);
-          state.draft = null; state.watchDraft = null; state.phase = "collecting"; state.history = [];
+          state.drafts = []; state.watchDrafts = []; state.phase = "collecting"; state.history = [];
           terminal = a.text || "Abgebrochen — nichts eingetragen.";
         } else if (a.action === "ack_alarms") {
           const n = await ackAllActiveAlarms(env, record);
           terminal = n > 0 ? workerT(record.lang || "de", "ack_received") : (a.text || "Keine aktiven Alarme.");
         } else { // ask | reply
-          if (a.action === "ask" && a.draft) state.draft = a.draft;
+          if (a.action === "ask" && (tradeItems.length || watchItems.length)) { state.drafts = tradeItems; state.watchDrafts = watchItems; }
           if (a.action === "ask") state.phase = "collecting";
           terminal = a.text;
         }
@@ -1694,24 +1716,17 @@ async function handleTelegramWebhook(req, env, ctx) {
         if (BOT_ACK_WORDS.has(normed)) {
           const state = await botLoadState(env);
           const { data: record } = await loadTradebook(env);
-          if (state.phase === "awaiting_confirm" && (state.draft || state.watchDraft)) {
+          if (state.phase === "awaiting_confirm" && (state.drafts.length > 0 || state.watchDrafts.length > 0)) {
             try {
-              let doneText;
-              if (state.watchDraft) {
-                doneText = botWatchResultText(await botSaveWatch(env, state.watchDraft));
-              } else {
-                const info = await botSaveTrade(env, state.draft);
-                const suffix = info.merged ? `\n(Als Tranche ${info.trancheCount} zu bestehendem Trade zusammengeführt.)` : "";
-                doneText = "✅ Eingetragen — erscheint beim nächsten Sync in der App." + suffix;
-              }
+              const doneText = await botCommitDrafts(env, state);
               await botClearState(env);
               await sendTelegram(env, doneText);
             } catch (e2) {
-              await sendTelegram(env, "❌ Eintragen fehlgeschlagen: " + e2.message + "\nDer Entwurf bleibt erhalten — nochmal 'ok' senden zum erneuten Versuch.");
+              await sendTelegram(env, "❌ Eintragen fehlgeschlagen: " + e2.message + "\nDie Entwürfe bleiben erhalten — nochmal 'ok' senden zum erneuten Versuch.");
             }
             return;
           }
-          const dialogActive = (state.history && state.history.length > 0) || state.draft || state.watchDraft;
+          const dialogActive = (state.history && state.history.length > 0) || state.drafts.length > 0 || state.watchDrafts.length > 0;
           if (!dialogActive && listActiveAlarms(record).length > 0) {
             await ackAllActiveAlarms(env, record);
             await sendTelegram(env, workerT(record.lang || "de", "ack_received"));
