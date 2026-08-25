@@ -1166,7 +1166,7 @@ const BOT_TOOLS = [
   },
   {
     name: "get_quote",
-    description: "Holt aktuellen Kurs, Währung und Börse für ein Yahoo-Symbol. Für Plausibilitätsprüfungen (Einstand, Schwellen, Zielkurse) nutzen.",
+    description: "Holt aktuellen Kurs, Währung und Börse für ein Yahoo-Symbol. Nur nutzen wenn Robert nach Kursen/Status fragt — NICHT zur Kontrolle seiner Angaben.",
     input_schema: { type: "object", additionalProperties: false, properties: { symbol: { type: "string" } }, required: ["symbol"] }
   },
   {
@@ -1297,8 +1297,9 @@ REGELN FÜR TICKER UND BÖRSE:
 - entryCurrency bleibt null (= Notierungswährung der Heimbörse, Roberts Default), außer Robert nennt explizit eine andere Währung.
 
 REGELN FÜR ZAHLEN:
-- Zahlen NIE raten oder korrigieren. Bei fehlenden Pflichtangaben so lange nachfragen, bis Robert eine konkrete Antwort gibt — freundlich hartnäckig, eine gezielte Frage pro Nachricht. Es gibt nur zwei Ausgänge: vollständiger Eintrag oder Abbruch (cancel nur wenn Robert explizit abbrechen will).
-- Plausibilität mit get_quote prüfen: weicht der genannte Einstand grob vom aktuellen Kurs ab (z.B. Faktor 10 — typischer Diktierfehler), nachfragen. Verlust-Schwelle als Kurs muss bei Long UNTER, bei Short ÜBER dem aktuellen Kurs liegen (sonst würde sie sofort feuern) — bei Verstoß nachfragen.
+- Zahlen NIE raten, ändern oder anzweifeln. Robert trägt oft HISTORISCHE Einstände ein — die dürfen beliebig weit vom aktuellen Kurs entfernt sein. KEINE Plausibilitäts-Rückfragen zu Zahlen, keine Kontroll-Kursabfragen: die Zusammenfassung vor dem Eintragen ist das Korrektur-Netz, das reicht.
+- Bei fehlenden Pflichtangaben so lange nachfragen, bis Robert eine konkrete Antwort gibt — freundlich hartnäckig, eine gezielte Frage pro Nachricht. Es gibt nur zwei Ausgänge: vollständiger Eintrag oder Abbruch (cancel nur wenn Robert explizit abbrechen will).
+- get_quote nur nutzen, wenn Robert selbst nach Kursen oder Status fragt — nicht zur Kontrolle seiner Angaben.
 
 PFLICHTFELDER: type (pair/long/short); je nach Typ Ticker, Stückzahl und Einstandskurs pro Leg. Optional (nicht nachbohren, nur aufnehmen wenn genannt): Verlust-/Gewinn-Schwelle (% oder Kurs; bei Pair nur %), Squeeze-Schwelle (nur short/pair), Zielkurs, Name.
 
