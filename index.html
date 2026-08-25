@@ -1351,6 +1351,50 @@ html[data-privacy="on"] .ds-status-value {
 /* Desktop-Privacy-Button: etwas größer/prominenter als die anderen Sidebar-Aktionen */
 .ds-action-privacy { padding: 12px 12px; font-size: 14px; margin-top: 2px; }
 #ds-privacy.active { color: var(--info); border-color: var(--info); background: rgba(21,101,192,0.08); }
+
+/* ============ Drag & Drop: Standalone-Trade in einen Korb ziehen ============ */
+/* Ziehbare Karten: Textauswahl + iOS-Callout aus, sonst kämpft der Long-Press
+   gegen die System-Textmarkierung. Eigene transition-Liste inkl. transform,
+   damit Press-Einsinken und Lift weich federn. */
+.trade-list[data-list] .trade-card.draggable-trade {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
+}
+[data-layout="desktop"] .trade-card.draggable-trade { cursor: grab; }
+body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+/* Press-Phase (Finger liegt auf, Lift noch nicht ausgelöst): leichtes Einsinken */
+.trade-card.drag-pressing { transform: scale(0.97); }
+/* Quell-Karte während des Drags: bleibt als gedimmter Platzhalter stehen */
+.trade-card.drag-source { opacity: 0.35; transform: scale(0.97); }
+/* Ghost: fixed-positionierter Klon, folgt dem Pointer. Der Wrapper trägt die
+   trade-list-Klasse + data-view des Quell-Containers, damit alle kontext-
+   abhängigen Card-Styles (List- vs. Grid-Look) im Klon weitergelten. Wrapper
+   übernimmt die Translation, der innere Klon Lift-Scale + Schatten. */
+.drag-ghost { position: fixed; left: 0; top: 0; z-index: 1200; pointer-events: none; will-change: transform; padding: 0; margin: 0; }
+.drag-ghost .trade-card {
+  margin: 0;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.38), 0 4px 14px rgba(0,0,0,0.28);
+  animation: dragGhostLift 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes dragGhostLift { from { transform: scale(1); } to { transform: scale(1.045); } }
+/* Rückflug (Abbruch) bzw. Einsaugen in den Korb steuert JS über diese transition */
+.drag-ghost.drag-ghost-settle { transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.28s ease; }
+/* Körbe als Abwurfziele: dezenter blauer Puls solange ein Drag läuft */
+.trade-list .basket-card.drop-target-ready { animation: dropTargetPulse 1.4s ease-in-out infinite; }
+@keyframes dropTargetPulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--target-edge); }
+  50%      { box-shadow: 0 0 0 4px var(--target); }
+}
+/* Aktiv gehovertes Ziel: wächst wie ein iOS-Ordner leicht an */
+.trade-list .basket-card.drop-target-hover {
+  animation: none;
+  transform: scale(1.03);
+  box-shadow: 0 0 0 3px var(--info), 0 10px 30px rgba(0,0,0,0.25);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
+}
+/* „Schluck"-Feder des Korbs nach erfolgreichem Drop */
+.trade-list .basket-card.basket-gulp { animation: basketGulp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes basketGulp { 0% { transform: scale(1); } 35% { transform: scale(1.06); } 100% { transform: scale(1); } }
 </style>
 </head>
 <body>
@@ -3917,6 +3961,7 @@ function renderOneTradeRow(tr, c) {
   const card = document.createElement("div");
   const tStatus = targetStatus(tr, c);
   card.className = "trade-card" + (tStatus.any ? " target-reached" : "");
+  card.setAttribute("data-trade-id", tr.id);
   const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
   const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
   const aCapsule = alarmCapsuleHtml(tr);
@@ -3983,6 +4028,7 @@ function renderOneTradeCard(tr, c) {
   const card = document.createElement("div");
   const tStatus = targetStatus(tr, c);
   card.className = "trade-card" + (tStatus.any ? " target-reached" : "");
+  card.setAttribute("data-trade-id", tr.id);
   const isMulti = Array.isArray(tr.tranches) && tr.tranches.length > 1;
   const firstT = (tr.tranches && tr.tranches[0]) || {};
   const tBadge = isMulti ? `<span class="tranche-badge">${t("tranche_badge", { n: tr.tranches.length })}</span>` : '';
@@ -4241,7 +4287,15 @@ function render() {
     for (const b of basketsHere) list.appendChild(renderBasketCard(b));
     const rows = computeRowsFor(standaloneTrades);
     const renderFn = mode === "list" ? renderOneTradeRow : renderOneTradeCard;
-    for (const row of rows) list.appendChild(renderFn(row.trade, row.c));
+    // Standalone-Trades sind per Drag & Drop in Körbe der Page ziehbar — nur
+    // markieren wenn es überhaupt einen Korb als Ziel gibt, sonst bliebe der
+    // Long-Press-Gestenpfad ohne Funktion aktiv.
+    const canDragToBasket = basketsHere.length > 0;
+    for (const row of rows) {
+      const el = renderFn(row.trade, row.c);
+      if (canDragToBasket) el.classList.add("draggable-trade");
+      list.appendChild(el);
+    }
     // Aggregat zeigt weiterhin ALLE Trades dieser Page (in Korb oder nicht)
     const aggRows = computeRowsFor(pageTrades);
     updatePageAggregate(pageKey, aggRows);
@@ -5243,6 +5297,61 @@ function deleteBasket(basketId) {
   render();
 }
 
+// Verschiebt einen Standalone-Trade per Drag & Drop in einen Korb.
+// Regeln (von Robert festgelegt):
+//   • Zielkurse (longTarget/shortTarget) bleiben am Trade erhalten.
+//   • Gewinn-/Verlustschwellen des Trades verschwinden — es gelten fortan die des
+//     Korbs, falls dort welche gesetzt sind (ansonsten hat der Trade schlicht keine
+//     mehr). Das räumt zugleich Stolperfalle „stale Alarm-Felder an Korb-Trades" ab:
+//     der Worker überspringt Korb-Trades beim Loss/Profit-Check ohnehin.
+//   • Squeeze-Schwellen bleiben pro Trade erhalten (bestehende Short-Korb-Konvention).
+// Liegt im Korb bereits ein Trade mit gleichem Ticker+Typ, greift die
+// Super-Trade-Merge-Semantik (Tranchen wandern in den bestehenden Korb-Trade).
+function moveTradeToBasket(tradeId, basketId) {
+  const tr = trades.find(x => x.id === tradeId); if (!tr) return false;
+  const b = findBasket(basketId); if (!b) return false;
+  if (tr.basketId === b.id) return false;
+  const tType = tradeType(tr);
+  if (tType !== basketType(b)) return false;
+  const tick = tType === "long" ? tr.longTicker : tr.shortTicker;
+  const matching = trades.find(x => x.id !== tr.id && tradeType(x) === tType
+    && (tType === "long" ? x.longTicker : x.shortTicker) === tick
+    && (x.basketId || null) === b.id);
+  if (matching) {
+    matching.tranches = (matching.tranches || []).concat(tr.tranches || []);
+    // Zielkurs wandert mit, sofern der Korb-Trade selbst noch keinen hat
+    if (matching.longTarget == null && tr.longTarget != null) matching.longTarget = tr.longTarget;
+    if (matching.shortTarget == null && tr.shortTarget != null) matching.shortTarget = tr.shortTarget;
+    // Squeeze-Schwelle erben wenn der Korb-Trade keine hat (nur Short-Trades relevant)
+    if (tType === "short" && (matching.alertShortPct == null || matching.alertShortPct === "") && tr.alertShortPct != null) {
+      matching.alertShortPct = tr.alertShortPct;
+    }
+    matching.updated = Date.now();
+    trades = trades.filter(x => x.id !== tr.id);
+    if (alertStates[tr.id]) delete alertStates[tr.id];
+    b.updated = Date.now();
+    markLocalChange(); render();
+    setTimeout(() => alert(t("merged_into_super", { n: matching.tranches.length })), 150);
+    return true;
+  }
+  // Snapshot der Alarm-Config vor dem Löschen — für den sauberen State-Reset
+  const oldCfg = {
+    alertPctMin: tr.alertPctMin, alertPctMax: tr.alertPctMax,
+    alertPriceMin: tr.alertPriceMin, alertPriceMax: tr.alertPriceMax,
+    alertMinMode: tr.alertMinMode, alertMaxMode: tr.alertMaxMode,
+    alertShortPct: tr.alertShortPct
+  };
+  tr.basketId = b.id;
+  tr.alertPctMin = null; tr.alertPctMax = null;
+  tr.alertPriceMin = null; tr.alertPriceMax = null;
+  tr.alertMinMode = "pct"; tr.alertMaxMode = "pct";
+  resetAlarmStateOnConfigChange(tr.id, oldCfg, tr);
+  tr.updated = Date.now();
+  b.updated = Date.now();
+  markLocalChange(); render();
+  return true;
+}
+
 // Builds a minimal trade-shaped object from the in-flight form values, suitable
 // for passing into computeTrade() so we can preview the trade's current perfPct
 // and live price.
@@ -6137,6 +6246,227 @@ document.getElementById("lock-new").addEventListener("input", updateLockUiState)
 document.getElementById("lock-confirm").addEventListener("input", updateLockUiState);
 document.getElementById("lock-apply-btn").addEventListener("click", applyLockChange);
 setInterval(setAutoStatus, 60000);
+
+// ============ Drag & Drop-Engine: Trade-Karte in einen Korb ziehen ============
+// Apple-Interaktion: auf Touch hebt ein Long-Press (350ms ohne Bewegung) die Karte
+// mit Feder-Scale an (iOS-Homescreen-Look) und sie folgt dem Finger; mit der Maus
+// startet der Drag nach 6px Bewegung sofort. Ein fixed-positionierter Klon (Ghost)
+// folgt dem Pointer, die Körbe der Page pulsieren als Ziele und wachsen beim
+// Drüberschweben an (iOS-Ordner-Look). Drop über einem Korb saugt die Karte ein
+// (Fly-In + Korb-Feder), Drop daneben schnappt zurück zur Ausgangsposition.
+(function setupTradeDragAndDrop() {
+  const HOLD_MS = 350;        // Touch: Long-Press-Dauer bis zum Lift
+  const HOLD_SLOP_PX = 8;     // Touch: mehr Bewegung vor Ablauf ⇒ User scrollt, kein Drag
+  const MOUSE_START_PX = 6;   // Maus: Bewegungs-Schwelle bis der Drag startet
+  const EDGE_ZONE_PX = 80;    // Auto-Scroll-Zone am oberen/unteren Viewport-Rand
+  const EDGE_MAX_SPEED = 14;  // max. Scroll-px pro Frame bei maximaler Randnähe
+  let ctx = null;             // aktiver Drag-Kontext (null = kein Drag)
+
+  function scrollContainerFor(list) {
+    // Desktop: jede .page scrollt intern; Mobile: das Dokument scrollt
+    if (document.documentElement.getAttribute("data-layout") === "desktop") {
+      return list.closest(".page") || document.scrollingElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+  function clearPress(p) {
+    if (p.holdTimer) clearTimeout(p.holdTimer);
+    p.card.classList.remove("drag-pressing");
+    document.removeEventListener("pointermove", p.onMove);
+    document.removeEventListener("pointerup", p.onEnd);
+    document.removeEventListener("pointercancel", p.onEnd);
+  }
+  // Nach einem Drag unterdrückt das den nachlaufenden Klick des Browsers —
+  // sonst würde z.B. der Tranchen-Toggle der Quell-Karte aufklappen.
+  function suppressNextClick() {
+    const h = (e) => { e.stopPropagation(); e.preventDefault(); };
+    document.addEventListener("click", h, { capture: true, once: true });
+    setTimeout(() => document.removeEventListener("click", h, { capture: true }), 350);
+  }
+
+  document.addEventListener("pointerdown", (e) => {
+    if (ctx) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const card = e.target.closest(".trade-card.draggable-trade");
+    if (!card) return;
+    if (e.target.closest("button")) return; // Edit/Delete/Tranchen-Buttons bleiben Klicks
+    const list = card.closest('.trade-list[data-list="long"], .trade-list[data-list="short"]');
+    if (!list) return;
+    const tradeId = card.getAttribute("data-trade-id"); if (!tradeId) return;
+
+    const isTouch = e.pointerType !== "mouse";
+    const press = { card, tradeId, list, startX: e.clientX, startY: e.clientY, pointerId: e.pointerId, holdTimer: null };
+    press.onMove = (ev) => {
+      if (ev.pointerId !== press.pointerId) return;
+      const dist = Math.hypot(ev.clientX - press.startX, ev.clientY - press.startY);
+      if (isTouch) {
+        if (dist > HOLD_SLOP_PX) clearPress(press); // User scrollt → Geste freigeben
+      } else if (dist > MOUSE_START_PX) {
+        clearPress(press);
+        startDrag(press, ev);
+      }
+    };
+    press.onEnd = (ev) => { if (ev.pointerId === press.pointerId) clearPress(press); };
+    document.addEventListener("pointermove", press.onMove);
+    document.addEventListener("pointerup", press.onEnd);
+    document.addEventListener("pointercancel", press.onEnd);
+    if (isTouch) {
+      card.classList.add("drag-pressing");
+      press.holdTimer = setTimeout(() => { clearPress(press); startDrag(press, e); }, HOLD_MS);
+    }
+  });
+
+  function startDrag(press, ev) {
+    const { card, tradeId, list } = press;
+    if (!document.body.contains(card)) return;
+    const targets = Array.from(list.querySelectorAll(".basket-card[data-basket-id]"));
+    if (targets.length === 0) return;
+    const rect = card.getBoundingClientRect();
+    // Ghost: Wrapper trägt trade-list-Klasse + data-view des Quell-Containers,
+    // damit die kontextabhängigen Card-Styles (List/Grid) im Klon weitergelten.
+    const ghost = document.createElement("div");
+    ghost.className = "drag-ghost trade-list";
+    ghost.setAttribute("data-view", list.getAttribute("data-view") || "grid");
+    ghost.style.width = rect.width + "px";
+    const clone = card.cloneNode(true);
+    clone.classList.remove("drag-pressing", "draggable-trade");
+    ghost.appendChild(clone);
+    document.body.appendChild(ghost);
+
+    ctx = {
+      tradeId, list, ghost,
+      pointerId: ev.pointerId,
+      srcRect: rect,
+      grabDX: ev.clientX - rect.left,
+      grabDY: ev.clientY - rect.top,
+      x: ev.clientX, y: ev.clientY,
+      hoverBasket: null,
+      scroller: scrollContainerFor(list),
+      raf: 0,
+    };
+    positionGhost();
+    card.classList.remove("drag-pressing");
+    card.classList.add("drag-source");
+    document.body.classList.add("trade-drag-active");
+    for (const bEl of targets) bEl.classList.add("drop-target-ready");
+    try { if (navigator.vibrate) navigator.vibrate(10); } catch {}
+
+    document.addEventListener("pointermove", onDragMove);
+    document.addEventListener("pointerup", onDragEnd);
+    document.addEventListener("pointercancel", onDragCancelEvt);
+    document.addEventListener("touchmove", blockScroll, { passive: false });
+    document.addEventListener("keydown", onDragKey, true);
+    ctx.raf = requestAnimationFrame(edgeScrollLoop);
+  }
+
+  function positionGhost() {
+    ctx.ghost.style.transform = "translate3d(" + (ctx.x - ctx.grabDX) + "px, " + (ctx.y - ctx.grabDY) + "px, 0)";
+  }
+  function blockScroll(e) { if (ctx) e.preventDefault(); }
+  function onDragKey(e) {
+    if (e.key === "Escape" && ctx) { e.stopPropagation(); e.preventDefault(); cancelDrag(); }
+  }
+  function currentDropTarget() {
+    const el = document.elementFromPoint(ctx.x, ctx.y); // Ghost ist pointer-events:none
+    const basket = el && el.closest ? el.closest(".basket-card[data-basket-id]") : null;
+    return basket && ctx.list.contains(basket) ? basket : null; // nur Körbe der eigenen Page
+  }
+
+  function onDragMove(e) {
+    if (!ctx || e.pointerId !== ctx.pointerId) return;
+    ctx.x = e.clientX; ctx.y = e.clientY;
+    positionGhost();
+    const target = currentDropTarget();
+    if (target !== ctx.hoverBasket) {
+      if (ctx.hoverBasket) ctx.hoverBasket.classList.remove("drop-target-hover");
+      ctx.hoverBasket = target;
+      if (target) {
+        target.classList.add("drop-target-hover");
+        try { if (navigator.vibrate) navigator.vibrate(6); } catch {}
+      }
+    }
+  }
+
+  // Auto-Scroll wenn der Pointer nahe am oberen/unteren Viewport-Rand steht —
+  // sonst kommt man in langen Listen nicht zu den Körben oben.
+  function edgeScrollLoop() {
+    if (!ctx) return;
+    const vh = window.innerHeight;
+    let dy = 0;
+    if (ctx.y < EDGE_ZONE_PX) dy = -Math.ceil(((EDGE_ZONE_PX - ctx.y) / EDGE_ZONE_PX) * EDGE_MAX_SPEED);
+    else if (ctx.y > vh - EDGE_ZONE_PX) dy = Math.ceil(((ctx.y - (vh - EDGE_ZONE_PX)) / EDGE_ZONE_PX) * EDGE_MAX_SPEED);
+    if (dy !== 0 && ctx.scroller) ctx.scroller.scrollTop += dy;
+    ctx.raf = requestAnimationFrame(edgeScrollLoop);
+  }
+
+  function teardownListeners(c) {
+    document.removeEventListener("pointermove", onDragMove);
+    document.removeEventListener("pointerup", onDragEnd);
+    document.removeEventListener("pointercancel", onDragCancelEvt);
+    document.removeEventListener("touchmove", blockScroll);
+    document.removeEventListener("keydown", onDragKey, true);
+    if (c.raf) cancelAnimationFrame(c.raf);
+  }
+  function clearDropDecoration() {
+    document.querySelectorAll(".drop-target-ready, .drop-target-hover").forEach(el => el.classList.remove("drop-target-ready", "drop-target-hover"));
+  }
+  function releaseSource() {
+    document.querySelectorAll(".trade-card.drag-source").forEach(el => el.classList.remove("drag-source"));
+    document.body.classList.remove("trade-drag-active");
+  }
+
+  function onDragCancelEvt(e) { if (ctx && e.pointerId === ctx.pointerId) cancelDrag(); }
+
+  function cancelDrag() {
+    if (!ctx) return;
+    const c = ctx; ctx = null;
+    teardownListeners(c);
+    clearDropDecoration();
+    suppressNextClick();
+    // Ghost federt zurück zur Quell-Position, dann aufräumen
+    const g = c.ghost;
+    const inner = g.firstElementChild;
+    if (inner) { inner.style.animation = "none"; inner.style.transition = "transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)"; inner.style.transform = "scale(1)"; }
+    g.classList.add("drag-ghost-settle");
+    g.style.transform = "translate3d(" + c.srcRect.left + "px, " + c.srcRect.top + "px, 0)";
+    setTimeout(() => { g.remove(); releaseSource(); }, 300);
+  }
+
+  function onDragEnd(e) {
+    if (!ctx || e.pointerId !== ctx.pointerId) return;
+    ctx.x = e.clientX; ctx.y = e.clientY;
+    const target = currentDropTarget();
+    if (!target) { cancelDrag(); return; }
+    const basketId = target.getAttribute("data-basket-id");
+    const c = ctx; ctx = null;
+    teardownListeners(c);
+    clearDropDecoration();
+    suppressNextClick();
+    // Fly-In: Ghost schrumpft in die Korb-Mitte (Scale um die eigene Mitte,
+    // Translation so gewählt dass Ghost-Mitte = Korb-Mitte)
+    const bRect = target.getBoundingClientRect();
+    const g = c.ghost;
+    const tx = bRect.left + bRect.width / 2 - c.srcRect.width / 2;
+    const ty = bRect.top + bRect.height / 2 - g.offsetHeight / 2;
+    g.classList.add("drag-ghost-settle");
+    g.style.transform = "translate3d(" + tx + "px, " + ty + "px, 0) scale(0.06)";
+    g.style.opacity = "0.15";
+    setTimeout(() => {
+      g.remove();
+      releaseSource();
+      const ok = moveTradeToBasket(c.tradeId, basketId);
+      if (ok) {
+        // „Schluck"-Feder auf der frisch gerenderten Korb-Karte
+        const fresh = document.querySelector('.basket-card[data-basket-id="' + basketId + '"]');
+        if (fresh) {
+          fresh.classList.add("basket-gulp");
+          fresh.addEventListener("animationend", () => fresh.classList.remove("basket-gulp"), { once: true });
+        }
+        try { if (navigator.vibrate) navigator.vibrate([12, 40, 8]); } catch {}
+      }
+    }, 290);
+  }
+})();
 </script>
 </body>
 </html>

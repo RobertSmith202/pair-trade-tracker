@@ -573,9 +573,16 @@ Die aktuelle Per-Page-Form gewann, weil sie die discoverable-ste und kontextuell
 
 **View-Modus:** `viewModes` hat einen zusätzlichen Key `basket` für die Trade-Liste innerhalb des Modals. Standalone-Anzeige auf der Page benutzt nach wie vor `viewModes.long` bzw. `viewModes.short`.
 
+**Drag & Drop: Standalone-Trade in Korb ziehen (seit Aug 2026):**
+- Auf Long-/Short-Pages sind Standalone-Trades per Drag & Drop in die Körbe der Page ziehbar (nur wenn mindestens ein Korb existiert — sonst wird die Geste gar nicht aktiviert; Klasse `draggable-trade` wird in `render()` vergeben).
+- **Interaktion (Apple-Style):** Touch = Long-Press 350ms ohne Bewegung hebt die Karte an (Feder-Scale + Schatten, iOS-Homescreen-Look), >8px Bewegung vor Ablauf = Scroll, kein Drag. Maus = Drag startet nach 6px Bewegung sofort. Ghost = fixed-positionierter Klon (Wrapper trägt `trade-list`-Klasse + `data-view` der Quell-Liste, damit List/Grid-Styles im Klon gelten). Körbe pulsieren als Ziele (`drop-target-ready`), wachsen beim Hover an (`drop-target-hover`, iOS-Ordner-Look), Drop = Fly-In + „Schluck"-Feder (`basket-gulp`), Drop daneben = Zurückschnappen. Esc bricht ab. Auto-Scroll am Viewport-Rand (Desktop scrollt die `.page`, Mobile das Dokument). Engine: IIFE `setupTradeDragAndDrop` am Skript-Ende, Datenlogik: `moveTradeToBasket(tradeId, basketId)`.
+- **Drop-Logik (von Robert festgelegt):** Zielkurse (`longTarget`/`shortTarget`) bleiben am Trade. Gewinn-/Verlustschwellen des Trades werden GELÖSCHT (Pct+Preis auf null, Modes auf "pct") — es gelten fortan die Korb-Schwellen, falls gesetzt, sonst hat der Trade schlicht keine mehr. Squeeze-Schwellen bleiben pro Trade (bestehende Short-Korb-Konvention). Alarm-States werden via `resetAlarmStateOnConfigChange` auf idle resettet. Kein Worker-Update nötig — der Worker überspringt Korb-Trades beim Loss/Profit-Check sowieso (`if (trade.basketId) continue`).
+- **Merge-Fall:** Liegt im Ziel-Korb schon ein Trade mit gleichem Ticker+Typ, greift die Super-Trade-Semantik: Tranchen wandern in den Korb-Trade, Zielkurs/Squeeze werden nur geerbt wenn der Korb-Trade keine hat, der gezogene Trade + sein alertState werden gelöscht, `merged_into_super`-Alert erscheint.
+- **Klick-Konflikte:** Buttons (Edit/Delete) starten keinen Drag (`closest("button")`-Guard); nach Drag-Ende wird der nachlaufende Browser-Klick unterdrückt (`suppressNextClick`), sonst würde z.B. der Tranchen-Toggle aufklappen. Ziehbare Karten haben `user-select: none` + `-webkit-touch-callout: none`, sonst kämpft der Long-Press gegen die iOS-Textmarkierung.
+
 **Bekannte Edge-Cases:**
 - Korb ohne Trades: zeigt Aggregat als „—", Alarme greifen nicht (kein Trade → `aggNotStart == 0` → `no_data` ohne State-Change).
-- Trade aus Korb entfernen: nur via Edit → `basketId` auf null setzen. Es gibt aktuell keinen UI-Shortcut „Trade aus Korb verschieben" — das ist bewusst, weil Verschiebe-Operationen leicht zu Verwirrung führen.
+- Trade aus Korb entfernen: nur via Edit → `basketId` auf null setzen. Für das RAUSziehen aus einem Korb gibt es weiterhin keinen UI-Shortcut (Drag & Drop geht nur in den Korb hinein).
 - Korb löschen: zeigt `confirm()` mit Hinweis dass die enthaltenen Trades zu Standalones werden (deren `basketId` wird auf null gesetzt). Trades selbst werden nicht gelöscht.
 
 ### Zwei-Schwellen-Alarm: Verlust + Gewinn
@@ -838,7 +845,7 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 
 17. **Loss-Alarm-Titel wurde umbenannt.** Vorherige Worker-Versionen schickten `🚨 ALARM` als Telegram-Titel. Aktuell: `🚨 VERLUST-SCHWELLE ÜBERSCHRITTEN` (parallel zur Gewinn-Schwelle). Der HTML-Pill/Status zeigt davon unabhängig `🚨 VERLUST-ALARM AUSGELÖST` — die App-Texte wurden bewusst nicht angepasst, weil sie im Kontext der App schon spezifisch genug sind.
 
-18. **Korb-Trades dürfen keine eigenen Loss/Profit-Alarme haben.** UI versteckt die Sektionen wenn `tradeFormBasketContext` gesetzt ist; Worker überspringt den Loss/Profit-Check für alle Trades mit `basketId` (`if (trade.basketId) continue`). Wer einen bestehenden Standalone-Trade mit Alarm später in einen Korb verschiebt (manuell via Edit), behält die Alarm-Werte in den Feldern stehen — der Worker ignoriert sie aber. Squeeze-Alarme sind davon ausgenommen und feuern weiter, weil Robert das für Short-Körbe explizit so wollte.
+18. **Korb-Trades dürfen keine eigenen Loss/Profit-Alarme haben.** UI versteckt die Sektionen wenn `tradeFormBasketContext` gesetzt ist; Worker überspringt den Loss/Profit-Check für alle Trades mit `basketId` (`if (trade.basketId) continue`). Beim Verschieben per Drag & Drop (seit Aug 2026) werden die Loss/Profit-Felder des Trades aktiv gelöscht — keine stale Felder mehr auf diesem Pfad. Squeeze-Alarme sind davon ausgenommen und feuern weiter, weil Robert das für Short-Körbe explizit so wollte.
 
 19. **`computePerf()` im Worker liefert seit Basket-Feature auch `notionalHomeStart`.** Das wird für die saubere Aggregation des Korb-Performance-Pct gebraucht (man kann NICHT einfach Pct-Werte mitteln). Wenn jemand eine ältere Worker-Version deployt, in der `notionalHomeStart` fehlt, geht der Basket-Aggregat-Pct entweder kaputt oder feuert falsch. Worker-Update zuerst, dann HTML — wie immer.
 
