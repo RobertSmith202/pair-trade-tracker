@@ -686,6 +686,8 @@ Yahoo's `defaultKeyStatistics` füllt `shortPercentOfFloat` zuverlässig nur fü
 - States: Union, Client-Stand gewinnt für mitgeschickte IDs; `_deletedIds` räumen auch alertStates/watchStates ab.
 - `lastModified` des Merge-Ergebnisses = `max(server, incoming, now)` → alle Clients konvergieren beim nächsten Pull auf den gemergten Stand.
 
+**Versions-Marker (Pflicht bei jeder Änderung mitzählen!):** `WORKER_VERSION` im Worker (sichtbar auf `/` und `GET /sync-info`) und `APP_VERSION` in index.html (sichtbar unten im Mobile-Menü-Sheet und im Desktop-Sidebar-Footer), Format `JJJJ-MM-TT.n`. Hintergrund: Beim Clobber-Vorfall luden die PWAs unerkennbar eine gecachte alte App-Version ohne Merge-Protokoll — deren LWW-Pushes löschten die Bot-Einträge wiederholt. `GET /sync-info` (öffentlich, nur Zähler/Zeitstempel/Version, keine Inhalte) beantwortet seither von außen „welche Worker-Version läuft?" und „was hält der Server?".
+
 **Rückwärtskompatibilität:** Pushes OHNE `_mergeV2` (alte HTML-Versionen) bleiben LWW — deren Löschungen sind implizit (fehlender Eintrag) und dürfen nicht als „fehlt nur" fehlinterpretiert werden. Deployment-Reihenfolge wie immer Worker zuerst; Übergangsphase alter Worker + neue HTML ist unschädlich (weiter LWW, `_mergeV2`-Felder landen als harmlose Extra-Keys im Record und werden vom neuen Worker beim ersten Merge entfernt).
 
 ### Sync-Migration: JSONBin → Cloudflare KV (Mai 2026)
