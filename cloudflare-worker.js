@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.7";
+const WORKER_VERSION = "2026-08-26.8";
 
 const WORKER_STRINGS = {
   de: {
@@ -1318,22 +1318,31 @@ async function botClearState(env) {
   try { await env.TRADEBOOK_CACHE.delete(BOT_STATE_KEY); } catch {}
 }
 
-// Foto von Telegram herunterladen und base64-kodieren (für Claude-Vision).
-// Telegram komprimiert Fotos auf handliche Größen — passt problemlos in einen
-// API-Call. getFile → file_path → Download über den File-Endpoint des Bots.
-async function telegramFetchPhoto(token, fileId) {
+// Anhang von Telegram herunterladen und base64-kodieren (für Claude).
+// Unterstützt komprimierte Fotos, unkomprimierte Bild-DATEIEN und PDFs —
+// Datei/PDF ist die bessere Wahl: Telegram komprimiert "Fotos" stark, kleine
+// Tabellenzahlen werden dadurch unleserlich; Broker-PDFs enthalten sogar
+// echten Text und werden exakt gelesen.
+async function telegramFetchAttachment(token, fileId, mimeHint) {
   const fr = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`);
   const fj = await fr.json();
   const path = fj?.result?.file_path;
-  if (!path) throw new Error("telegram getFile lieferte keinen Pfad");
+  if (!path) throw new Error("telegram getFile lieferte keinen Pfad (Datei zu groß? Bot-Limit 20 MB)");
   const ir = await fetch(`https://api.telegram.org/file/bot${token}/${path}`);
-  if (!ir.ok) throw new Error("telegram Foto-Download http " + ir.status);
+  if (!ir.ok) throw new Error("telegram Datei-Download http " + ir.status);
   const bytes = new Uint8Array(await ir.arrayBuffer());
   let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  const mediaType = path.toLowerCase().endsWith(".png") ? "image/png" : (path.toLowerCase().endsWith(".webp") ? "image/webp" : "image/jpeg");
-  return { b64: btoa(binary), mediaType };
+  const p = path.toLowerCase();
+  let mediaType = mimeHint || null;
+  if (!mediaType) {
+    if (p.endsWith(".pdf")) mediaType = "application/pdf";
+    else if (p.endsWith(".png")) mediaType = "image/png";
+    else if (p.endsWith(".webp")) mediaType = "image/webp";
+    else mediaType = "image/jpeg";
+  }
+  return { b64: btoa(binary), mediaType, kind: mediaType === "application/pdf" ? "pdf" : "image" };
 }
 
 // Yahoo-Symbolsuche: fehlertolerant auch bei Diktier-Verschreibern. Liefert
@@ -1814,9 +1823,9 @@ WATCHLIST (zweiter Eintrags-Typ neben Trades):
 - Die Meldung beim Kreuzen ist einmalig (kein Repeat, re-armt automatisch) — das kannst du in der Zusammenfassung kurz erwähnen.
 - Gleicher Ticker schon auf der Watchlist → propose als Update (nur genannte Felder ändern sich). Löschen ("nimm X von der Watchlist") → watch mit ticker + remove:true, ebenfalls erst propose ("Eintrag X löschen — ok?"), dann save.
 
-BILDER (Kontoauszüge / Orderausführungen): Robert schickt Screenshots, auf denen eine Order in viele Teilausführungen zerlegt ist (z.B. 17 Einzelkäufe). Dann:
+BILDER & PDFs (Kontoauszüge / Orderausführungen): Robert schickt Screenshots oder Broker-PDFs, auf denen eine Order in viele Teilausführungen zerlegt ist (z.B. 17 Einzelkäufe). Dann:
 - ALLE Ausführungen exakt ablesen (Stückzahl × Kurs pro Zeile) und als "fills"-Array in EINEN Draft eintragen (ein Draft pro Wertpapier; type/side aus Caption oder nachfragen; Ticker per search_symbol auflösen falls nur der Firmenname im Bild steht).
-- Zahlen exakt aus dem Bild übernehmen, NIE runden oder raten. Unleserliche Zeilen → nachfragen statt schätzen.
+- Zahlen exakt aus Bild/PDF übernehmen, NIE runden oder raten. Unleserliche Zeilen → nachfragen statt schätzen; wenn ein komprimiertes Foto zu unscharf ist, Robert bitten, es als DATEI oder PDF zu schicken (kommt unkomprimiert an).
 - In der propose-Zusammenfassung: nummerierte Liste aller Ausführungen PLUS Kontrollsummen (Gesamtstückzahl und Gesamtvolumen) — Robert vergleicht die mit seinem Auszug, bevor er "ok" sagt.
 - Grenzen/Zielkurse nur aufnehmen, wenn Robert sie nennt (bestehende Grenzen einer Position bleiben bei Aufstockungen sowieso erhalten).
 
@@ -1882,11 +1891,17 @@ async function botProcessMessage(env, userText, opts = {}) {
   const { data: record } = await loadTradebook(env);
   const state = await botLoadState(env);
   const system = botSystemPrompt(record, state);
-  // Bild dabei? → als Vision-Content-Block vor den Text. Im gespeicherten
-  // Verlauf landet nur der Text-Platzhalter (KV klein halten); das Bild lebt
+  // Anhang dabei? → als Vision-/Dokument-Block vor den Text. Im gespeicherten
+  // Verlauf landet nur der Text-Platzhalter (KV klein halten); der Anhang lebt
   // nur innerhalb dieses einen Verarbeitungs-Durchlaufs.
-  const userContent = opts.image
-    ? [{ type: "image", source: { type: "base64", media_type: opts.image.mediaType, data: opts.image.b64 } }, { type: "text", text: userText }]
+  const att = opts.image; // { b64, mediaType, kind: "image"|"pdf" }
+  const userContent = att
+    ? [
+        att.kind === "pdf"
+          ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: att.b64 } }
+          : { type: "image", source: { type: "base64", media_type: att.mediaType, data: att.b64 } },
+        { type: "text", text: userText }
+      ]
     : userText;
   const messages = [...(state.history || []), { role: "user", content: userContent }];
   let replyText = null;
@@ -2059,11 +2074,15 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
   let update; try { update = await req.json(); } catch { return textResponse("bad json", 400); }
   const m = update.message;
   if (!m || !m.chat || String(m.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return textResponse("ignored");
-  // Fotos (z.B. Kontoauszug-Screenshots mit Teilausführungen) sind erlaubt —
-  // größte verfügbare Auflösung nehmen, Caption wird zum Begleittext.
+  // Anhänge (Kontoauszug-Screenshots/PDFs mit Teilausführungen) sind erlaubt:
+  // "Foto" (komprimiert, größte Auflösung nehmen), Bild als DATEI (unkomprimiert,
+  // besser lesbar) oder PDF (am besten — echter Text). Caption wird Begleittext.
   const photo = Array.isArray(m.photo) && m.photo.length ? m.photo[m.photo.length - 1] : null;
+  const doc = m.document && /^(image\/(jpeg|png|webp)|application\/pdf)$/.test(m.document.mime_type || "") ? m.document : null;
+  const attachRef = doc ? { fileId: doc.file_id, mime: doc.mime_type, size: doc.file_size || 0 }
+                  : photo ? { fileId: photo.file_id, mime: null, size: photo.file_size || 0 } : null;
   const hasText = typeof m.text === "string" && m.text.trim();
-  if (!hasText && !photo) return textResponse("ignored");
+  if (!hasText && !attachRef) return textResponse("ignored");
   const entryToken = env.TELEGRAM_ENTRY_BOT_TOKEN;
   if (!entryToken) return textResponse("entry bot not configured");
   const text = hasText ? m.text.trim()
@@ -2079,12 +2098,16 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
       const normed = text.toLowerCase().replace(/[\s!.,:;()"']+/g, "");
       // "Chat löschen" u.ä. → deterministisch, ohne Claude: alle getrackten
       // Nachrichten (≤48h) aus dem Chat entfernen + Dialog resetten
-      if (!photo && BOT_WIPE_COMMANDS.has(normed)) {
+      if (!attachRef && BOT_WIPE_COMMANDS.has(normed)) {
         await botWipeChat(env, entryToken);
         return;
       }
-      if (photo) {
-        const image = await telegramFetchPhoto(entryToken, photo.file_id);
+      if (attachRef) {
+        if (attachRef.size > 15 * 1024 * 1024) {
+          await sendEntryTracked(env, "⚠️ Datei zu groß (max. 15 MB) — bitte kleiner schicken oder zuschneiden.", entryToken);
+          return;
+        }
+        const image = await telegramFetchAttachment(entryToken, attachRef.fileId, attachRef.mime);
         await botProcessMessage(env, text, { token: entryToken, image });
         return;
       }
