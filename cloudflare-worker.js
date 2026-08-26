@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.12";
+const WORKER_VERSION = "2026-08-26.13";
 
 const WORKER_STRINGS = {
   de: {
@@ -736,6 +736,34 @@ async function sendEntryTracked(env, text, token) {
   const res = await sendTelegram(env, text, token);
   if (res && res.message_id) await botTrackMsg(env, res.message_id);
   return res;
+}
+
+// Kurzbefehl "Modell"/"Provider": zeigt deterministisch (ohne LLM-Aufruf, also
+// kostenlos), welcher Versteher gerade arbeitet — aus den gem_ok/gem_err-Markern.
+const BOT_PROVIDER_COMMANDS = new Set(["modell", "modellstatus", "model", "provider", "llm", "llmstatus", "werantwortet", "welchesmodell", "werläuft", "geminioderanthropic"]);
+
+async function botProviderStatus(env) {
+  let gemErr = null, gemOk = null;
+  try { gemErr = await env.TRADEBOOK_CACHE.get("gem_err:last", { type: "json" }); } catch {}
+  try { const v = await env.TRADEBOOK_CACHE.get("gem_ok:last"); gemOk = v ? parseInt(v, 10) : null; } catch {}
+  const fmtAge = (ts) => {
+    const s = Math.round((Date.now() - ts) / 1000);
+    if (s < 90) return s + " Sek.";
+    const m = Math.round(s / 60);
+    if (m < 90) return m + " Min.";
+    return Math.round(m / 60) + " Std.";
+  };
+  const lines = ["🤖 Versteher-Status"];
+  if (!env.GEMINI_API_KEY) {
+    lines.push(env.ANTHROPIC_API_KEY ? "Aktiv: Anthropic (kostenpflichtig) — kein Gemini-Key gesetzt." : "Kein LLM-Key konfiguriert.");
+  } else {
+    const okNewer = gemOk && (!gemErr || gemOk > gemErr.ts);
+    if (okNewer) lines.push("Aktiv: Gemini ✅ (kostenlos) — letzte erfolgreiche Antwort vor " + fmtAge(gemOk) + ".");
+    else if (gemErr) lines.push("⚠️ Zuletzt Fallback auf Anthropic (kostenpflichtig).\nGemini-Fehler vor " + fmtAge(gemErr.ts) + ": " + String(gemErr.err).slice(0, 160));
+    else lines.push("Gemini konfiguriert — seit dem letzten Deploy noch keine Anfrage gelaufen.");
+    lines.push("Anthropic-Fallback: " + (env.ANTHROPIC_API_KEY ? "bereit." : "nicht konfiguriert."));
+  }
+  return lines.join("\n");
 }
 
 async function botWipeChat(env, token) {
@@ -1863,6 +1891,7 @@ ABLAUF:
 6. Nachricht ist eine Alarm-Quittierung (kurze Bestätigung während aktive Alarme laufen und KEINE Zusammenfassung aussteht, oder Worte wie "quittiert") → action "ack_alarms".
 7. Alles andere (Statusfrage, Smalltalk) → action "reply" (Statusfragen zu Kursen per get_quote beantworten).
 8. Fragt Robert, wie er den Chat leeren kann: Kurzbefehl "Chat löschen" (verarbeitet der Worker selbst — löscht alle Nachrichten der letzten 48h und resettet den Dialog; Älteres deckt Telegrams Auto-Lösch-Timer ab).
+9. Fragt Robert, welches Modell/welcher Anbieter gerade antwortet: auf den Kurzbefehl "Modell" verweisen (der Worker antwortet dann selbst mit dem exakten Status — du selbst weißt es nicht zuverlässig, also nicht raten).
 
 KENNZAHL-ABFRAGEN (action "reply", Daten IMMER frisch via get_portfolio_stats holen):
 - Robert kann alles abfragen: Longs/Shorts/Pairs/Gesamt-Aggregate, Portfolio-Gewichtung (pro Position), Long/Short-Exposure — WICHTIG: sowohl nach Einstand (exposure.entry / weightStartPct, "notionale Gewichtung") als auch nach aktuellem Marktwert (exposure.current / weightNowPct, "wahre Gewichtung") — Portfolio-Beta, Sektor-Aufteilung (Donut-Daten) und den Watchlist-Stand inkl. Live-Kursen.
@@ -2222,6 +2251,11 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
       // Nachrichten (≤48h) aus dem Chat entfernen + Dialog resetten
       if (!attachRef && BOT_WIPE_COMMANDS.has(normed)) {
         await botWipeChat(env, entryToken);
+        return;
+      }
+      // "Modell"/"Provider" → kostenloser Status: läuft Gemini oder Anthropic?
+      if (!attachRef && BOT_PROVIDER_COMMANDS.has(normed)) {
+        await sendEntryTracked(env, await botProviderStatus(env), entryToken);
         return;
       }
       if (attachRef) {
