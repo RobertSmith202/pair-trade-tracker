@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.4";
+const WORKER_VERSION = "2026-08-26.5";
 
 const WORKER_STRINGS = {
   de: {
@@ -1736,7 +1736,10 @@ KENNZAHL-ABFRAGEN (action "reply", Daten IMMER frisch via get_portfolio_stats ho
 - Antworte kompakt und leserlich formatiert (Telegram): Beträge in EUR gerundet, Prozente mit einer Nachkommastelle, Listen mit Zeilenumbrüchen, wichtigste Zahl zuerst. Nicht alle Daten ausschütten — nur was gefragt war; bei "alles" eine strukturierte Übersicht.
 - Beta-Lesart wie in der App: β/Brutto = Beta pro Brutto-Exposure; β/Netto nur wenn |Netto| > 5% Brutto (sonst market-neutral, dann das sagen). coveragePct nennt, wie viel vom Exposure Beta-Daten hat.
 
-WICHTIG: Beende JEDE Antwort mit genau einem emit_action-Aufruf. Bei "ask"/"propose" immer den aktuellen Draft-Zwischenstand mitgeben (bekannte Felder gefüllt, Rest null). Antworte auf ${record.lang === "en" ? "Englisch" : "Deutsch"}, kompakt und ohne Floskeln (Telegram-Chat).
+WICHTIG:
+- Robert sieht AUSSCHLIESSLICH das text-Feld deines emit_action — Tool-Ergebnisse sieht er NIEMALS. Die vollständige Antwort mit allen Zahlen muss also ins text-Feld. Meldungen wie "✓", "abgerufen" oder "erledigt" sind wertlos und verboten.
+- emit_action immer ALLEIN in einem eigenen Zug — nie im selben Zug wie search_symbol/get_quote/get_portfolio_stats. Erst Daten holen, Ergebnis lesen, DANN emit_action mit der ausformulierten Antwort.
+- Beende jede Konversationsrunde mit genau einem emit_action-Aufruf. Bei "ask"/"propose" immer den aktuellen Entwurfs-Zwischenstand mitgeben (bekannte Felder gefüllt, Rest null). Antworte auf ${record.lang === "en" ? "Englisch" : "Deutsch"}, kompakt und ohne Floskeln (Telegram-Chat).
 
 AKTUELLER DIALOG-STATUS: phase=${state.phase}${state.drafts.length ? ", gespeicherte Trade-Entwürfe: " + JSON.stringify(state.drafts) : ""}${state.watchDrafts.length ? ", gespeicherte Watch-Entwürfe: " + JSON.stringify(state.watchDrafts) : ""}${!state.drafts.length && !state.watchDrafts.length ? ", keine Entwürfe" : ""}
 
@@ -1791,6 +1794,12 @@ async function botProcessMessage(env, userText, opts = {}) {
     }
     const toolResults = [];
     let terminal = null;
+    // Guard: ruft das Modell Daten-Tools UND emit_action im selben Zug auf,
+    // würde emit_action den Loop beenden BEVOR die Daten zurückkommen — der
+    // User bekäme "abgerufen ✓" statt Zahlen (live beobachtet mit Haiku).
+    // Darum: emit_action in Kombination mit Daten-Tools ablehnen und den Loop
+    // mit den Daten-Ergebnissen fortsetzen.
+    const hasDataTool = resp.content.some(b => b.type === "tool_use" && b.name !== "emit_action");
     for (const block of resp.content) {
       if (block.type !== "tool_use") continue;
       if (block.name === "search_symbol") {
@@ -1803,6 +1812,10 @@ async function botProcessMessage(env, userText, opts = {}) {
         catch (e) { statsJson = JSON.stringify({ error: e.message }); }
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: statsJson });
       } else if (block.name === "emit_action") {
+        if (hasDataTool) {
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, is_error: true, content: "emit_action NIE zusammen mit Daten-Tools aufrufen. Lies erst die Tool-Ergebnisse und rufe DANN in einem eigenen Zug emit_action auf — mit der vollständigen Antwort (alle Zahlen) im text-Feld." });
+          continue;
+        }
         const a = block.input;
         // Entwürfe aus der Aktion einsammeln — Einzel-Felder (draft/watch) und
         // Mehrfach-Arrays (drafts/watchList) werden gleich behandelt.
