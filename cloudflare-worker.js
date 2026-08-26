@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.14";
+const WORKER_VERSION = "2026-08-26.15";
 
 const WORKER_STRINGS = {
   de: {
@@ -711,24 +711,22 @@ async function sendTelegram(env, text, token = null) {
 }
 
 // === "Chat löschen"-Kurzbefehl im Assistant-Chat ===========================
-// Der Worker merkt sich die Message-IDs des Entry-Chats (eingehend + eigene
-// Antworten) in KV. Auf Kommando löscht er alle davon per deleteMessage.
-// Telegram-Grenzen: Bots können nur Nachrichten der letzten 48h löschen und
-// die Historie nicht auflisten — deshalb das eigene ID-Tracking. Ältere
-// Nachrichten deckt Telegrams nativer Auto-Lösch-Timer im Chat ab.
-const BOT_MSGS_KEY = "bot_msgs:v1";
-const BOT_MSGS_MAX = 200;
+// Tracking: EINE KV-Zelle pro Nachricht (botmsg:<id>) statt einer gemeinsamen
+// Liste. Grund: die frühere Read-Modify-Write-Liste verlor bei schnell
+// aufeinanderfolgenden Nachrichten Einträge (Lost-Update-Race) bzw. las beim
+// Wipe einen veralteten Stand — Robert musste "Chat löschen" zweimal schicken.
+// Per-Key-Puts überschreiben sich nie gegenseitig, und die 48h-TTL entspricht
+// exakt Telegrams Bot-Löschfenster (räumt sich selbst auf). Ältere Nachrichten
+// deckt Telegrams nativer Auto-Lösch-Timer im Chat ab.
+const BOT_MSG_KEY_PREFIX = "botmsg:";
+const BOT_MSG_TTL_SECONDS = 48 * 3600;
 const BOT_WIPE_BATCH = 40;              // Subrequest-Limit-Puffer pro Aufruf
-const BOT_MSG_MAX_AGE_MS = 48 * 3600 * 1000;
+const BOT_WIPE_SWEEP = 12;              // ID-Kehrbesen unterhalb der aktuellen Nachricht
 const BOT_WIPE_COMMANDS = new Set(["chatlöschen", "chatleeren", "löschdenchat", "chatlöschung", "automatischelöschung", "chatreset", "resetchat", "clearchat"]);
 
 async function botTrackMsg(env, messageId) {
   if (!messageId) return;
-  try {
-    const list = (await env.TRADEBOOK_CACHE.get(BOT_MSGS_KEY, { type: "json" })) || [];
-    list.push({ id: messageId, ts: Date.now() });
-    await env.TRADEBOOK_CACHE.put(BOT_MSGS_KEY, JSON.stringify(list.slice(-BOT_MSGS_MAX)), { expirationTtl: 3 * 24 * 3600 });
-  } catch {}
+  try { await env.TRADEBOOK_CACHE.put(BOT_MSG_KEY_PREFIX + messageId, "1", { expirationTtl: BOT_MSG_TTL_SECONDS }); } catch {}
 }
 
 // Antwort im Entry-Chat senden + fürs spätere Löschen vormerken
@@ -766,26 +764,35 @@ async function botProviderStatus(env) {
   return lines.join("\n");
 }
 
-async function botWipeChat(env, token) {
-  let list = [];
-  try { list = (await env.TRADEBOOK_CACHE.get(BOT_MSGS_KEY, { type: "json" })) || []; } catch {}
-  const now = Date.now();
-  const deletable = list.filter(e => now - e.ts < BOT_MSG_MAX_AGE_MS);
-  const tooOld = list.length - deletable.length;
-  const batch = deletable.slice(0, BOT_WIPE_BATCH);
-  const rest = deletable.slice(BOT_WIPE_BATCH);
+async function botWipeChat(env, token, currentMsgId = null) {
+  // 1. Getrackte IDs einsammeln (per-Key, kein Überschreib-Race)
+  const ids = new Set();
+  try {
+    const listed = await env.TRADEBOOK_CACHE.list({ prefix: BOT_MSG_KEY_PREFIX, limit: 1000 });
+    for (const k of (listed.keys || [])) {
+      const id = parseInt(k.name.slice(BOT_MSG_KEY_PREFIX.length), 10);
+      if (isFinite(id)) ids.add(id);
+    }
+  } catch {}
+  // 2. Kehrbesen: aktuelle Nachricht + die IDs direkt darunter mitnehmen —
+  //    fängt ab, was das (eventually-consistent) KV-Listing noch nicht zeigt.
+  //    Telegram-Message-IDs sind im Privat-Chat aufsteigend.
+  if (currentMsgId) { for (let i = 0; i <= BOT_WIPE_SWEEP; i++) ids.add(currentMsgId - i); }
+  const all = [...ids].sort((a, b) => b - a); // neueste zuerst
+  const batch = all.slice(0, BOT_WIPE_BATCH);
+  const rest = all.length - batch.length;
   let deleted = 0;
-  for (const e of batch) {
+  for (const id of batch) {
     try {
-      const r = await fetch(`https://api.telegram.org/bot${token}/deleteMessage?chat_id=${encodeURIComponent(env.TELEGRAM_CHAT_ID)}&message_id=${e.id}`);
-      if (r.ok) deleted++;
+      const r = await fetch(`https://api.telegram.org/bot${token}/deleteMessage?chat_id=${encodeURIComponent(env.TELEGRAM_CHAT_ID)}&message_id=${id}`);
+      const j = await r.json().catch(() => null);
+      if (j && j.ok) deleted++;
     } catch {}
+    try { await env.TRADEBOOK_CACHE.delete(BOT_MSG_KEY_PREFIX + id); } catch {}
   }
-  try { await env.TRADEBOOK_CACHE.put(BOT_MSGS_KEY, JSON.stringify(rest), { expirationTtl: 3 * 24 * 3600 }); } catch {}
   await botClearState(env); // Dialog-Kontext gleich mit resetten
   let msg = "🗑 Chat geleert — " + deleted + " Nachricht" + (deleted === 1 ? "" : "en") + " gelöscht, Dialog zurückgesetzt.";
-  if (rest.length) msg += "\nEs stehen noch " + rest.length + " aus — nochmal 'Chat löschen' senden.";
-  if (tooOld > 0) msg += "\nHinweis: " + tooOld + " Nachricht(en) waren älter als 48h — die darf ein Bot nicht mehr löschen (Telegram-Limit). Tipp: Im Chat den Auto-Lösch-Timer aktivieren (⋮ → Automatische Löschung), dann räumt Telegram selbst auf.";
+  if (rest > 0) msg += "\nEs könnten noch ältere Nachrichten übrig sein — nochmal 'Chat löschen' senden.";
   await sendEntryTracked(env, msg, token);
 }
 
@@ -2300,7 +2307,7 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
       // "Chat löschen" u.ä. → deterministisch, ohne Claude: alle getrackten
       // Nachrichten (≤48h) aus dem Chat entfernen + Dialog resetten
       if (!attachRef && BOT_WIPE_COMMANDS.has(normed)) {
-        await botWipeChat(env, entryToken);
+        await botWipeChat(env, entryToken, m.message_id);
         return;
       }
       // "Modell"/"Provider" → kostenloser Status: läuft Gemini oder Anthropic?
