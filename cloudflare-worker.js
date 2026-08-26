@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.2";
+const WORKER_VERSION = "2026-08-26.3";
 
 const WORKER_STRINGS = {
   de: {
@@ -687,8 +687,12 @@ async function computePerf(trade) {
   };
 }
 
-async function sendTelegram(env, text) {
-  const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }) });
+// token=null → Alarm-Bot (TELEGRAM_BOT_TOKEN). Der Assistant-Bot (Eintrage-
+// Dialog, separater Chat) sendet über TELEGRAM_ENTRY_BOT_TOKEN. Die Chat-ID ist
+// bei Privat-Chats für beide Bots dieselbe (Roberts Telegram-Nutzer-ID).
+async function sendTelegram(env, text, token = null) {
+  const t = token || env.TELEGRAM_BOT_TOKEN;
+  const r = await fetch(`https://api.telegram.org/bot${t}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }) });
   if (!r.ok) console.error("Telegram send failed:", r.status);
   return r.ok;
 }
@@ -1693,7 +1697,7 @@ async function botProcessMessage(env, userText, opts = {}) {
   // Verlauf fortschreiben (nur Text-Ebene, Tool-Zwischenschritte bleiben ephemer)
   state.history = [...(state.history || []), { role: "user", content: userText }, { role: "assistant", content: replyText }];
   await botSaveState(env, state);
-  if (!opts.dryRun) await sendTelegram(env, replyText);
+  if (!opts.dryRun) await sendTelegram(env, replyText, opts.token || null);
   return replyText;
 }
 
@@ -1702,9 +1706,13 @@ async function handleTelegramWebhook(req, env, ctx) {
   const m = update.message;
   if (!m || !m.chat || String(m.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return textResponse("ignored");
 
-  // Bot-Dialog nur mit konfiguriertem ANTHROPIC_API_KEY + Text-Nachricht.
+  // Zwei-Bot-Modus (TELEGRAM_ENTRY_BOT_TOKEN gesetzt): der Alarm-Bot ist wieder
+  // rein deterministisch — jede Antwort quittiert alle aktiven Alarme, kein
+  // Claude-Aufruf, keine "ok"-Doppeldeutigkeit. Der Dialog lebt komplett beim
+  // Assistant-Bot (/telegram-entry-webhook).
+  // Bot-Dialog im Ein-Bot-Modus nur mit konfiguriertem ANTHROPIC_API_KEY + Text.
   // Verarbeitung async via waitUntil — Telegram will schnell ein 200 sehen.
-  if (env.ANTHROPIC_API_KEY && typeof m.text === "string" && m.text.trim()) {
+  if (env.ANTHROPIC_API_KEY && !env.TELEGRAM_ENTRY_BOT_TOKEN && typeof m.text === "string" && m.text.trim()) {
     const text = m.text.trim();
     ctx.waitUntil((async () => {
       try {
@@ -1758,10 +1766,61 @@ async function handleTelegramWebhook(req, env, ctx) {
   return textResponse("ok");
 }
 
+// Webhook des Assistant-Bots (Zwei-Bot-Modus): kompletter Claude-Dialog für
+// Trades/Watchlist/Statusfragen. Kein Alarm-Quittieren über den "ok"-Kurzschluss
+// hier — Quittierungen gehören in den Alarm-Chat (das war der Sinn der Trennung).
+async function handleTelegramEntryWebhook(req, env, ctx) {
+  let update; try { update = await req.json(); } catch { return textResponse("bad json", 400); }
+  const m = update.message;
+  if (!m || !m.chat || String(m.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return textResponse("ignored");
+  if (typeof m.text !== "string" || !m.text.trim()) return textResponse("ignored");
+  const entryToken = env.TELEGRAM_ENTRY_BOT_TOKEN;
+  if (!entryToken) return textResponse("entry bot not configured");
+  const text = m.text.trim();
+  if (!env.ANTHROPIC_API_KEY) {
+    ctx.waitUntil(sendTelegram(env, "⚠️ ANTHROPIC_API_KEY fehlt — der Assistent braucht ihn zum Verstehen.", entryToken));
+    return textResponse("ok");
+  }
+  ctx.waitUntil((async () => {
+    try {
+      // Kosten-Kurzschluss: "ok" auf eine ausstehende Zusammenfassung → direkt eintragen
+      const normed = text.toLowerCase().replace(/[\s!.,:;()]+/g, "");
+      if (BOT_ACK_WORDS.has(normed)) {
+        const state = await botLoadState(env);
+        if (state.phase === "awaiting_confirm" && (state.drafts.length > 0 || state.watchDrafts.length > 0)) {
+          try {
+            const doneText = await botCommitDrafts(env, state);
+            await botClearState(env);
+            await sendTelegram(env, doneText, entryToken);
+          } catch (e2) {
+            await sendTelegram(env, "❌ Eintragen fehlgeschlagen: " + e2.message + "\nDie Entwürfe bleiben erhalten — nochmal 'ok' senden zum erneuten Versuch.", entryToken);
+          }
+          return;
+        }
+      }
+      await botProcessMessage(env, text, { token: entryToken });
+    } catch (e) {
+      console.error("entry bot error:", e.message);
+      try { await sendTelegram(env, "⚠️ Assistent momentan nicht erreichbar (" + e.message.slice(0, 300) + ")", entryToken); } catch {}
+    }
+  })());
+  return textResponse("ok");
+}
+
 async function setupWebhook(req, env) {
   const u = new URL(req.url);
   const webhookUrl = u.origin + "/telegram-webhook";
   const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
+  return jsonResponse({ requested: webhookUrl, telegram: await r.json() });
+}
+
+// Registriert den Webhook des Assistant-Bots (einmalig nach Anlegen des Bots
+// + Secret TELEGRAM_ENTRY_BOT_TOKEN aufrufen).
+async function setupEntryWebhook(req, env) {
+  if (!env.TELEGRAM_ENTRY_BOT_TOKEN) return jsonResponse({ error: "TELEGRAM_ENTRY_BOT_TOKEN not configured" }, 400);
+  const u = new URL(req.url);
+  const webhookUrl = u.origin + "/telegram-entry-webhook";
+  const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_ENTRY_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
   return jsonResponse({ requested: webhookUrl, telegram: await r.json() });
 }
 
@@ -1772,7 +1831,7 @@ export default {
     if (url.pathname === "/" || url.pathname === "") {
       const s = url.searchParams.get("symbol");
       if (s) return yahooProxy(s);
-      return textResponse("Pair Trade Tracker Worker v" + WORKER_VERSION + " — endpoints: /?symbol=, /profile?symbol=, /sync-info, /check, /check-squeeze, /test-alert, /setup-webhook, /telegram-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST), /bot-test (POST)");
+      return textResponse("Pair Trade Tracker Worker v" + WORKER_VERSION + " — endpoints: /?symbol=, /profile?symbol=, /sync-info, /check, /check-squeeze, /test-alert, /setup-webhook, /setup-entry-webhook, /telegram-webhook, /telegram-entry-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST), /bot-test (POST)");
     }
     if (url.pathname === "/profile") {
       const s = url.searchParams.get("symbol");
@@ -1784,7 +1843,9 @@ export default {
     if (url.pathname === "/check-squeeze") { try { return jsonResponse(await runShortSqueezeCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
     if (url.pathname === "/test-alert") return textResponse(await sendTestAlert(env));
     if (url.pathname === "/setup-webhook") return setupWebhook(req, env);
+    if (url.pathname === "/setup-entry-webhook") return setupEntryWebhook(req, env);
     if (url.pathname === "/telegram-webhook" && req.method === "POST") return handleTelegramWebhook(req, env, ctx);
+    if (url.pathname === "/telegram-entry-webhook" && req.method === "POST") return handleTelegramEntryWebhook(req, env, ctx);
     // Bot-Dialog testen ohne Telegram (Bearer SYNC_SECRET): POST /bot-test {"text": "..."}
     // Antwort kommt als HTTP-Response zurück statt als Telegram-Nachricht (dry-run).
     if (url.pathname === "/bot-test" && req.method === "POST") {

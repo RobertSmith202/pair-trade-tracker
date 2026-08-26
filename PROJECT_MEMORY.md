@@ -817,6 +817,8 @@ Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; d
 
 **Architektur im Worker:** `botProcessMessage()` = Tool-Loop (max. 6 Runden) gegen `POST api.anthropic.com/v1/messages` mit Tools `search_symbol`, `get_quote` und dem terminalen `emit_action` (strict; Aktionen ask/propose/save/cancel/ack_alarms/reply). Worker validiert Drafts selbst (`botValidateDraft`) — unvollständiges propose/save wird als Tool-Error in den Loop zurückgespielt. **`save` trägt immer den GESPEICHERTEN Draft ein** (den zuletzt zusammengefassten Stand), nie den vom Modell mitgeschickten — verhindert Last-Second-Änderungen ohne neue Zusammenfassung. Dialog-State (History max. 24 Nachrichten, Draft, Phase) in KV `bot_state:v1`, TTL 24h. Gleicher Ticker+Typ beim Eintragen → Tranche an bestehenden Trade (Super-Trade-Konvention inkl. Schwellen-Erbregeln). Webhook antwortet Telegram sofort 200, Verarbeitung via `ctx.waitUntil`.
 
+**Zwei-Bot-Modus (seit Worker v2026-08-26.3, Roberts Wunsch):** Mit Secret `TELEGRAM_ENTRY_BOT_TOKEN` (zweiter BotFather-Bot, Robert nennt ihn „Assistant Bot") teilt sich die Arbeit: Der **Alarm-Bot** (bestehender Token) verschickt weiterhin alle Alarme + 📡-Watchlist-Meldungen und wird wieder rein deterministisch — jede Antwort quittiert, kein Claude-Aufruf, keine „ok"-Doppeldeutigkeit mit ausstehenden Zusammenfassungen. Der **Assistant-Bot** führt den kompletten Claude-Dialog über die eigene Route `/telegram-entry-webhook` (einmalig via `GET /setup-entry-webhook` registrieren; Chat-ID ist dieselbe — bei Privat-Chats Roberts Nutzer-ID, bot-unabhängig). Grund: Minuten-Repeat-Alarme begruben sonst die Bestätigungs-Zusammenfassungen im selben Chat. Ohne das Secret gilt unverändert der Ein-Bot-Modus.
+
 **Alarm-Quittierung bleibt ausfallsicher:** Claude entscheidet die Intention (kurze Bestätigung bei aktiven Alarmen ohne ausstehende Zusammenfassung → ack). Wenn die Claude API down ist, fällt der Webhook auf das Legacy-Verhalten zurück (alles quittieren + Fehlerhinweis) — Quittieren darf nie von Anthropic-Verfügbarkeit abhängen.
 
 **Kosten:** ~2–5 Cent pro kompletter Trade-Eintragung (Haiku 4.5; mit Opus 5 wären es ~10–25 Cent). **Kosten-Kurzschluss:** Eindeutige Ein-Wort-Bestätigungen (`BOT_ACK_WORDS`: ok/ja/passt/quittiert/👍 …) verarbeitet der Worker ohne Claude-Aufruf — Zusammenfassung bestätigen (deterministisches Eintragen des gespeicherten Drafts) und Alarm-Quittierung (nur wenn kein Dialog aktiv ist, sonst könnte „ja" die Antwort auf eine Bot-Frage sein) sind damit kostenlos. Ausgehende Alarm-Nachrichten kosten grundsätzlich nichts (kein Claude im Alarm-Pfad). `POST /bot-test` (Bearer SYNC_SECRET, `{"text": "..."}`) testet den Dialog ohne Telegram (dry-run, Antwort als HTTP-Response).
@@ -853,6 +855,7 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 - `TELEGRAM_CHAT_ID` (die Chat-ID zwischen Robert und seinem Bot)
 - `SYNC_SECRET` (32-Zeichen-Random, für App-Sync + /bot-test)
 - `ANTHROPIC_API_KEY` (von console.anthropic.com — aktiviert den Bot-Dialog; ohne den Key läuft der Webhook im Legacy-Modus)
+- `TELEGRAM_ENTRY_BOT_TOKEN` (optional — zweiter Bot „Assistant Bot" für den Eintrage-Dialog; aktiviert den Zwei-Bot-Modus)
 - `JSONBIN_BIN_ID` / `JSONBIN_KEY` (Legacy, nur noch für Migrations-Fallback)
 
 ---

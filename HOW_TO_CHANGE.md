@@ -61,6 +61,21 @@ Hat nichts mit Code zu tun. In Telegram an **@BotFather** schreiben → `/mybots
 
 **Deaktivieren:** Secret `ANTHROPIC_API_KEY` löschen → Webhook verhält sich wieder wie früher (jede Antwort quittiert Alarme).
 
+### H) Zweiter Bot für den Eintrage-Dialog („Assistant Bot", einmalig, Aug 2026)
+
+**Wozu:** Alarme (minütliche Wiederholung!) und Eintrage-Dialog in getrennten Chats — die Bestätigungs-Zusammenfassung geht nicht mehr zwischen 🚨-Nachrichten unter, und „ok" ist nie mehr doppeldeutig. Der Alarm-Bot quittiert dann wieder auf jede Antwort (kostenlos, ohne Claude).
+
+**Setup-Schritte:**
+
+1. In Telegram an **@BotFather**: `/newbot` → Namen vergeben (z.B. „Assistant Bot") → **Token** kopieren (Chat-ID braucht es NICHT neu — die ist bot-unabhängig deine Nutzer-ID).
+2. Cloudflare → Worker → Settings → Variables and Secrets → Add → Secret **`TELEGRAM_ENTRY_BOT_TOKEN`** = der Token.
+3. Neuen Worker-Code deployen (Workflow B).
+4. Einmal im Browser aufrufen: `https://yahoo-finance-proxy.fabian-terhorst.workers.dev/setup-entry-webhook` → sollte `"ok": true` vom Telegram-API zeigen.
+5. Dem neuen Bot in Telegram **`/start`** schreiben (sonst darf er nicht antworten).
+6. Testen: dem Assistant-Bot „Neuer Long" schreiben → Rückfrage muss kommen. Dem Alarm-Bot irgendwas schreiben → „✅ Alarm bestätigt".
+
+**Deaktivieren:** Secret `TELEGRAM_ENTRY_BOT_TOKEN` löschen → alles läuft wieder über den einen Bot.
+
 ### D) Cloudflare Secrets ändern (neues Token, neue Bin-ID)
 
 **Beispiele:** JSONBin-Key rotiert, neuer Telegram-Bot.
