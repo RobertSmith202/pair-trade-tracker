@@ -745,7 +745,7 @@ async function botWipeChat(env, token) {
   try { await env.TRADEBOOK_CACHE.put(BOT_MSGS_KEY, JSON.stringify(rest), { expirationTtl: 3 * 24 * 3600 }); } catch {}
   await botClearState(env); // Dialog-Kontext gleich mit resetten
   let msg = "🗑 Chat geleert — " + deleted + " Nachricht" + (deleted === 1 ? "" : "en") + " gelöscht, Dialog zurückgesetzt.";
-  if (rest.length) msg += "\nEs stehen noch " + rest.length + " aus — nochmal „Chat löschen" senden.";
+  if (rest.length) msg += "\nEs stehen noch " + rest.length + " aus — nochmal 'Chat löschen' senden.";
   if (tooOld > 0) msg += "\nHinweis: " + tooOld + " Nachricht(en) waren älter als 48h — die darf ein Bot nicht mehr löschen (Telegram-Limit). Tipp: Im Chat den Auto-Lösch-Timer aktivieren (⋮ → Automatische Löschung), dann räumt Telegram selbst auf.";
   await sendEntryTracked(env, msg, token);
 }
