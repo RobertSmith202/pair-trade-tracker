@@ -8,7 +8,10 @@
 <meta name="apple-mobile-web-app-title" content="Pair Trades">
 <meta name="theme-color" content="#1a1a1a">
 <title>Pair Trade Tracker</title>
-<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='36' fill='%231a1a1a'/><text x='50%25' y='58%25' text-anchor='middle' fill='white' font-size='90' font-family='-apple-system' font-weight='700'>L|S</text></svg>">
+<!-- Home-Icon: MUSS eine echte PNG-Datei sein — iOS ignoriert Data-URIs und SVG
+     für apple-touch-icon (deshalb erschien vorher nur der Buchstaben-Platzhalter).
+     Quelle: icon-source.svg (Marken-Eule auf Midnight-Verlauf). -->
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%231a1a1a'/><text x='50%25' y='62%25' text-anchor='middle' fill='white' font-size='28' font-weight='700' font-family='sans-serif'>L|S</text></svg>">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -2746,7 +2749,7 @@ let syncDebounce = null;
 // Sichtbare App-Version (Menü + Sidebar) — bei jeder HTML-Änderung hochzählen.
 // Zweck: zweifelsfrei erkennen, ob eine PWA noch eine alte Version aus dem
 // Cache lädt (der Sync-Clobber-Vorfall Aug 2026 war genau das, unentdeckbar).
-const APP_VERSION = "2026-08-26.1";
+const APP_VERSION = "2026-08-26.2";
 const PAGES = ["pair", "long", "short", "watch", "total"];
 let currentPage = "pair";
 let formType = "pair";
