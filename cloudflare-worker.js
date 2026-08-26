@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.10";
+const WORKER_VERSION = "2026-08-26.11";
 
 const WORKER_STRINGS = {
   de: {
@@ -541,8 +541,19 @@ async function handleTradebookPost(req, env) {
 async function handleSyncInfo(env) {
   try {
     const { data, source } = await loadTradebook(env);
+    // LLM-Diagnose: nur Booleans + letzte Gemini-Fehler-/Erfolgs-Marker,
+    // niemals Key-Werte. Beantwortet "läuft wirklich Gemini?" von außen.
+    let gemErr = null, gemOk = null;
+    try { gemErr = await env.TRADEBOOK_CACHE.get("gem_err:last", { type: "json" }); } catch {}
+    try { const v = await env.TRADEBOOK_CACHE.get("gem_ok:last"); gemOk = v ? parseInt(v, 10) : null; } catch {}
     return jsonResponse({
       version: WORKER_VERSION,
+      llm: {
+        geminiKeySet: !!env.GEMINI_API_KEY,
+        anthropicKeySet: !!env.ANTHROPIC_API_KEY,
+        geminiLastOkAgeSec: gemOk ? Math.round((Date.now() - gemOk) / 1000) : null,
+        geminiLastError: gemErr ? { ageSec: Math.round((Date.now() - gemErr.ts) / 1000), err: gemErr.err } : null
+      },
       source,
       lastModified: data.lastModified || 0,
       ageSeconds: data.lastModified ? Math.round((Date.now() - data.lastModified) / 1000) : null,
@@ -2003,8 +2014,13 @@ async function botProcessMessage(env, userText, opts = {}) {
   for (let round = 0; round < BOT_MAX_LLM_ROUNDS; round++) {
     let resp;
     if (env.GEMINI_API_KEY) {
-      try { resp = await geminiCall(env, system, messages); }
-      catch (e) {
+      try {
+        resp = await geminiCall(env, system, messages);
+        // Erfolgs-Marker für /sync-info (Diagnose: läuft wirklich Gemini?)
+        try { await env.TRADEBOOK_CACHE.put("gem_ok:last", String(Date.now()), { expirationTtl: 7 * 86400 }); } catch {}
+      } catch (e) {
+        // Fehler-Marker VOR dem stillen Fallback — sonst ist die Ursache unsichtbar
+        try { await env.TRADEBOOK_CACHE.put("gem_err:last", JSON.stringify({ ts: Date.now(), err: String(e.message).slice(0, 300) }), { expirationTtl: 7 * 86400 }); } catch {}
         if (!env.ANTHROPIC_API_KEY) throw e;
         console.warn("gemini failed, fallback auf anthropic:", e.message);
         resp = await claudeCall(env, system, messages, model);
