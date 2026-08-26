@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.6";
+const WORKER_VERSION = "2026-08-26.7";
 
 const WORKER_STRINGS = {
   de: {
@@ -690,11 +690,64 @@ async function computePerf(trade) {
 // token=null → Alarm-Bot (TELEGRAM_BOT_TOKEN). Der Assistant-Bot (Eintrage-
 // Dialog, separater Chat) sendet über TELEGRAM_ENTRY_BOT_TOKEN. Die Chat-ID ist
 // bei Privat-Chats für beide Bots dieselbe (Roberts Telegram-Nutzer-ID).
+// Returns das gesendete Message-Objekt (für Tracking) bzw. true/false.
 async function sendTelegram(env, text, token = null) {
   const t = token || env.TELEGRAM_BOT_TOKEN;
   const r = await fetch(`https://api.telegram.org/bot${t}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }) });
-  if (!r.ok) console.error("Telegram send failed:", r.status);
-  return r.ok;
+  if (!r.ok) { console.error("Telegram send failed:", r.status); return false; }
+  const j = await r.json().catch(() => null);
+  return j?.result || true;
+}
+
+// === "Chat löschen"-Kurzbefehl im Assistant-Chat ===========================
+// Der Worker merkt sich die Message-IDs des Entry-Chats (eingehend + eigene
+// Antworten) in KV. Auf Kommando löscht er alle davon per deleteMessage.
+// Telegram-Grenzen: Bots können nur Nachrichten der letzten 48h löschen und
+// die Historie nicht auflisten — deshalb das eigene ID-Tracking. Ältere
+// Nachrichten deckt Telegrams nativer Auto-Lösch-Timer im Chat ab.
+const BOT_MSGS_KEY = "bot_msgs:v1";
+const BOT_MSGS_MAX = 200;
+const BOT_WIPE_BATCH = 40;              // Subrequest-Limit-Puffer pro Aufruf
+const BOT_MSG_MAX_AGE_MS = 48 * 3600 * 1000;
+const BOT_WIPE_COMMANDS = new Set(["chatlöschen", "chatleeren", "löschdenchat", "chatlöschung", "automatischelöschung", "chatreset", "resetchat", "clearchat"]);
+
+async function botTrackMsg(env, messageId) {
+  if (!messageId) return;
+  try {
+    const list = (await env.TRADEBOOK_CACHE.get(BOT_MSGS_KEY, { type: "json" })) || [];
+    list.push({ id: messageId, ts: Date.now() });
+    await env.TRADEBOOK_CACHE.put(BOT_MSGS_KEY, JSON.stringify(list.slice(-BOT_MSGS_MAX)), { expirationTtl: 3 * 24 * 3600 });
+  } catch {}
+}
+
+// Antwort im Entry-Chat senden + fürs spätere Löschen vormerken
+async function sendEntryTracked(env, text, token) {
+  const res = await sendTelegram(env, text, token);
+  if (res && res.message_id) await botTrackMsg(env, res.message_id);
+  return res;
+}
+
+async function botWipeChat(env, token) {
+  let list = [];
+  try { list = (await env.TRADEBOOK_CACHE.get(BOT_MSGS_KEY, { type: "json" })) || []; } catch {}
+  const now = Date.now();
+  const deletable = list.filter(e => now - e.ts < BOT_MSG_MAX_AGE_MS);
+  const tooOld = list.length - deletable.length;
+  const batch = deletable.slice(0, BOT_WIPE_BATCH);
+  const rest = deletable.slice(BOT_WIPE_BATCH);
+  let deleted = 0;
+  for (const e of batch) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/deleteMessage?chat_id=${encodeURIComponent(env.TELEGRAM_CHAT_ID)}&message_id=${e.id}`);
+      if (r.ok) deleted++;
+    } catch {}
+  }
+  try { await env.TRADEBOOK_CACHE.put(BOT_MSGS_KEY, JSON.stringify(rest), { expirationTtl: 3 * 24 * 3600 }); } catch {}
+  await botClearState(env); // Dialog-Kontext gleich mit resetten
+  let msg = "🗑 Chat geleert — " + deleted + " Nachricht" + (deleted === 1 ? "" : "en") + " gelöscht, Dialog zurückgesetzt.";
+  if (rest.length) msg += "\nEs stehen noch " + rest.length + " aus — nochmal „Chat löschen" senden.";
+  if (tooOld > 0) msg += "\nHinweis: " + tooOld + " Nachricht(en) waren älter als 48h — die darf ein Bot nicht mehr löschen (Telegram-Limit). Tipp: Im Chat den Auto-Lösch-Timer aktivieren (⋮ → Automatische Löschung), dann räumt Telegram selbst auf.";
+  await sendEntryTracked(env, msg, token);
 }
 
 // alarmKind = "loss" (loss threshold, repeating until ack)
@@ -1777,6 +1830,7 @@ ABLAUF:
 5. Robert will abbrechen → action "cancel".
 6. Nachricht ist eine Alarm-Quittierung (kurze Bestätigung während aktive Alarme laufen und KEINE Zusammenfassung aussteht, oder Worte wie "quittiert") → action "ack_alarms".
 7. Alles andere (Statusfrage, Smalltalk) → action "reply" (Statusfragen zu Kursen per get_quote beantworten).
+8. Fragt Robert, wie er den Chat leeren kann: Kurzbefehl "Chat löschen" (verarbeitet der Worker selbst — löscht alle Nachrichten der letzten 48h und resettet den Dialog; Älteres deckt Telegrams Auto-Lösch-Timer ab).
 
 KENNZAHL-ABFRAGEN (action "reply", Daten IMMER frisch via get_portfolio_stats holen):
 - Robert kann alles abfragen: Longs/Shorts/Pairs/Gesamt-Aggregate, Portfolio-Gewichtung (pro Position), Long/Short-Exposure — WICHTIG: sowohl nach Einstand (exposure.entry / weightStartPct, "notionale Gewichtung") als auch nach aktuellem Marktwert (exposure.current / weightNowPct, "wahre Gewichtung") — Portfolio-Beta, Sektor-Aufteilung (Donut-Daten) und den Watchlist-Stand inkl. Live-Kursen.
@@ -1926,7 +1980,10 @@ async function botProcessMessage(env, userText, opts = {}) {
   // Verlauf fortschreiben (nur Text-Ebene, Tool-Zwischenschritte bleiben ephemer)
   state.history = [...(state.history || []), { role: "user", content: userText }, { role: "assistant", content: replyText }];
   await botSaveState(env, state);
-  if (!opts.dryRun) await sendTelegram(env, replyText, opts.token || null);
+  if (!opts.dryRun) {
+    if (opts.token) await sendEntryTracked(env, replyText, opts.token);
+    else await sendTelegram(env, replyText);
+  }
   return replyText;
 }
 
@@ -2017,22 +2074,30 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
   }
   ctx.waitUntil((async () => {
     try {
+      // Jede eingehende Nachricht fürs "Chat löschen"-Kommando vormerken
+      await botTrackMsg(env, m.message_id);
+      const normed = text.toLowerCase().replace(/[\s!.,:;()"']+/g, "");
+      // "Chat löschen" u.ä. → deterministisch, ohne Claude: alle getrackten
+      // Nachrichten (≤48h) aus dem Chat entfernen + Dialog resetten
+      if (!photo && BOT_WIPE_COMMANDS.has(normed)) {
+        await botWipeChat(env, entryToken);
+        return;
+      }
       if (photo) {
         const image = await telegramFetchPhoto(entryToken, photo.file_id);
         await botProcessMessage(env, text, { token: entryToken, image });
         return;
       }
       // Kosten-Kurzschluss: "ok" auf eine ausstehende Zusammenfassung → direkt eintragen
-      const normed = text.toLowerCase().replace(/[\s!.,:;()]+/g, "");
       if (BOT_ACK_WORDS.has(normed)) {
         const state = await botLoadState(env);
         if (state.phase === "awaiting_confirm" && (state.drafts.length > 0 || state.watchDrafts.length > 0)) {
           try {
             const doneText = await botCommitDrafts(env, state);
             await botClearState(env);
-            await sendTelegram(env, doneText, entryToken);
+            await sendEntryTracked(env, doneText, entryToken);
           } catch (e2) {
-            await sendTelegram(env, "❌ Eintragen fehlgeschlagen: " + e2.message + "\nDie Entwürfe bleiben erhalten — nochmal 'ok' senden zum erneuten Versuch.", entryToken);
+            await sendEntryTracked(env, "❌ Eintragen fehlgeschlagen: " + e2.message + "\nDie Entwürfe bleiben erhalten — nochmal 'ok' senden zum erneuten Versuch.", entryToken);
           }
           return;
         }
@@ -2040,7 +2105,7 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
       await botProcessMessage(env, text, { token: entryToken });
     } catch (e) {
       console.error("entry bot error:", e.message);
-      try { await sendTelegram(env, "⚠️ Assistent momentan nicht erreichbar (" + e.message.slice(0, 300) + ")", entryToken); } catch {}
+      try { await sendEntryTracked(env, "⚠️ Assistent momentan nicht erreichbar (" + e.message.slice(0, 300) + ")", entryToken); } catch {}
     }
   })());
   return textResponse("ok");
