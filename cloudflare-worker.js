@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.3";
+const WORKER_VERSION = "2026-08-26.4";
 
 const WORKER_STRINGS = {
   de: {
@@ -1294,6 +1294,154 @@ async function botGetQuote(symbol) {
   } catch (e) { return { error: e.message }; }
 }
 
+// === Portfolio-Kennzahlen für den Assistant-Bot ============================
+// Spiegelt die App-Berechnungen (computeTrade/computePortfolioBeta/Donuts) im
+// Worker: Aggregate pro Typ, Long/Short-Exposure nach Einstand UND aktuellem
+// Marktwert, Positions-Gewichtungen, Sektor-Aufteilung und Portfolio-Beta
+// (β$ = Σ LongNow×β − Σ ShortNow×β; β/Brutto und β/Netto wie in der App,
+// β/Netto nur wenn |Netto| > 5% Brutto; Beta-Quelle: Trade-Override vor Yahoo).
+
+// Sektor/Beta pro Ticker über die bestehende /profile-Logik (KV-gecacht 30 Tage).
+async function botGetProfile(env, sym) {
+  try { return await (await handleProfile(sym, env)).json(); }
+  catch (e) { return { symbol: sym, sector: null, beta: null, error: e.message }; }
+}
+
+const r2 = (x) => (x == null || !isFinite(x)) ? null : Math.round(x * 100) / 100;
+
+// Pro Trade: PnL + Notionale je Seite (Einstand + aktuell), in Home-Ccy.
+// priceCache dedupliziert die Yahoo-Fetches über alle Trades hinweg.
+async function botTradeLegAgg(trade, priceCache) {
+  const type = tradeType(trade);
+  const tranches = getTranches(trade);
+  const getP = async (sym) => {
+    const k = String(sym).toUpperCase();
+    if (!priceCache.has(k)) priceCache.set(k, await fetchPriceInternal(sym));
+    return priceCache.get(k);
+  };
+  let longLive = null, shortLive = null;
+  if (type === "pair" || type === "long")  longLive  = await getP(trade.longTicker);
+  if (type === "pair" || type === "short") shortLive = await getP(trade.shortTicker);
+  let pnl = 0, longStart = 0, longNow = 0, shortStart = 0, shortNow = 0;
+  for (const tr of tranches) {
+    if (type === "pair" || type === "long") {
+      const ccy = tr.longEntryNative ? longLive.currency : (tr.longEntryCcy || HOME_CCY);
+      const L = await legPnl(tr.longEntry, tr.longQty, longLive.price, longLive.currency, ccy, true);
+      pnl += L.pnlHome; longStart += L.notionalHomeStart; longNow += L.notionalHomeNow;
+    }
+    if (type === "pair" || type === "short") {
+      const ccy = tr.shortEntryNative ? shortLive.currency : (tr.shortEntryCcy || HOME_CCY);
+      const S = await legPnl(tr.shortEntry, tr.shortQty, shortLive.price, shortLive.currency, ccy, false);
+      pnl += S.pnlHome; shortStart += S.notionalHomeStart; shortNow += S.notionalHomeNow;
+    }
+  }
+  return { type, pnl, longStart, longNow, shortStart, shortNow };
+}
+
+async function botPortfolioStats(env) {
+  const { data: record } = await loadTradebook(env);
+  const trades = Array.isArray(record.trades) ? record.trades : [];
+  const priceCache = new Map();
+  const errors = [];
+
+  const agg0 = () => ({ count: 0, pnl: 0, start: 0, now: 0 });
+  const buckets = { pair: agg0(), long: agg0(), short: agg0(), total: agg0() };
+  let longNowAll = 0, shortNowAll = 0, longStartAll = 0, shortStartAll = 0;
+  const positions = [];
+  const perTrade = [];
+
+  for (const tr of trades) {
+    try {
+      const a = await botTradeLegAgg(tr, priceCache);
+      perTrade.push({ tr, a });
+      const label = tr.name || (a.type === "long" ? tr.longTicker : a.type === "short" ? tr.shortTicker : (tr.longTicker + "/" + tr.shortTicker));
+      const start = a.longStart + a.shortStart, now = a.longNow + a.shortNow;
+      for (const b of [buckets[a.type], buckets.total]) { b.count++; b.pnl += a.pnl; b.start += start; b.now += now; }
+      longNowAll += a.longNow; shortNowAll += a.shortNow;
+      longStartAll += a.longStart; shortStartAll += a.shortStart;
+      positions.push({ name: label, type: a.type, inBasket: !!tr.basketId, pnl: r2(a.pnl), perfPct: r2(start > 0 ? (a.pnl / start) * 100 : null), startHome: r2(start), nowHome: r2(now) });
+    } catch (e) { errors.push((tr.name || tr.longTicker || tr.shortTicker || tr.id) + ": " + e.message); }
+  }
+
+  const grossNow = longNowAll + shortNowAll, netNow = longNowAll - shortNowAll;
+  const grossStart = longStartAll + shortStartAll;
+  for (const p of positions) {
+    p.weightNowPct = r2(grossNow > 0 && p.nowHome != null ? (p.nowHome / grossNow) * 100 : null);
+    p.weightStartPct = r2(grossStart > 0 && p.startHome != null ? (p.startHome / grossStart) * 100 : null);
+  }
+  positions.sort((x, y) => (y.nowHome || 0) - (x.nowHome || 0));
+
+  // Sektoren + Beta: Profile pro Ticker (KV-gecacht), gewichtet mit aktuellem Leg-Notional
+  const sectorMap = new Map();
+  let betaDollar = 0, grossWithBeta = 0;
+  const betaContribs = [];
+  const profileCache = new Map();
+  const getProf = async (sym) => {
+    const k = String(sym).toUpperCase();
+    if (!profileCache.has(k)) profileCache.set(k, await botGetProfile(env, k));
+    return profileCache.get(k);
+  };
+  const addSector = (sector, side, amount) => {
+    const key = sector || "Unbekannt";
+    if (!sectorMap.has(key)) sectorMap.set(key, { sector: key, longNow: 0, shortNow: 0 });
+    sectorMap.get(key)[side] += amount;
+  };
+  for (const { tr, a } of perTrade) {
+    if (a.longNow > 0 && tr.longTicker) {
+      const prof = await getProf(tr.longTicker);
+      addSector(prof.sector, "longNow", a.longNow);
+      const beta = (tr.longBetaOverride != null && isFinite(tr.longBetaOverride)) ? tr.longBetaOverride : (prof.beta != null && isFinite(prof.beta) ? prof.beta : null);
+      if (beta != null) { const c = a.longNow * beta; betaDollar += c; grossWithBeta += a.longNow; betaContribs.push({ name: tr.name || tr.longTicker, side: "long", beta: r2(beta), notional: r2(a.longNow), contribution: r2(c) }); }
+    }
+    if (a.shortNow > 0 && tr.shortTicker) {
+      const prof = await getProf(tr.shortTicker);
+      addSector(prof.sector, "shortNow", a.shortNow);
+      const beta = (tr.shortBetaOverride != null && isFinite(tr.shortBetaOverride)) ? tr.shortBetaOverride : (prof.beta != null && isFinite(prof.beta) ? prof.beta : null);
+      if (beta != null) { const c = -1 * a.shortNow * beta; betaDollar += c; grossWithBeta += a.shortNow; betaContribs.push({ name: tr.name || tr.shortTicker, side: "short", beta: r2(beta), notional: r2(a.shortNow), contribution: r2(c) }); }
+    }
+  }
+  const sectors = [...sectorMap.values()].map(s => ({
+    sector: s.sector,
+    longNow: r2(s.longNow), shortNow: r2(s.shortNow),
+    grossNow: r2(s.longNow + s.shortNow), netNow: r2(s.longNow - s.shortNow),
+    grossPct: r2(grossNow > 0 ? ((s.longNow + s.shortNow) / grossNow) * 100 : null)
+  })).sort((x, y) => (y.grossNow || 0) - (x.grossNow || 0));
+
+  // Watchlist mit Live-Kursen + Abstand zu den Grenzen
+  const watch = [];
+  for (const w of (Array.isArray(record.watchlist) ? record.watchlist : [])) {
+    if (!w.ticker) continue;
+    let price = null, ccy = null;
+    try { const p = await fetchPriceInternal(w.ticker); price = p.price; ccy = p.currency; } catch {}
+    watch.push({ ticker: w.ticker, name: w.name || null, side: w.side, price: r2(price), ccy, levelAbove: w.levelAbove ?? null, levelBelow: w.levelBelow ?? null });
+  }
+
+  const bucketOut = {};
+  for (const k of Object.keys(buckets)) {
+    const b = buckets[k];
+    bucketOut[k] = { count: b.count, pnl: r2(b.pnl), startHome: r2(b.start), nowHome: r2(b.now), perfPct: r2(b.start > 0 ? (b.pnl / b.start) * 100 : null) };
+  }
+  return {
+    homeCcy: HOME_CCY,
+    totals: bucketOut,
+    exposure: {
+      current: { longNow: r2(longNowAll), shortNow: r2(shortNowAll), grossNow: r2(grossNow), netNow: r2(netNow), longPct: r2(grossNow > 0 ? (longNowAll / grossNow) * 100 : null), shortPct: r2(grossNow > 0 ? (shortNowAll / grossNow) * 100 : null) },
+      entry:   { longStart: r2(longStartAll), shortStart: r2(shortStartAll), grossStart: r2(grossStart), netStart: r2(longStartAll - shortStartAll), longPct: r2(grossStart > 0 ? (longStartAll / grossStart) * 100 : null), shortPct: r2(grossStart > 0 ? (shortStartAll / grossStart) * 100 : null) }
+    },
+    beta: {
+      betaDollar: r2(betaDollar),
+      betaPerGross: r2(grossWithBeta > 0 ? betaDollar / grossWithBeta : null),
+      betaPerNet: r2((grossNow > 0 && Math.abs(netNow) > 0.05 * grossNow) ? betaDollar / netNow : null),
+      coveragePct: r2(grossNow > 0 ? (grossWithBeta / grossNow) * 100 : null),
+      contributors: betaContribs.sort((x, y) => Math.abs(y.contribution || 0) - Math.abs(x.contribution || 0))
+    },
+    positions,
+    sectors,
+    watchlist: watch,
+    errors
+  };
+}
+
 // Draft-Felder-Schema für emit_action (strict) — alle Felder Pflicht im Schema,
 // fehlende Infos als null. entryCurrency null = native Währung der Heimbörse
 // (Roberts Default), sonst expliziter Ccy-Code wenn er eine andere nennt.
@@ -1342,6 +1490,11 @@ const BOT_TOOLS = [
     name: "get_quote",
     description: "Holt aktuellen Kurs, Währung und Börse für ein Yahoo-Symbol. Nur nutzen wenn Robert nach Kursen/Status fragt — NICHT zur Kontrolle seiner Angaben.",
     input_schema: { type: "object", additionalProperties: false, properties: { symbol: { type: "string" } }, required: ["symbol"] }
+  },
+  {
+    name: "get_portfolio_stats",
+    description: "Berechnet ALLE Portfolio-Kennzahlen live (Home-Ccy EUR): Aggregate pro Typ (Pairs/Longs/Shorts/Gesamt: PnL, Performance %, Notional Einstand + aktuell), Long/Short-Exposure und -Gewichtung nach Einstand UND aktuellem Marktwert, Positions-Gewichtungen, Sektor-Aufteilung (Donut-Daten), Portfolio-Beta (β$, β/Brutto, β/Netto, Abdeckung, Beitrag pro Position) und die Watchlist mit Live-Kursen. Für JEDE Kennzahl-/Gewichtungs-/Beta-/Sektor-/Statusfrage aufrufen — dauert ein paar Sekunden, also nur bei solchen Fragen.",
+    input_schema: { type: "object", additionalProperties: false, properties: {} }
   },
   {
     name: "emit_action",
@@ -1578,6 +1731,11 @@ ABLAUF:
 6. Nachricht ist eine Alarm-Quittierung (kurze Bestätigung während aktive Alarme laufen und KEINE Zusammenfassung aussteht, oder Worte wie "quittiert") → action "ack_alarms".
 7. Alles andere (Statusfrage, Smalltalk) → action "reply" (Statusfragen zu Kursen per get_quote beantworten).
 
+KENNZAHL-ABFRAGEN (action "reply", Daten IMMER frisch via get_portfolio_stats holen):
+- Robert kann alles abfragen: Longs/Shorts/Pairs/Gesamt-Aggregate, Portfolio-Gewichtung (pro Position), Long/Short-Exposure — WICHTIG: sowohl nach Einstand (exposure.entry / weightStartPct, "notionale Gewichtung") als auch nach aktuellem Marktwert (exposure.current / weightNowPct, "wahre Gewichtung") — Portfolio-Beta, Sektor-Aufteilung (Donut-Daten) und den Watchlist-Stand inkl. Live-Kursen.
+- Antworte kompakt und leserlich formatiert (Telegram): Beträge in EUR gerundet, Prozente mit einer Nachkommastelle, Listen mit Zeilenumbrüchen, wichtigste Zahl zuerst. Nicht alle Daten ausschütten — nur was gefragt war; bei "alles" eine strukturierte Übersicht.
+- Beta-Lesart wie in der App: β/Brutto = Beta pro Brutto-Exposure; β/Netto nur wenn |Netto| > 5% Brutto (sonst market-neutral, dann das sagen). coveragePct nennt, wie viel vom Exposure Beta-Daten hat.
+
 WICHTIG: Beende JEDE Antwort mit genau einem emit_action-Aufruf. Bei "ask"/"propose" immer den aktuellen Draft-Zwischenstand mitgeben (bekannte Felder gefüllt, Rest null). Antworte auf ${record.lang === "en" ? "Englisch" : "Deutsch"}, kompakt und ohne Floskeln (Telegram-Chat).
 
 AKTUELLER DIALOG-STATUS: phase=${state.phase}${state.drafts.length ? ", gespeicherte Trade-Entwürfe: " + JSON.stringify(state.drafts) : ""}${state.watchDrafts.length ? ", gespeicherte Watch-Entwürfe: " + JSON.stringify(state.watchDrafts) : ""}${!state.drafts.length && !state.watchDrafts.length ? ", keine Entwürfe" : ""}
@@ -1639,6 +1797,11 @@ async function botProcessMessage(env, userText, opts = {}) {
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(await botSearchSymbol(block.input.query)) });
       } else if (block.name === "get_quote") {
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(await botGetQuote(block.input.symbol)) });
+      } else if (block.name === "get_portfolio_stats") {
+        let statsJson;
+        try { statsJson = JSON.stringify(await botPortfolioStats(env)); }
+        catch (e) { statsJson = JSON.stringify({ error: e.message }); }
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: statsJson });
       } else if (block.name === "emit_action") {
         const a = block.input;
         // Entwürfe aus der Aktion einsammeln — Einzel-Felder (draft/watch) und
