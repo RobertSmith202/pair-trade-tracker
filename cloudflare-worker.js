@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.8";
+const WORKER_VERSION = "2026-08-26.9";
 
 const WORKER_STRINGS = {
   de: {
@@ -1297,6 +1297,10 @@ const BOT_MAX_LLM_ROUNDS = 6;              // Tool-Loop-Deckel pro Webhook-Aufru
 // Roberts explizite Wahl (Aug 2026). Falls das Verstehen mal zu schwach wird:
 // hier auf "claude-opus-5" zurückstellen und Worker neu deployen.
 const CLAUDE_MODEL = "claude-haiku-4-5";
+// Für Nachrichten MIT Bild/PDF: stärkeres Modell — Haiku scheiterte live am
+// Ablesen kleiner Zahlen aus Telegram-komprimierten Fotos. Kostet nur bei
+// Anhang-Nachrichten mehr (~3–8 Cent statt 1–3), Textdialoge bleiben Haiku.
+const CLAUDE_VISION_MODEL = "claude-sonnet-5";
 
 async function botLoadState(env) {
   let st;
@@ -1863,7 +1867,7 @@ AKTIVE ALARME:
 ${alarmsCompact}`;
 }
 
-async function claudeCall(env, system, messages) {
+async function claudeCall(env, system, messages, model = CLAUDE_MODEL) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -1872,7 +1876,7 @@ async function claudeCall(env, system, messages) {
       "content-type": "application/json"
     },
     body: JSON.stringify({
-      model: CLAUDE_MODEL,
+      model,
       max_tokens: 8000,
       system,
       messages,
@@ -1906,8 +1910,9 @@ async function botProcessMessage(env, userText, opts = {}) {
   const messages = [...(state.history || []), { role: "user", content: userContent }];
   let replyText = null;
 
+  const model = att ? CLAUDE_VISION_MODEL : CLAUDE_MODEL;
   for (let round = 0; round < BOT_MAX_LLM_ROUNDS; round++) {
-    const resp = await claudeCall(env, system, messages);
+    const resp = await claudeCall(env, system, messages, model);
     if (resp.stop_reason === "refusal") { replyText = "⚠️ Anfrage konnte nicht verarbeitet werden — bitte anders formulieren."; break; }
     if (resp.stop_reason !== "tool_use") {
       // Modell hat ohne emit_action geantwortet → Text übernehmen als Fallback
