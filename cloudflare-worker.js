@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.11";
+const WORKER_VERSION = "2026-08-26.12";
 
 const WORKER_STRINGS = {
   de: {
@@ -1316,7 +1316,9 @@ const CLAUDE_VISION_MODEL = "claude-sonnet-5";
 // Gemini als primärer "Versteher" — Secret GEMINI_API_KEY (aistudio.google.com).
 // Ist der Key nicht gesetzt oder schlägt Gemini fehl (z.B. Tageslimit), fällt
 // der Bot automatisch auf die Anthropic-API zurück (falls deren Key existiert).
-const GEMINI_MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash ist für neue Accounts abgeschaltet (404 mit Verweis auf
+// dieses Modell — live diagnostiziert über den gem_err-Marker, Aug 2026)
+const GEMINI_MODEL = "gemini-3.6-flash";
 function botLlmReady(env) { return !!(env.GEMINI_API_KEY || env.ANTHROPIC_API_KEY); }
 
 async function botLoadState(env) {
