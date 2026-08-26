@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.13";
+const WORKER_VERSION = "2026-08-26.14";
 
 const WORKER_STRINGS = {
   de: {
@@ -1469,7 +1469,7 @@ async function botTradeLegAgg(trade, priceCache) {
   return { type, pnl, longStart, longNow, shortStart, shortNow };
 }
 
-async function botPortfolioStats(env) {
+async function botPortfolioStats(env, simulate = []) {
   const { data: record } = await loadTradebook(env);
   const trades = Array.isArray(record.trades) ? record.trades : [];
   const priceCache = new Map();
@@ -1494,13 +1494,9 @@ async function botPortfolioStats(env) {
     } catch (e) { errors.push((tr.name || tr.longTicker || tr.shortTicker || tr.id) + ": " + e.message); }
   }
 
-  const grossNow = longNowAll + shortNowAll, netNow = longNowAll - shortNowAll;
-  const grossStart = longStartAll + shortStartAll;
-  for (const p of positions) {
-    p.weightNowPct = r2(grossNow > 0 && p.nowHome != null ? (p.nowHome / grossNow) * 100 : null);
-    p.weightStartPct = r2(grossStart > 0 && p.startHome != null ? (p.startHome / grossStart) * 100 : null);
-  }
-  positions.sort((x, y) => (y.nowHome || 0) - (x.nowHome || 0));
+  // Basis-Exposure VOR dem Simulations-Overlay festhalten (für den Vergleich);
+  // Gewichte/Summen werden erst NACH dem Overlay berechnet.
+  const base = { longNow: longNowAll, shortNow: shortNowAll, longStart: longStartAll, shortStart: shortStartAll };
 
   // Sektoren + Beta: Profile pro Ticker (KV-gecacht), gewichtet mit aktuellem Leg-Notional
   const sectorMap = new Map();
@@ -1531,6 +1527,40 @@ async function botPortfolioStats(env) {
       if (beta != null) { const c = -1 * a.shortNow * beta; betaDollar += c; grossWithBeta += a.shortNow; betaContribs.push({ name: tr.name || tr.shortTicker, side: "short", beta: r2(beta), notional: r2(a.shortNow), contribution: r2(c) }); }
     }
   }
+
+  // --- Portfolio-Simulator-Overlay -----------------------------------------
+  // Hypothetische Positionen: Betrag in EUR = heutiger Marktwert = Einstand
+  // (Kauf "jetzt"), PnL 0. Fließen in Exposure, Gewichte, Sektoren und Beta
+  // ein — NICHT in die totals-Buckets (die bleiben der echte Bestand) und
+  // werden NIEMALS ins Tradebook gespeichert.
+  const simApplied = [];
+  for (const sp of (Array.isArray(simulate) ? simulate : [])) {
+    const amt = Number(sp && sp.amountEur);
+    if (!isFinite(amt) || amt <= 0) continue;
+    const side = sp.side === "short" ? "short" : "long";
+    let sector = "Simulation", beta = null;
+    const label = sp.ticker ? String(sp.ticker).toUpperCase() : "(ohne Ticker)";
+    if (sp.ticker) {
+      const prof = await getProf(sp.ticker);
+      sector = prof.sector || "Unbekannt";
+      beta = (prof.beta != null && isFinite(prof.beta)) ? prof.beta : null;
+    }
+    if (side === "long") { longNowAll += amt; longStartAll += amt; }
+    else { shortNowAll += amt; shortStartAll += amt; }
+    addSector(sector, side === "long" ? "longNow" : "shortNow", amt);
+    if (beta != null) { const c = (side === "long" ? 1 : -1) * amt * beta; betaDollar += c; grossWithBeta += amt; betaContribs.push({ name: "SIM " + label, side, beta: r2(beta), notional: r2(amt), contribution: r2(c) }); }
+    positions.push({ name: "SIM " + label, type: side, sim: true, pnl: 0, perfPct: 0, startHome: r2(amt), nowHome: r2(amt) });
+    simApplied.push({ side, ticker: sp.ticker || null, amountEur: r2(amt), sector, beta: r2(beta) });
+  }
+
+  const grossNow = longNowAll + shortNowAll, netNow = longNowAll - shortNowAll;
+  const grossStart = longStartAll + shortStartAll;
+  for (const p of positions) {
+    p.weightNowPct = r2(grossNow > 0 && p.nowHome != null ? (p.nowHome / grossNow) * 100 : null);
+    p.weightStartPct = r2(grossStart > 0 && p.startHome != null ? (p.startHome / grossStart) * 100 : null);
+  }
+  positions.sort((x, y) => (y.nowHome || 0) - (x.nowHome || 0));
+
   const sectors = [...sectorMap.values()].map(s => ({
     sector: s.sector,
     longNow: r2(s.longNow), shortNow: r2(s.shortNow),
@@ -1569,6 +1599,14 @@ async function botPortfolioStats(env) {
     positions,
     sectors,
     watchlist: watch,
+    simulation: simApplied.length ? {
+      note: "HYPOTHETISCH — nichts wurde eingetragen. totals = echter Bestand ohne Simulation; exposure/positions/sectors/beta ENTHALTEN die Simulation.",
+      applied: simApplied,
+      exposureWithoutSim: {
+        current: { longNow: r2(base.longNow), shortNow: r2(base.shortNow), netNow: r2(base.longNow - base.shortNow), longPct: r2((base.longNow + base.shortNow) > 0 ? (base.longNow / (base.longNow + base.shortNow)) * 100 : null), shortPct: r2((base.longNow + base.shortNow) > 0 ? (base.shortNow / (base.longNow + base.shortNow)) * 100 : null) },
+        entry:   { longStart: r2(base.longStart), shortStart: r2(base.shortStart), netStart: r2(base.longStart - base.shortStart), longPct: r2((base.longStart + base.shortStart) > 0 ? (base.longStart / (base.longStart + base.shortStart)) * 100 : null), shortPct: r2((base.longStart + base.shortStart) > 0 ? (base.shortStart / (base.longStart + base.shortStart)) * 100 : null) }
+      }
+    } : undefined,
     errors
   };
 }
@@ -1625,8 +1663,14 @@ const BOT_TOOLS = [
   },
   {
     name: "get_portfolio_stats",
-    description: "Berechnet ALLE Portfolio-Kennzahlen live (Home-Ccy EUR): Aggregate pro Typ (Pairs/Longs/Shorts/Gesamt: PnL, Performance %, Notional Einstand + aktuell), Long/Short-Exposure und -Gewichtung nach Einstand UND aktuellem Marktwert, Positions-Gewichtungen, Sektor-Aufteilung (Donut-Daten), Portfolio-Beta (β$, β/Brutto, β/Netto, Abdeckung, Beitrag pro Position) und die Watchlist mit Live-Kursen. Für JEDE Kennzahl-/Gewichtungs-/Beta-/Sektor-/Statusfrage aufrufen — dauert ein paar Sekunden, also nur bei solchen Fragen.",
-    input_schema: { type: "object", additionalProperties: false, properties: {} }
+    description: "Berechnet ALLE Portfolio-Kennzahlen live (Home-Ccy EUR): Aggregate pro Typ (Pairs/Longs/Shorts/Gesamt: PnL, Performance %, Notional Einstand + aktuell), Long/Short-Exposure und -Gewichtung nach Einstand UND aktuellem Marktwert, Positions-Gewichtungen, Sektor-Aufteilung (Donut-Daten), Portfolio-Beta (β$, β/Brutto, β/Netto, Abdeckung, Beitrag pro Position) und die Watchlist mit Live-Kursen. Für JEDE Kennzahl-/Gewichtungs-/Beta-/Sektor-/Statusfrage aufrufen — dauert ein paar Sekunden, also nur bei solchen Fragen. Optional simulate: hypothetische Positionen für den Portfolio-Simulator (werden ins Exposure/Sektoren/Beta eingerechnet, NIE gespeichert; das Ergebnis enthält zum Vergleich exposureWithoutSim).",
+    input_schema: { type: "object", additionalProperties: false, properties: {
+      simulate: { type: ["array", "null"], description: "Portfolio-Simulator: hypothetische Positionen. Betrag in EUR = heutiger Marktwert. ticker optional (mit Ticker fließen Sektor + Beta ein, Heimbörsen-Regel).", items: { type: "object", additionalProperties: false, properties: {
+        side: { type: "string", enum: ["long", "short"] },
+        ticker: { type: ["string", "null"] },
+        amountEur: { type: "number" }
+      }, required: ["side", "amountEur"] } }
+    } }
   },
   {
     name: "emit_action",
@@ -1893,6 +1937,12 @@ ABLAUF:
 8. Fragt Robert, wie er den Chat leeren kann: Kurzbefehl "Chat löschen" (verarbeitet der Worker selbst — löscht alle Nachrichten der letzten 48h und resettet den Dialog; Älteres deckt Telegrams Auto-Lösch-Timer ab).
 9. Fragt Robert, welches Modell/welcher Anbieter gerade antwortet: auf den Kurzbefehl "Modell" verweisen (der Worker antwortet dann selbst mit dem exakten Status — du selbst weißt es nicht zuverlässig, also nicht raten).
 
+PORTFOLIO-SIMULATOR (Stichworte "Simulation", "Simulator", "was wäre wenn"): Robert nennt hypothetische Positionen ("1.000 € long", "2.000 € short Apple", auch mehrere) — NICHTS davon wird eingetragen, es ist reines Durchrechnen:
+- get_portfolio_stats mit dem simulate-Array aufrufen: side + amountEur (Betrag = heutiger Marktwert) + ticker falls genannt (Heimbörsen-Regel; ohne Ticker läuft die Position als Sektor "Simulation" und ohne Beta).
+- Antworte mit den RESULTIERENDEN Werten: Long/Short-Verhältnis nach Marktwert UND nach Einstand (exposure), auf Wunsch Sektor-Verteilung (sectors = Donut-Zahlen), Gewichtungen, Beta. Zum Vergleich steht exposureWithoutSim im Ergebnis — nenne Vorher → Nachher, das ist der Witz der Simulation.
+- Folge-Nachrichten ("nimm noch 500 € short dazu", "ändere Apple auf 1.500") bauen auf der Simulation auf: IMMER die komplette aktuelle Sim-Liste im nächsten simulate-Array mitgeben (aus dem Gesprächsverlauf rekonstruieren). "Simulation beenden/zurücksetzen" → einfach ohne simulate weitermachen und das bestätigen.
+- In jeder Simulations-Antwort kurz klarmachen, dass nichts eingetragen wurde. Will Robert eine simulierte Position DANACH wirklich eintragen, läuft das über den normalen Trade-Ablauf (propose → ok) — dann fehlen noch Stückzahl/Einstand, also nachfragen.
+
 KENNZAHL-ABFRAGEN (action "reply", Daten IMMER frisch via get_portfolio_stats holen):
 - Robert kann alles abfragen: Longs/Shorts/Pairs/Gesamt-Aggregate, Portfolio-Gewichtung (pro Position), Long/Short-Exposure — WICHTIG: sowohl nach Einstand (exposure.entry / weightStartPct, "notionale Gewichtung") als auch nach aktuellem Marktwert (exposure.current / weightNowPct, "wahre Gewichtung") — Portfolio-Beta, Sektor-Aufteilung (Donut-Daten) und den Watchlist-Stand inkl. Live-Kursen.
 - Antworte kompakt und leserlich formatiert (Telegram): Beträge in EUR gerundet, Prozente mit einer Nachkommastelle, Listen mit Zeilenumbrüchen, wichtigste Zahl zuerst. Nicht alle Daten ausschütten — nur was gefragt war; bei "alles" eine strukturierte Übersicht.
@@ -2081,7 +2131,7 @@ async function botProcessMessage(env, userText, opts = {}) {
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(await botGetQuote(block.input.symbol)) });
       } else if (block.name === "get_portfolio_stats") {
         let statsJson;
-        try { statsJson = JSON.stringify(await botPortfolioStats(env)); }
+        try { statsJson = JSON.stringify(await botPortfolioStats(env, Array.isArray(block.input && block.input.simulate) ? block.input.simulate : [])); }
         catch (e) { statsJson = JSON.stringify({ error: e.message }); }
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: statsJson });
       } else if (block.name === "emit_action") {
