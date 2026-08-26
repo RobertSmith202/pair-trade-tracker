@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.5";
+const WORKER_VERSION = "2026-08-26.6";
 
 const WORKER_STRINGS = {
   de: {
@@ -1265,6 +1265,24 @@ async function botClearState(env) {
   try { await env.TRADEBOOK_CACHE.delete(BOT_STATE_KEY); } catch {}
 }
 
+// Foto von Telegram herunterladen und base64-kodieren (für Claude-Vision).
+// Telegram komprimiert Fotos auf handliche Größen — passt problemlos in einen
+// API-Call. getFile → file_path → Download über den File-Endpoint des Bots.
+async function telegramFetchPhoto(token, fileId) {
+  const fr = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  const fj = await fr.json();
+  const path = fj?.result?.file_path;
+  if (!path) throw new Error("telegram getFile lieferte keinen Pfad");
+  const ir = await fetch(`https://api.telegram.org/file/bot${token}/${path}`);
+  if (!ir.ok) throw new Error("telegram Foto-Download http " + ir.status);
+  const bytes = new Uint8Array(await ir.arrayBuffer());
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  const mediaType = path.toLowerCase().endsWith(".png") ? "image/png" : (path.toLowerCase().endsWith(".webp") ? "image/webp" : "image/jpeg");
+  return { b64: btoa(binary), mediaType };
+}
+
 // Yahoo-Symbolsuche: fehlertolerant auch bei Diktier-Verschreibern. Liefert
 // die Kandidaten-Listings inkl. Börse, damit Claude die Heimbörse wählen kann.
 async function botSearchSymbol(query) {
@@ -1461,9 +1479,10 @@ const BOT_DRAFT_PROPS = {
   profitPrice:   { type: ["number", "null"] },
   squeezePct:    { type: ["number", "null"], description: "Short-Squeeze-Schwelle in % (nur short/pair)" },
   longTarget:    { type: ["number", "null"], description: "Zielkurs Long (stille Markierung)" },
-  shortTarget:   { type: ["number", "null"] }
+  shortTarget:   { type: ["number", "null"] },
+  fills:         { type: ["array", "null"], items: { type: "object", additionalProperties: false, properties: { qty: { type: "number" }, price: { type: "number" } }, required: ["qty", "price"] }, description: "Einzelausführungen/Teilkäufe (z.B. aus einem Kontoauszug-Screenshot) — jede wird eine eigene Tranche DESSELBEN Trades. Nur für long/short. Wenn gesetzt, ersetzen sie longQty/longEntry bzw. shortQty/shortEntry." }
 };
-const BOT_DRAFT_REQUIRED = ["type", "name", "longTicker", "shortTicker", "longQty", "longEntry", "shortQty", "shortEntry", "entryCurrency", "lossPct", "lossPrice", "profitPct", "profitPrice", "squeezePct", "longTarget", "shortTarget"];
+const BOT_DRAFT_REQUIRED = ["type", "name", "longTicker", "shortTicker", "longQty", "longEntry", "shortQty", "shortEntry", "entryCurrency", "lossPct", "lossPrice", "profitPct", "profitPrice", "squeezePct", "longTarget", "shortTarget", "fills"];
 const BOT_DRAFT_SCHEMA = { type: ["object", "null"], additionalProperties: false, properties: BOT_DRAFT_PROPS, required: BOT_DRAFT_REQUIRED };
 const BOT_DRAFT_ITEM   = { type: "object", additionalProperties: false, properties: BOT_DRAFT_PROPS, required: BOT_DRAFT_REQUIRED };
 
@@ -1525,6 +1544,15 @@ function botValidateDraft(d) {
   if (t !== "pair" && t !== "long" && t !== "short") missing.push("type (pair/long/short)");
   const needLong = t === "pair" || t === "long";
   const needShort = t === "pair" || t === "short";
+  const fills = Array.isArray(d.fills) ? d.fills : [];
+  if (fills.length) {
+    // Mehrfach-Ausführungen: ersetzen die Einzel-Qty/Entry-Felder, nur long/short
+    if (t === "pair") missing.push("fills nur bei long/short möglich (nicht pair)");
+    if (needLong && !d.longTicker) missing.push("longTicker");
+    if (needShort && t !== "pair" && !d.shortTicker) missing.push("shortTicker");
+    fills.forEach((f, i) => { if (!f || !(f.qty > 0) || !(f.price > 0)) missing.push("Ausführung " + (i + 1) + ": qty/price"); });
+    return missing;
+  }
   if (needLong) {
     if (!d.longTicker) missing.push("longTicker");
     if (!(d.longQty > 0)) missing.push("longQty");
@@ -1607,7 +1635,10 @@ async function botCommitDrafts(env, state) {
   const parts = [];
   for (const d of (state.drafts || [])) {
     const info = await botSaveTrade(env, d);
-    parts.push("✅ " + botTradeLabel(d) + " eingetragen" + (info.merged ? " (als Tranche " + info.trancheCount + " zusammengeführt)" : ""));
+    let note = "";
+    if (info.merged) note = " (+" + info.added + " Tranche" + (info.added > 1 ? "n" : "") + " → jetzt " + info.trancheCount + ")";
+    else if (info.trancheCount > 1) note = " (" + info.trancheCount + " Tranchen)";
+    parts.push("✅ " + botTradeLabel(d) + " eingetragen" + note);
   }
   for (const w of (state.watchDrafts || [])) {
     parts.push(botWatchResultText(w, await botSaveWatch(env, w)));
@@ -1627,18 +1658,28 @@ async function botSaveTrade(env, draft) {
   const needShort = t === "pair" || t === "short";
   const entryNative = draft.entryCurrency == null;
   const entryCcy = entryNative ? null : String(draft.entryCurrency).toUpperCase();
-  const tranche = {
-    id: "tr_" + now + "_" + Math.floor(Math.random() * 10000),
-    longQty: needLong ? draft.longQty : 0,
-    longEntry: needLong ? draft.longEntry : 0,
+  const mkTranche = (qty, price, i) => ({
+    id: "tr_" + now + "_" + i + "_" + Math.floor(Math.random() * 10000),
+    longQty: needLong ? qty : 0,
+    longEntry: needLong ? price : 0,
     longEntryNative: needLong ? entryNative : false,
     longEntryCcy: needLong ? entryCcy : null,
-    shortQty: needShort ? draft.shortQty : 0,
-    shortEntry: needShort ? draft.shortEntry : 0,
+    shortQty: needShort ? qty : 0,
+    shortEntry: needShort ? price : 0,
     shortEntryNative: needShort ? entryNative : false,
     shortEntryCcy: needShort ? entryCcy : null,
     created: now
-  };
+  });
+  // Mehrfach-Ausführungen (fills) → eine Tranche pro Teilkauf; sonst eine
+  // Tranche aus den Einzel-Feldern. Pair-Trades haben nie fills (Validierung),
+  // dort trägt mkTranche beide Seiten aus den Einzel-Feldern.
+  const fills = Array.isArray(draft.fills) ? draft.fills : [];
+  const newTranches = fills.length
+    ? fills.map((f, i) => mkTranche(f.qty, f.price, i))
+    : [(function () { const tr = mkTranche(0, 0, 0);
+        if (needLong)  { tr.longQty = draft.longQty;  tr.longEntry = draft.longEntry; }
+        if (needShort) { tr.shortQty = draft.shortQty; tr.shortEntry = draft.shortEntry; }
+        return tr; })()];
   const lossPct = draft.lossPct != null ? -Math.abs(draft.lossPct) : null;
   const profitPct = draft.profitPct != null ? Math.abs(draft.profitPct) : null;
   const minMode = (t !== "pair" && draft.lossPrice != null && draft.lossPct == null) ? "price" : "pct";
@@ -1654,7 +1695,7 @@ async function botSaveTrade(env, draft) {
 
   let resultInfo;
   if (matching) {
-    matching.tranches = (Array.isArray(matching.tranches) ? matching.tranches : []).concat([tranche]);
+    matching.tranches = (Array.isArray(matching.tranches) ? matching.tranches : []).concat(newTranches);
     const hasMin = (matching.alertPctMin != null && matching.alertPctMin !== "") || (matching.alertPriceMin != null && matching.alertPriceMin !== "");
     const hasMax = (matching.alertPctMax != null && matching.alertPctMax !== "") || (matching.alertPriceMax != null && matching.alertPriceMax !== "");
     if (!hasMin && (lossPct != null || draft.lossPrice != null)) { matching.alertPctMin = lossPct; matching.alertPriceMin = draft.lossPrice ?? null; matching.alertMinMode = minMode; }
@@ -1663,7 +1704,7 @@ async function botSaveTrade(env, draft) {
     if (draft.longTarget != null && matching.longTarget == null) matching.longTarget = draft.longTarget;
     if (draft.shortTarget != null && matching.shortTarget == null) matching.shortTarget = draft.shortTarget;
     matching.updated = now;
-    resultInfo = { merged: true, trancheCount: matching.tranches.length };
+    resultInfo = { merged: true, trancheCount: matching.tranches.length, added: newTranches.length };
   } else {
     trades.push({
       id: "t_" + now + "_" + Math.floor(Math.random() * 10000),
@@ -1679,9 +1720,9 @@ async function botSaveTrade(env, draft) {
       alertMinMode: minMode, alertMaxMode: maxMode,
       alertShortPct: squeeze,
       created: now, updated: now,
-      tranches: [tranche]
+      tranches: newTranches
     });
-    resultInfo = { merged: false };
+    resultInfo = { merged: false, trancheCount: newTranches.length, added: newTranches.length };
   }
   fresh.trades = trades;
   fresh.lastModified = now;
@@ -1719,6 +1760,12 @@ WATCHLIST (zweiter Eintrags-Typ neben Trades):
 - Pflicht: ticker (Heimbörsen-Regel wie oben), side (long/short — wenn unklar, nachfragen) und MINDESTENS eine Grenze: levelAbove (Meldung bei Kurs ≥) und/oder levelBelow (Meldung bei Kurs ≤), in der Notierungswährung des Tickers. Beide Grenzen zusammen = Korridor.
 - Die Meldung beim Kreuzen ist einmalig (kein Repeat, re-armt automatisch) — das kannst du in der Zusammenfassung kurz erwähnen.
 - Gleicher Ticker schon auf der Watchlist → propose als Update (nur genannte Felder ändern sich). Löschen ("nimm X von der Watchlist") → watch mit ticker + remove:true, ebenfalls erst propose ("Eintrag X löschen — ok?"), dann save.
+
+BILDER (Kontoauszüge / Orderausführungen): Robert schickt Screenshots, auf denen eine Order in viele Teilausführungen zerlegt ist (z.B. 17 Einzelkäufe). Dann:
+- ALLE Ausführungen exakt ablesen (Stückzahl × Kurs pro Zeile) und als "fills"-Array in EINEN Draft eintragen (ein Draft pro Wertpapier; type/side aus Caption oder nachfragen; Ticker per search_symbol auflösen falls nur der Firmenname im Bild steht).
+- Zahlen exakt aus dem Bild übernehmen, NIE runden oder raten. Unleserliche Zeilen → nachfragen statt schätzen.
+- In der propose-Zusammenfassung: nummerierte Liste aller Ausführungen PLUS Kontrollsummen (Gesamtstückzahl und Gesamtvolumen) — Robert vergleicht die mit seinem Auszug, bevor er "ok" sagt.
+- Grenzen/Zielkurse nur aufnehmen, wenn Robert sie nennt (bestehende Grenzen einer Position bleiben bei Aufstockungen sowieso erhalten).
 
 MEHRERE EINTRÄGE IN EINER NACHRICHT: Nennt Robert mehrere Trades und/oder Watchlist-Kandidaten auf einmal ("setz Apple bei 250 und Tesla bei 300 auf die Watchlist"), ALLE erfassen: mehrere Trades ins Array "drafts", mehrere Watchlist-Einträge ins Array "watchList" (auch gemischt in einem propose möglich). Die Zusammenfassung dann nummeriert (①②③…), EIN "ok" bestätigt alles. Fehlt bei einzelnen Einträgen etwas, gezielt nur das nachfragen — die vollständigen Einträge dabei nicht vergessen (im ask-Zwischenstand mitführen).
 
@@ -1781,7 +1828,13 @@ async function botProcessMessage(env, userText, opts = {}) {
   const { data: record } = await loadTradebook(env);
   const state = await botLoadState(env);
   const system = botSystemPrompt(record, state);
-  const messages = [...(state.history || []), { role: "user", content: userText }];
+  // Bild dabei? → als Vision-Content-Block vor den Text. Im gespeicherten
+  // Verlauf landet nur der Text-Platzhalter (KV klein halten); das Bild lebt
+  // nur innerhalb dieses einen Verarbeitungs-Durchlaufs.
+  const userContent = opts.image
+    ? [{ type: "image", source: { type: "base64", media_type: opts.image.mediaType, data: opts.image.b64 } }, { type: "text", text: userText }]
+    : userText;
+  const messages = [...(state.history || []), { role: "user", content: userContent }];
   let replyText = null;
 
   for (let round = 0; round < BOT_MAX_LLM_ROUNDS; round++) {
@@ -1949,16 +2002,26 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
   let update; try { update = await req.json(); } catch { return textResponse("bad json", 400); }
   const m = update.message;
   if (!m || !m.chat || String(m.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return textResponse("ignored");
-  if (typeof m.text !== "string" || !m.text.trim()) return textResponse("ignored");
+  // Fotos (z.B. Kontoauszug-Screenshots mit Teilausführungen) sind erlaubt —
+  // größte verfügbare Auflösung nehmen, Caption wird zum Begleittext.
+  const photo = Array.isArray(m.photo) && m.photo.length ? m.photo[m.photo.length - 1] : null;
+  const hasText = typeof m.text === "string" && m.text.trim();
+  if (!hasText && !photo) return textResponse("ignored");
   const entryToken = env.TELEGRAM_ENTRY_BOT_TOKEN;
   if (!entryToken) return textResponse("entry bot not configured");
-  const text = m.text.trim();
+  const text = hasText ? m.text.trim()
+    : ((m.caption || "").trim() || "[Bild ohne Text — Inhalt auswerten und ggf. als Trade-Ausführungen erfassen]");
   if (!env.ANTHROPIC_API_KEY) {
     ctx.waitUntil(sendTelegram(env, "⚠️ ANTHROPIC_API_KEY fehlt — der Assistent braucht ihn zum Verstehen.", entryToken));
     return textResponse("ok");
   }
   ctx.waitUntil((async () => {
     try {
+      if (photo) {
+        const image = await telegramFetchPhoto(entryToken, photo.file_id);
+        await botProcessMessage(env, text, { token: entryToken, image });
+        return;
+      }
       // Kosten-Kurzschluss: "ok" auf eine ausstehende Zusammenfassung → direkt eintragen
       const normed = text.toLowerCase().replace(/[\s!.,:;()]+/g, "");
       if (BOT_ACK_WORDS.has(normed)) {
