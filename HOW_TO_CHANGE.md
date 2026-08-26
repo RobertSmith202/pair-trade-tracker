@@ -61,6 +61,14 @@ Hat nichts mit Code zu tun. In Telegram an **@BotFather** schreiben → `/mybots
 
 **Deaktivieren:** Secret `ANTHROPIC_API_KEY` löschen → Webhook verhält sich wieder wie früher (jede Antwort quittiert Alarme).
 
+### G2) Gemini als kostenloser Bot-Versteher (seit Aug 2026 der Primärweg)
+
+1. Auf https://aistudio.google.com einloggen (Google-Konto) → **„Get API key"** → Key erstellen und kopieren.
+2. Cloudflare → Worker → Settings → Variables and Secrets → Add → Secret **`GEMINI_API_KEY`** = der Key.
+3. Fertig — kein Deploy nötig, Secrets wirken sofort. Der Bot nutzt ab dann Gemini (gratis); `ANTHROPIC_API_KEY` kann als automatischer Fallback liegen bleiben (springt bei Gemini-Ausfällen/Tageslimit ein) oder gelöscht werden.
+
+⚠️ Bewusste Abwägung: Im Gemini-**Gratis**-Tarif darf Google die Eingaben (auch Depot-Screenshots) zum Training verwenden. Wer das nicht mehr will: Secret `GEMINI_API_KEY` löschen → Bot läuft wieder komplett über Anthropic (kein Training, Centbeträge).
+
 ### H) Zweiter Bot für den Eintrage-Dialog („Assistant Bot", einmalig, Aug 2026)
 
 **Wozu:** Alarme (minütliche Wiederholung!) und Eintrage-Dialog in getrennten Chats — die Bestätigungs-Zusammenfassung geht nicht mehr zwischen 🚨-Nachrichten unter, und „ok" ist nie mehr doppeldeutig. Der Alarm-Bot quittiert dann wieder auf jede Antwort (kostenlos, ohne Claude).

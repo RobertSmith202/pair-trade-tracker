@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.9";
+const WORKER_VERSION = "2026-08-26.10";
 
 const WORKER_STRINGS = {
   de: {
@@ -1301,6 +1301,12 @@ const CLAUDE_MODEL = "claude-haiku-4-5";
 // Ablesen kleiner Zahlen aus Telegram-komprimierten Fotos. Kostet nur bei
 // Anhang-Nachrichten mehr (~3–8 Cent statt 1–3), Textdialoge bleiben Haiku.
 const CLAUDE_VISION_MODEL = "claude-sonnet-5";
+// Seit Aug 2026 (Roberts bewusste Wahl, Gratis-Tarif inkl. Trainings-Klausel):
+// Gemini als primärer "Versteher" — Secret GEMINI_API_KEY (aistudio.google.com).
+// Ist der Key nicht gesetzt oder schlägt Gemini fehl (z.B. Tageslimit), fällt
+// der Bot automatisch auf die Anthropic-API zurück (falls deren Key existiert).
+const GEMINI_MODEL = "gemini-2.5-flash";
+function botLlmReady(env) { return !!(env.GEMINI_API_KEY || env.ANTHROPIC_API_KEY); }
 
 async function botLoadState(env) {
   let st;
@@ -1867,6 +1873,89 @@ AKTIVE ALARME:
 ${alarmsCompact}`;
 }
 
+// === Gemini-Adapter ========================================================
+// Übersetzt unsere (Anthropic-förmigen) Tool-Schemas und Nachrichten in das
+// Gemini-Format und liefert die Antwort wieder Anthropic-förmig zurück —
+// dadurch bleibt die komplette Dialog-Maschine (botProcessMessage) unverändert
+// und der Anthropic-Fallback funktioniert ohne Sonderpfade.
+function toGeminiSchema(s) {
+  if (!s) return undefined;
+  let t = s.type, nullable = false;
+  if (Array.isArray(t)) { nullable = t.includes("null"); t = t.find(x => x !== "null") || "string"; }
+  const out = { type: String(t).toUpperCase() };
+  if (nullable) out.nullable = true;
+  if (s.description) out.description = s.description;
+  if (Array.isArray(s.enum)) out.enum = s.enum.filter(v => v !== null);
+  if (s.properties) { out.properties = {}; for (const k of Object.keys(s.properties)) out.properties[k] = toGeminiSchema(s.properties[k]); }
+  if (s.items) out.items = toGeminiSchema(s.items);
+  // "required" bewusst weggelassen: die Pflichtfeld-Prüfung macht der Worker
+  // (botValidateDraft/botValidateWatch) — so vermeiden wir Gemini-Schema-Zicken.
+  return out;
+}
+const GEMINI_TOOL_DECLS = BOT_TOOLS.map(t => {
+  const decl = { name: t.name, description: t.description };
+  const params = toGeminiSchema(t.input_schema);
+  if (params && params.properties && Object.keys(params.properties).length) decl.parameters = params;
+  return decl;
+});
+
+// Anthropic-Messages → Gemini-Contents. tool_use-IDs werden beim Durchlauf auf
+// Funktionsnamen gemappt (Gemini adressiert Ergebnisse über den Namen).
+function anthToGemContents(messages) {
+  const idToName = {};
+  const contents = [];
+  for (const msg of messages) {
+    const role = msg.role === "assistant" ? "model" : "user";
+    const parts = [];
+    if (typeof msg.content === "string") {
+      if (msg.content) parts.push({ text: msg.content });
+    } else if (Array.isArray(msg.content)) {
+      for (const b of msg.content) {
+        if (b.type === "text") { if (b.text) parts.push({ text: b.text }); }
+        else if (b.type === "image") parts.push({ inlineData: { mimeType: b.source.media_type, data: b.source.data } });
+        else if (b.type === "document") parts.push({ inlineData: { mimeType: "application/pdf", data: b.source.data } });
+        else if (b.type === "tool_use") { idToName[b.id] = b.name; parts.push({ functionCall: { name: b.name, args: b.input || {} } }); }
+        else if (b.type === "tool_result") {
+          let resp;
+          try { resp = JSON.parse(b.content); } catch { resp = { result: String(b.content) }; }
+          if (resp == null || typeof resp !== "object" || Array.isArray(resp)) resp = { result: resp };
+          if (b.is_error) resp = { error: typeof b.content === "string" ? b.content : "tool error" };
+          parts.push({ functionResponse: { name: idToName[b.tool_use_id] || "tool", response: resp } });
+        }
+      }
+    }
+    if (parts.length) contents.push({ role, parts });
+  }
+  return contents;
+}
+
+let _gemCallSeq = 0;
+async function geminiCall(env, system, messages) {
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: anthToGemContents(messages),
+    tools: [{ functionDeclarations: GEMINI_TOOL_DECLS }],
+    generationConfig: { maxOutputTokens: 8000 }
+  };
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error("gemini http " + r.status + ": " + (await r.text()).slice(0, 400));
+  const j = await r.json();
+  const cand = j?.candidates?.[0];
+  if (!cand || j?.promptFeedback?.blockReason) return { stop_reason: "refusal", content: [] };
+  const content = [];
+  let hasCall = false;
+  for (const p of (cand.content?.parts || [])) {
+    if (p.text) content.push({ type: "text", text: p.text });
+    else if (p.functionCall) { hasCall = true; content.push({ type: "tool_use", id: "g_" + (++_gemCallSeq), name: p.functionCall.name, input: p.functionCall.args || {} }); }
+  }
+  const stop = hasCall ? "tool_use" : (cand.finishReason === "SAFETY" ? "refusal" : "end_turn");
+  return { stop_reason: stop, content };
+}
+
 async function claudeCall(env, system, messages, model = CLAUDE_MODEL) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -1912,7 +2001,17 @@ async function botProcessMessage(env, userText, opts = {}) {
 
   const model = att ? CLAUDE_VISION_MODEL : CLAUDE_MODEL;
   for (let round = 0; round < BOT_MAX_LLM_ROUNDS; round++) {
-    const resp = await claudeCall(env, system, messages, model);
+    let resp;
+    if (env.GEMINI_API_KEY) {
+      try { resp = await geminiCall(env, system, messages); }
+      catch (e) {
+        if (!env.ANTHROPIC_API_KEY) throw e;
+        console.warn("gemini failed, fallback auf anthropic:", e.message);
+        resp = await claudeCall(env, system, messages, model);
+      }
+    } else {
+      resp = await claudeCall(env, system, messages, model);
+    }
     if (resp.stop_reason === "refusal") { replyText = "⚠️ Anfrage konnte nicht verarbeitet werden — bitte anders formulieren."; break; }
     if (resp.stop_reason !== "tool_use") {
       // Modell hat ohne emit_action geantwortet → Text übernehmen als Fallback
@@ -2018,7 +2117,7 @@ async function handleTelegramWebhook(req, env, ctx) {
   // Assistant-Bot (/telegram-entry-webhook).
   // Bot-Dialog im Ein-Bot-Modus nur mit konfiguriertem ANTHROPIC_API_KEY + Text.
   // Verarbeitung async via waitUntil — Telegram will schnell ein 200 sehen.
-  if (env.ANTHROPIC_API_KEY && !env.TELEGRAM_ENTRY_BOT_TOKEN && typeof m.text === "string" && m.text.trim()) {
+  if (botLlmReady(env) && !env.TELEGRAM_ENTRY_BOT_TOKEN && typeof m.text === "string" && m.text.trim()) {
     const text = m.text.trim();
     ctx.waitUntil((async () => {
       try {
@@ -2092,8 +2191,8 @@ async function handleTelegramEntryWebhook(req, env, ctx) {
   if (!entryToken) return textResponse("entry bot not configured");
   const text = hasText ? m.text.trim()
     : ((m.caption || "").trim() || "[Bild ohne Text — Inhalt auswerten und ggf. als Trade-Ausführungen erfassen]");
-  if (!env.ANTHROPIC_API_KEY) {
-    ctx.waitUntil(sendTelegram(env, "⚠️ ANTHROPIC_API_KEY fehlt — der Assistent braucht ihn zum Verstehen.", entryToken));
+  if (!botLlmReady(env)) {
+    ctx.waitUntil(sendTelegram(env, "⚠️ Kein LLM-Key konfiguriert — Secret GEMINI_API_KEY (oder ANTHROPIC_API_KEY) im Cloudflare-Dashboard hinterlegen.", entryToken));
     return textResponse("ok");
   }
   ctx.waitUntil((async () => {
@@ -2183,7 +2282,7 @@ export default {
     if (url.pathname === "/bot-test" && req.method === "POST") {
       const auth = checkSyncAuth(req, env);
       if (!auth.ok) return jsonResponse({ error: auth.msg }, 401);
-      if (!env.ANTHROPIC_API_KEY) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 400);
+      if (!botLlmReady(env)) return jsonResponse({ error: "no LLM key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)" }, 400);
       let body; try { body = await req.json(); } catch { return jsonResponse({ error: "invalid JSON body" }, 400); }
       if (!body || typeof body.text !== "string" || !body.text.trim()) return jsonResponse({ error: "missing text" }, 400);
       try { return jsonResponse({ reply: await botProcessMessage(env, body.text.trim(), { dryRun: true }) }); }

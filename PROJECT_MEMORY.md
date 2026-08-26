@@ -819,7 +819,9 @@ Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; d
 
 **„Chat löschen"-Kurzbefehl (seit Worker v2026-08-26.7):** Im Assistant-Chat leert das Kommando „Chat löschen" (auch „Chat leeren"/„Chat reset"/„automatische Löschung") den Chat deterministisch ohne Claude: Der Worker trackt alle Message-IDs des Entry-Chats (eingehend + eigene Antworten via `sendEntryTracked`) in KV (`bot_msgs:v1`, Cap 200) und löscht sie per deleteMessage, dazu Dialog-Reset. Telegram-Grenzen: Bots können nur Nachrichten ≤48h löschen und Historie nicht auflisten (daher das Tracking); max. 40 Löschungen pro Aufruf (Subrequest-Limit) — Rest per erneutem Kommando. Für Älteres: Telegrams nativer Auto-Lösch-Timer im Chat.
 
-**Vision-Modell-Split (seit v2026-08-26.9):** Nachrichten MIT Anhang laufen über `CLAUDE_VISION_MODEL` (`claude-sonnet-5`) statt Haiku — Haiku scheiterte live am Ablesen kleiner Zahlen aus Telegram-komprimierten Fotos. Textdialoge bleiben beim günstigen Haiku (Kosten nur bei Anhang-Nachrichten höher, ~3–8 Cent).
+**Gemini als primärer Versteher (seit v2026-08-26.10, Roberts bewusste Wahl):** Mit Secret `GEMINI_API_KEY` laufen alle Bot-Dialoge (Text + Vision/PDF) über `gemini-2.5-flash` (Gratis-Tarif; Trainings-Klausel war Robert bei der Entscheidung bewusst). Architektur unverändert: `geminiCall` ist ein Adapter, der Anthropic-förmige Messages/Tools nach Gemini übersetzt (`toGeminiSchema` — nullable statt Type-Arrays, ohne required/additionalProperties; `anthToGemContents` — tool_use-IDs→Funktionsnamen, image/document→inlineData) und die Antwort wieder Anthropic-förmig zurückgibt — die Dialog-Maschine kennt den Provider nicht. Schlägt Gemini fehl (z.B. Tageslimit) → automatischer Fallback auf die Anthropic-API (Haiku/Sonnet-Split), sofern deren Key gesetzt ist.
+
+**Vision-Modell-Split (Anthropic-Fallback-Pfad, seit v2026-08-26.9):** Nachrichten MIT Anhang laufen über `CLAUDE_VISION_MODEL` (`claude-sonnet-5`) statt Haiku — Haiku scheiterte live am Ablesen kleiner Zahlen aus Telegram-komprimierten Fotos. Textdialoge bleiben beim günstigen Haiku (Kosten nur bei Anhang-Nachrichten höher, ~3–8 Cent).
 
 **Bilder, Dateien & PDFs mit Mehrfach-Ausführungen (seit v2026-08-26.6, Datei/PDF seit .8):** Der Assistant-Bot nimmt Fotos, Bild-DATEIEN (unkomprimiert — wichtig: Telegram komprimiert „Fotos" so stark, dass kleine Tabellenzahlen für Haiku unleserlich wurden, live beobachtet) und **PDFs** an (Broker-PDFs = echter Text = exakteste Extraktion; als Claude-`document`-Block). `telegramFetchAttachment` lädt via getFile (Limit 15 MB); Caption wird Begleittext, im KV-Verlauf landet nur ein Text-Platzhalter. Teilausführungen kommen als `fills`-Array in EINEN Draft (`[{qty, price}]`, nur long/short) — `botSaveTrade` macht daraus eine Tranche pro Ausführung am selben Trade (Super-Trade-Konvention, bestehende Grenzen bleiben unberührt). Die Zusammenfassung enthält Kontrollsummen (Gesamtstückzahl + Gesamtvolumen) als Ablese-Sicherheitsnetz vor dem „ok".
 
@@ -862,7 +864,8 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 - `TELEGRAM_BOT_TOKEN` (vom BotFather)
 - `TELEGRAM_CHAT_ID` (die Chat-ID zwischen Robert und seinem Bot)
 - `SYNC_SECRET` (32-Zeichen-Random, für App-Sync + /bot-test)
-- `ANTHROPIC_API_KEY` (von console.anthropic.com — aktiviert den Bot-Dialog; ohne den Key läuft der Webhook im Legacy-Modus)
+- `GEMINI_API_KEY` (von aistudio.google.com — primärer Bot-„Versteher" seit Aug 2026, Gratis-Tarif; Roberts BEWUSSTE Wahl trotz Trainings-Klausel des Gratis-Tarifs, auf den Konflikt mit dem Privatsphäre-Ziel wurde explizit hingewiesen)
+- `ANTHROPIC_API_KEY` (von console.anthropic.com — automatischer Fallback wenn Gemini fehlt/fehlschlägt, z.B. Tageslimit; ganz ohne LLM-Key läuft der Webhook im Legacy-Modus)
 - `TELEGRAM_ENTRY_BOT_TOKEN` (optional — zweiter Bot „Assistant Bot" für den Eintrage-Dialog; aktiviert den Zwei-Bot-Modus)
 - `JSONBIN_BIN_ID` / `JSONBIN_KEY` (Legacy, nur noch für Migrations-Fallback)
 
