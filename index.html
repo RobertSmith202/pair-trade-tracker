@@ -107,6 +107,10 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .page-fx-note .fx-note-sub { color: var(--muted); font-weight: 400; }
 [data-layout="desktop"] .page-fx-note { padding: 10px 14px; font-size: 12.5px; gap: 10px; margin: 10px 0 14px; }
 [data-layout="desktop"] .page-fx-note .fx-note-icon { font-size: 16px; }
+/* Neutral-Variante für Short: keine "Information", sondern "Entwarnung" — dezenter,
+   ohne Info-Blau. Muted-Ton passt zum "alles normal, kein FX-Risiko"-Charakter. */
+.page-fx-note.page-fx-note-neutral { background: linear-gradient(135deg, rgba(148, 163, 184, 0.08), rgba(148, 163, 184, 0.03));
+  border-color: rgba(148, 163, 184, 0.20); }
 .thr-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; min-height: 38px; flex-wrap: wrap; }
 .thr-label-row > label { margin-bottom: 0; }
 .thr-toggle { display: inline-flex; gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; flex-shrink: 0; }
@@ -1737,7 +1741,7 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
     </div>
     <div class="page-fx-note" data-fx-note-for="pair" hidden>
       <span class="fx-note-icon" aria-hidden="true">💱</span>
-      <span class="fx-note-text"><span data-i18n="fx_note_headline">Rendite inkl. Wechselkurs vom Kauftag</span> <span class="fx-note-sub" data-i18n="fx_note_sub_pair">— Long-Seite in Fremdwährung</span></span>
+      <span class="fx-note-text" data-i18n="fx_note_pair">Fremdwährungsrisiko ist in der GuV enthalten (Long-Seite)</span>
     </div>
     <div class="trade-list" data-list="pair"></div>
   </section>
@@ -1756,7 +1760,7 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
     </div>
     <div class="page-fx-note" data-fx-note-for="long" hidden>
       <span class="fx-note-icon" aria-hidden="true">💱</span>
-      <span class="fx-note-text"><span data-i18n="fx_note_headline">Rendite inkl. Wechselkurs vom Kauftag</span> <span class="fx-note-sub" data-i18n="fx_note_sub_long">— Positionen in Fremdwährung</span></span>
+      <span class="fx-note-text" data-i18n="fx_note_long">Fremdwährungsrisiko ist in der GuV enthalten</span>
     </div>
     <div class="basket-actions"><button class="btn-new-basket" data-basket-new="long" data-i18n="btn_new_basket" type="button">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="long"></div>
@@ -1773,6 +1777,10 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
       <div class="agg-cell wide"><div class="label" data-i18n="agg_total_pnl">Gesamt-PnL</div><div class="value tabular" data-agg-pnl>—</div><div class="sub" data-agg-pnl-sub>&nbsp;</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_performance">Performance</div><div class="value tabular" data-agg-pct>—</div><div class="sub" data-i18n="agg_on_notional">auf Notional</div></div>
       <div class="agg-cell"><div class="label" data-i18n="agg_notional">Notional gesamt</div><div class="value tabular" data-agg-notional>—</div><div class="sub" data-agg-notional-cur>&nbsp;</div><div class="sub" data-agg-count>0 Trades</div></div>
+    </div>
+    <div class="page-fx-note page-fx-note-neutral" data-fx-note-for="short" hidden>
+      <span class="fx-note-icon" aria-hidden="true">🔒</span>
+      <span class="fx-note-text" data-i18n="fx_note_short">Kein Fremdwährungsrisiko — Cash bleibt in Fremdwährung</span>
     </div>
     <div class="basket-actions"><button class="btn-new-basket" data-basket-new="short" data-i18n="btn_new_basket" type="button">+ Neuer Korb</button></div>
     <div class="trade-list" data-list="short"></div>
@@ -2174,9 +2182,9 @@ const STRINGS = {
     agg_total_pnl: "Gesamt-PnL", agg_performance: "Performance", agg_notional: "Notional gesamt",
     agg_notional_current: "aktuell {amt}",
     agg_on_notional: "auf Notional", agg_in_ccy_fx: "in {ccy} · FX-konvertiert",
-    fx_note_headline: "Rendite inkl. Wechselkurs vom Kauftag",
-    fx_note_sub_pair: "— Long-Seite in Fremdwährung",
-    fx_note_sub_long: "— Positionen in Fremdwährung",
+    fx_note_pair: "Fremdwährungsrisiko ist in der GuV enthalten (Long-Seite)",
+    fx_note_long: "Fremdwährungsrisiko ist in der GuV enthalten",
+    fx_note_short: "Kein Fremdwährungsrisiko — Cash bleibt in Fremdwährung",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "Trade", agg_trade_plural: "Trades",
     agg_partial: " · {n} unvollständig", agg_loading: "Lädt...", agg_no_trades: "Noch keine Trades",
     btn_new_trade: "+ Neuer Trade", btn_refresh: "↻ Kurse", btn_save: "Speichern", btn_cancel: "Abbrechen",
@@ -2413,9 +2421,9 @@ const STRINGS = {
     agg_total_pnl: "Total P&L", agg_performance: "Performance", agg_notional: "Total notional",
     agg_notional_current: "now {amt}",
     agg_on_notional: "on notional", agg_in_ccy_fx: "in {ccy} · FX-converted",
-    fx_note_headline: "Return incl. exchange rate at purchase date",
-    fx_note_sub_pair: "— long leg in foreign currency",
-    fx_note_sub_long: "— positions in foreign currency",
+    fx_note_pair: "FX risk is included in P&L (long leg)",
+    fx_note_long: "FX risk is included in P&L",
+    fx_note_short: "No FX risk — cash stays in foreign currency",
     agg_trades_count: "{n} {plural}", agg_trade_singular: "trade", agg_trade_plural: "trades",
     agg_partial: " · {n} incomplete", agg_loading: "Loading...", agg_no_trades: "No trades yet",
     btn_new_trade: "+ New Trade", btn_refresh: "↻ Quotes", btn_save: "Save", btn_cancel: "Cancel",
@@ -2776,7 +2784,7 @@ let syncDebounce = null;
 // Sichtbare App-Version (Menü + Sidebar) — bei jeder HTML-Änderung hochzählen.
 // Zweck: zweifelsfrei erkennen, ob eine PWA noch eine alte Version aus dem
 // Cache lädt (der Sync-Clobber-Vorfall Aug 2026 war genau das, unentdeckbar).
-const APP_VERSION = "2026-09-24.2";
+const APP_VERSION = "2026-09-24.3";
 const PAGES = ["pair", "long", "short", "watch", "total"];
 let currentPage = "pair";
 let formType = "pair";
@@ -3608,32 +3616,48 @@ async function fetchHistoricalFxRate(from, to, ts) {
 // hat). Läuft asynchron beim Boot, nicht-blockierend — wenn's Trades trifft, wird
 // nach dem Lauf einmal re-rendert + gepushed. Idempotent: Trades mit gesetztem
 // Kurs oder EUR-in-EUR-Trades werden übersprungen.
-// Sichtbarkeit des FX-Hinweises auf Pair- und Long-Page: nur wenn tatsächlich
-// mindestens ein Long-Leg in Fremdwährung auf der Page steht (sonst wär der
-// Hinweis Rauschen). Für Native-Ccy-Trades checken wir den PRICE_CACHE — wenn
-// der noch leer ist (früh im Boot), zeigen wir vorsichtshalber den Hinweis
-// (kleinerer Schaden als ihn zu verstecken wenn er relevant wäre).
+// Sichtbarkeit der FX-Hinweise auf Pair-, Long- und Short-Page. Nur wenn
+// tatsächlich mindestens ein Leg (Long bei pair/long, Short bei short) in
+// Fremdwährung auf der Page steht — sonst wär der Hinweis Rauschen. Für
+// Native-Ccy-Trades checken wir den PRICE_CACHE; wenn der noch leer ist
+// (früh im Boot), zeigen wir vorsichtshalber (kleinerer Schaden als ein
+// versteckter relevanter Hinweis).
+// - Pair/Long-Chip = "GuV enthält FX-Risiko" (blau, info-tint) — triggert
+//   auf Long-Legs, die historisiert werden.
+// - Short-Chip = "kein FX-Risiko" (grau, neutral) — triggert auf Short-
+//   Legs, für die USD-Cash-Konvention gilt (User-Setup: Consorsbank ohne
+//   USD-Sub-Konto ist der Standard-Fall — Short-Erlös bleibt in FX-Cash).
 function refreshPageFxNotes() {
   const hcUpper = (homeCurrency || "EUR").toUpperCase();
-  for (const pageKey of ["pair", "long"]) {
+  function resolveLegCcy(tranche, side, ticker) {
+    const nativeFlag = side === "long" ? tranche.longEntryNative : tranche.shortEntryNative;
+    const storedCcy = side === "long" ? tranche.longEntryCcy : tranche.shortEntryCcy;
+    if (nativeFlag) {
+      const lp = PRICE_CACHE.get((ticker || "").toUpperCase());
+      return (lp && lp.currency) ? lp.currency.toUpperCase() : null;  // null = unbekannt → treat as foreign
+    }
+    return (storedCcy || hcUpper).toUpperCase();
+  }
+  const configs = [
+    { pageKey: "pair",  side: "long"  },
+    { pageKey: "long",  side: "long"  },
+    { pageKey: "short", side: "short" }
+  ];
+  for (const { pageKey, side } of configs) {
     const el = document.querySelector(`.page-fx-note[data-fx-note-for="${pageKey}"]`);
     if (!el) continue;
     const pageTrades = tradesForPage(pageKey);
     let hasForeign = false;
     for (const tr of pageTrades) {
-      if (!hasLong(tr)) continue;
+      if (side === "long" && !hasLong(tr)) continue;
+      if (side === "short" && !hasShort(tr)) continue;
       const tranches = Array.isArray(tr.tranches) ? tr.tranches : [];
       for (const tranche of tranches) {
-        if (!(tranche.longQty > 0)) continue;
-        let entryCcy;
-        if (tranche.longEntryNative) {
-          const lp = PRICE_CACHE.get((tr.longTicker || "").toUpperCase());
-          entryCcy = (lp && lp.currency) ? lp.currency.toUpperCase() : null;
-          if (!entryCcy) { hasForeign = true; break; }  // Cache leer → vorsichtshalber zeigen
-        } else {
-          entryCcy = (tranche.longEntryCcy || hcUpper).toUpperCase();
-        }
-        if (entryCcy !== hcUpper) { hasForeign = true; break; }
+        const qty = side === "long" ? tranche.longQty : tranche.shortQty;
+        if (!(qty > 0)) continue;
+        const ticker = side === "long" ? tr.longTicker : tr.shortTicker;
+        const ccy = resolveLegCcy(tranche, side, ticker);
+        if (ccy == null || ccy !== hcUpper) { hasForeign = true; break; }
       }
       if (hasForeign) break;
     }
