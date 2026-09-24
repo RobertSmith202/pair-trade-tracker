@@ -2749,7 +2749,7 @@ let syncDebounce = null;
 // Sichtbare App-Version (Menü + Sidebar) — bei jeder HTML-Änderung hochzählen.
 // Zweck: zweifelsfrei erkennen, ob eine PWA noch eine alte Version aus dem
 // Cache lädt (der Sync-Clobber-Vorfall Aug 2026 war genau das, unentdeckbar).
-const APP_VERSION = "2026-08-26.2";
+const APP_VERSION = "2026-09-24.1";
 const PAGES = ["pair", "long", "short", "watch", "total"];
 let currentPage = "pair";
 let formType = "pair";
@@ -3556,6 +3556,74 @@ async function fetchFxRate(from, to) {
 }
 function getCachedFx(from, to) { if (!from || !to) return null; const F = from.toUpperCase(), T = to.toUpperCase(); if (F === T) return 1; const c = FX_CACHE.get(F + "/" + T); if (c && isFinite(c.rate)) return c.rate; return null; }
 
+// Historischer FX-Kurs zu einem beliebigen Zeitpunkt (Tages-Close des Trade-Datums).
+// Wird beim Backfill bestehender Long-Trades benutzt, damit der real damals bezahlte
+// EUR-Einstand berechnet werden kann. Läuft gegen den eigenen Worker (/fx-historical),
+// der Yahoo mit period1/period2 anfragt. Wenn keine Rate verfügbar → null.
+async function fetchHistoricalFxRate(from, to, ts) {
+  const base = workerBase(); if (!base) return null;
+  const F = String(from || "").toUpperCase(), T = String(to || "").toUpperCase();
+  if (!F || !T || F === T) return F === T ? 1 : null;
+  if (!isFinite(ts) || ts <= 0) return null;
+  try {
+    const url = base + "/fx-historical?from=" + encodeURIComponent(F) + "&to=" + encodeURIComponent(T) + "&ts=" + ts;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return (j && isFinite(j.rate) && j.rate > 0) ? j.rate : null;
+  } catch { return null; }
+}
+
+// Einmaliger Backfill des historischen FX-Kurses für alle Long-Legs bestehender
+// Trades, die noch keinen `longEntryFxRate` haben. Für neue Trades: das Feld
+// bleibt initial null und wird beim nächsten Boot vom Backfill nachgetragen
+// (Yahoo-Tages-Close ist ~exakt der Kurs, der beim frisch angelegten Trade gegolten
+// hat). Läuft asynchron beim Boot, nicht-blockierend — wenn's Trades trifft, wird
+// nach dem Lauf einmal re-rendert + gepushed. Idempotent: Trades mit gesetztem
+// Kurs oder EUR-in-EUR-Trades werden übersprungen.
+async function backfillMissingLongEntryFxRates() {
+  if (!workerBase()) return { skipped: "no worker url" };
+  let touched = 0, failed = 0;
+  for (const tr of trades) {
+    const type = tradeType(tr);
+    if (type !== "long" && type !== "pair") continue;
+    if (!hasLong(tr)) continue;
+    const tranches = Array.isArray(tr.tranches) ? tr.tranches : [];
+    for (const tranche of tranches) {
+      if (isFinite(tranche.longEntryFxRate) && tranche.longEntryFxRate > 0) continue; // schon gesetzt
+      if (!(tranche.longQty > 0) || !(tranche.longEntry > 0)) continue;
+      // entryCcy bestimmen. Wenn native, brauchen wir die api-ccy des Tickers.
+      // Ohne Live-Preis-Cache lässt sich das nicht 100% auflösen — beim Backfill
+      // konsultieren wir den PRICE_CACHE (der wird beim Boot befüllt) und, wenn
+      // leer, fetchen wir den Preis kurz an. Bei fehlgeschlagenem Ticker-Fetch:
+      // Tranche skippen (nächster Boot versucht's erneut).
+      let entryCcy;
+      if (tranche.longEntryNative) {
+        let lp = PRICE_CACHE.get(tr.longTicker.toUpperCase());
+        if (!lp || lp.error) lp = await fetchPrice(tr.longTicker, true);
+        if (!lp || lp.error || !lp.currency) { failed++; continue; }
+        entryCcy = (lp.currency || homeCurrency).toUpperCase();
+      } else {
+        entryCcy = (tranche.longEntryCcy || homeCurrency).toUpperCase();
+      }
+      if (entryCcy === homeCurrency) continue; // kein FX nötig
+      const ts = tranche.created || tr.created || Date.now();
+      const rate = await fetchHistoricalFxRate(entryCcy, homeCurrency, ts);
+      if (rate != null && isFinite(rate) && rate > 0) {
+        tranche.longEntryFxRate = rate;
+        touched++;
+      } else {
+        failed++;
+      }
+    }
+  }
+  if (touched > 0) {
+    markLocalChange();
+    try { render(); } catch {}
+  }
+  return { touched, failed };
+}
+
 async function ensureFxRatesForTrades() {
   const pairs = new Set();
   for (const tr of trades) {
@@ -3700,20 +3768,55 @@ async function testSyncCredentials(secret) {
   } catch (e) { return { ok: false, msg: (e.message || e) }; }
 }
 
-function computeLeg(entry, qty, livePx, apiCcy, useNative, storedEntryCcy, isLong) {
+// Long-Legs (auch in Pair-Trades) nutzen einen historischen FX-Kurs für die
+// Umrechnung des Einstands in Home-Ccy — real damals bezahlte EUR statt „was wäre
+// der Einstand heute wert". Das erfasst FX-Bewegungen als echten PnL-Bestandteil:
+// wenn der Dollar seit Kauf 8 % zum Euro verloren hat, siehst du 8 % FX-Verlust
+// in deiner EUR-Rendite selbst wenn der Aktienkurs unverändert ist. Historischer
+// Kurs liegt in `tranche.longEntryFxRate` (befüllt beim Backfill via /fx-historical
+// oder null bei ganz neuen Trades — Backfill trägt beim nächsten Boot nach).
+// Shorts NICHT historisiert (Robert-Entscheidung, andere Cashflow-Semantik).
+// entryToHomeFx bleibt aus Kompat-Gründen der AKTUELLE Kurs (wird downstream für
+// "aktuelles Notional in Home" und Heute-Delta gebraucht); der historische Wert
+// steht separat in `entryToHomeFxHistorical`.
+function computeLeg(entry, qty, livePx, apiCcy, useNative, storedEntryCcy, isLong, tranche) {
   const entryCcy = useNative ? (apiCcy || homeCurrency) : (storedEntryCcy || "EUR");
   const apiToEntry = (apiCcy === entryCcy) ? 1 : getCachedFx(apiCcy || homeCurrency, entryCcy);
-  const entryToHome = (entryCcy === homeCurrency) ? 1 : getCachedFx(entryCcy, homeCurrency);
+  const currentEntryToHome = (entryCcy === homeCurrency) ? 1 : getCachedFx(entryCcy, homeCurrency);
+  const historicalFx = (isLong && tranche && isFinite(tranche.longEntryFxRate) && tranche.longEntryFxRate > 0 && entryCcy !== homeCurrency) ? tranche.longEntryFxRate : null;
+  const entryToHomeForPnl = historicalFx != null ? historicalFx : currentEntryToHome;
   let livePxInEntry = null;
   if (livePx != null && apiToEntry != null) livePxInEntry = livePx * apiToEntry;
+  const entryNotionalInEntry = entry * qty;
+  // Einstands-Notional in Home-Ccy: für Long real-damals (historicalFx), für Short aktuell.
+  let entryNotionalInHome = null;
+  if (entryToHomeForPnl != null) entryNotionalInHome = entryNotionalInEntry * entryToHomeForPnl;
+  // Aktuelles Notional in Home-Ccy: immer aktueller FX (Marktwert heute).
+  let currentNotionalInHome = null;
+  if (livePxInEntry != null && currentEntryToHome != null) currentNotionalInHome = livePxInEntry * qty * currentEntryToHome;
+  // PnL in Home-Ccy: Differenz der beiden Notionals. Für Short mathematisch identisch
+  // zur alten Formel (currentEntryToHome auf beiden Seiten), für Long enthält es den
+  // FX-Effekt sobald historicalFx gesetzt ist.
+  let pnlInHome = null;
+  if (currentNotionalInHome != null && entryNotionalInHome != null) {
+    pnlInHome = isLong ? (currentNotionalInHome - entryNotionalInHome) : (entryNotionalInHome - currentNotionalInHome);
+  }
+  // pnlInEntry (Anzeige in Entry-Ccy, ohne FX-Effekt) unverändert
   let pnlInEntry = null;
   if (livePxInEntry != null) pnlInEntry = (isLong ? (livePxInEntry - entry) : (entry - livePxInEntry)) * qty;
-  let pnlInHome = null;
-  if (pnlInEntry != null && entryToHome != null) pnlInHome = pnlInEntry * entryToHome;
-  const entryNotionalInEntry = entry * qty;
-  let entryNotionalInHome = null;
-  if (entryToHome != null) entryNotionalInHome = entryNotionalInEntry * entryToHome;
-  return { apiCcy: apiCcy || homeCurrency, entryCcy, apiToEntryFx: apiToEntry, entryToHomeFx: entryToHome, livePxInEntry, pnlInEntry, pnlInHome, entryNotionalInEntry, entryNotionalInHome };
+  return {
+    apiCcy: apiCcy || homeCurrency,
+    entryCcy,
+    apiToEntryFx: apiToEntry,
+    entryToHomeFx: currentEntryToHome,          // AKTUELL (für downstream: heute-Delta, current notional)
+    entryToHomeFxHistorical: historicalFx,      // HISTORISCH (nur Long, null wenn nicht gesnappt)
+    livePxInEntry,
+    pnlInEntry,
+    pnlInHome,
+    entryNotionalInEntry,
+    entryNotionalInHome,                        // Long: real damals bezahlt; Short: aktueller Marktwert-Äquivalent
+    currentNotionalInHome                       // immer aktueller Marktwert in Home-Ccy
+  };
 }
 
 function computeTrade(tr, lp, sp) {
@@ -3744,8 +3847,8 @@ function computeTrade(tr, lp, sp) {
   let todayDeltaHome = null, todayNotionalHome = null;
   for (const tranche of tranches) {
     let longLeg = null, shortLeg = null;
-    if (hasLong(tr)) longLeg = computeLeg(tranche.longEntry, tranche.longQty, lpx, longApiCcy, !!tranche.longEntryNative, tranche.longEntryCcy, true);
-    if (hasShort(tr)) shortLeg = computeLeg(tranche.shortEntry, tranche.shortQty, spx, shortApiCcy, !!tranche.shortEntryNative, tranche.shortEntryCcy, false);
+    if (hasLong(tr)) longLeg = computeLeg(tranche.longEntry, tranche.longQty, lpx, longApiCcy, !!tranche.longEntryNative, tranche.longEntryCcy, true, tranche);
+    if (hasShort(tr)) shortLeg = computeLeg(tranche.shortEntry, tranche.shortQty, spx, shortApiCcy, !!tranche.shortEntryNative, tranche.shortEntryCcy, false, tranche);
     let trancheNotional = null, tranchePnl = null, tranchePct = null;
     if (type === "pair") {
       if (longLeg.entryNotionalInHome != null && shortLeg.entryNotionalInHome != null) trancheNotional = longLeg.entryNotionalInHome + shortLeg.entryNotionalInHome;
@@ -6474,6 +6577,15 @@ if (trades.length > 0 && priceSettings.workerUrl) refreshAll(false);
 if (syncSettings.enabled) syncFull();
 startAutoRefresh();
 setAutoStatus();
+// Backfill des historischen FX-Kurses für Long-Legs (echte EUR-Rendite mit FX-Effekt).
+// Läuft fire-and-forget nach kurzer Verzögerung, damit refreshAll/syncFull den
+// PRICE_CACHE zuerst befüllen können (nötig für Native-Ccy-Auflösung). Idempotent —
+// überspringt bereits gesnappte Tranchen. Kein User-Trigger nötig.
+setTimeout(() => {
+  backfillMissingLongEntryFxRates()
+    .then(r => { if (r && r.touched) console.log("FX-Backfill:", r.touched, "Long-Legs nachgetragen"); })
+    .catch(e => console.warn("FX-Backfill fehlgeschlagen:", e));
+}, 5000);
 currentPage = loadStartPage();
 requestAnimationFrame(() => scrollToPage(currentPage, false));
 

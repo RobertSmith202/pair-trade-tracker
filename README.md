@@ -14,6 +14,7 @@ Persönlicher Long/Short-Trade-Tracker als Single-File-PWA — Pair-, Long-only-
 ## Features (Auszug)
 
 - Drei Trade-Typen (Pair / Long / Short) mit Tranchen-Modell (Super-Trades bei Aufstockungen)
+- **Echte EUR-Rendite** bei Long-Legs (auch in Pair-Trades): historischer FX-Kurs vom Kauftag wird gesnappt, damit Währungsbewegungen als realer PnL-Bestandteil erfasst werden (verliert der Dollar seit Kauf 8 % zum Euro, siehst du 8 % FX-Verlust in deiner EUR-Rendite). Bestehende Long-Trades werden beim ersten Boot automatisch aus Yahoo-Historik nachgetragen. Shorts unverändert.
 - Körbe auf den Long-/Short-Pages mit Aggregat-Performance und eigenen Alarmen — Standalone-Trades lassen sich per Drag & Drop (Apple-Lift-Effekt) in Körbe ziehen
 - Karten auf allen Pages per Drag & Drop umsortierbar — die übrigen Karten machen animiert Platz wie App-Icons auf dem iOS-Homescreen; die Reihenfolge synct zwischen den Geräten
 - Drei Alarm-Typen via Telegram: Verlust-, Gewinn- und Short-Squeeze-Schwellen, edge-getriggert mit Quittierung per Telegram-Reply

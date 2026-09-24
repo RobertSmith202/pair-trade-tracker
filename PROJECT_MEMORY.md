@@ -246,6 +246,7 @@ Hier transparent die Schwachstellen (bewusst auch im inzwischen öffentlichen Re
           "longEntry": 150.50,
           "longEntryCcy": "EUR",
           "longEntryNative": false,
+          "longEntryFxRate": 0.909,
           "shortQty": 50,
           "shortEntry": 300.00,
           "shortEntryCcy": "EUR",
@@ -294,6 +295,7 @@ Hier transparent die Schwachstellen (bewusst auch im inzwischen öffentlichen Re
   
   `ensureStateShape()` im Worker und `alarmStateOf()` im Frontend migrieren transparent on-read. Alle drei Achsen sind unabhängig.
 - `tranches` ersetzt die früheren flachen Felder. `migrateTrades()` läuft beim ersten Mal nach Pull.
+- `longEntryFxRate` (seit 2026-09-24) ist der historische FX-Kurs `entryCcy → homeCurrency` zum Zeitpunkt des Trade-Anlegens. Nur für Long-Legs (auch in Pair-Trades), Short-Legs bleiben unhistorisiert. Für neue Trades initial `null` — `backfillMissingLongEntryFxRates()` holt den Tages-Close-Kurs beim nächsten Boot vom Worker (`/fx-historical`). Bei ganz frisch angelegten Trades ist das ≈ aktueller Kurs, also praktisch identisch. Fehlt der Wert (Yahoo hat für exotische Currency nichts, Worker nicht erreichbar) → Fallback auf aktuellen FX (Legacy-Verhalten).
 
 ---
 
@@ -502,6 +504,26 @@ Auto-Merge nur bei gleichem Ticker UND gleichem Typ. Ein Long-only AAPL und ein 
 Jede Tranche speichert ihre Entry-Currency explizit als `longEntryCcy` / `shortEntryCcy`. Wenn der User später die Heimat-Währung wechselt, bleiben die Entry-Preise korrekt interpretiert.
 
 `longEntryNative` / `shortEntryNative` erlaubt alternativ „verwende die API-Währung des Tickers".
+
+### Echte EUR-Rendite bei Long-Legs (FX-Snapshot am Kauftag, seit Sep 2026)
+
+**Problem:** Vor Sep-2026 rechnete `computeLeg` sowohl Einstands-Notional als auch aktuellen Marktwert mit dem **heutigen** FX-Kurs in Home-Ccy um. Wenn eine US-Aktie zwischen Kauf und heute unverändert bei $100 steht, der Dollar aber 8 % zum Euro verloren hat, zeigte die App PnL = 0 € — obwohl beim realen Verkauf 8 % weniger EUR ankämen. Der Fehler ist symmetrisch für Long: FX-Verlust und FX-Gewinn werden beide unterschlagen.
+
+**Lösung nur für Long-Legs (auch in Pair-Trades). Shorts unverändert.** Roberts explizite Entscheidung — bei Short generiert der Open Cashflow (verkauft was er nicht hat) statt zu bezahlen, das ist eine fundamental andere FX-Rechnung (welche Cashflow-Convention, Margin-Konto-Modell) und muss separat entschieden werden.
+
+**Umsetzung:**
+1. **Datenmodell:** Neues Feld `tranche.longEntryFxRate` = FX-Kurs `entryCcy → homeCurrency` am Trade-Datum. Optional. `null` bedeutet „nicht bekannt → aktuellen FX benutzen" (Legacy-Verhalten). Merge-Sync v2 verträgt das Feld ohne Migration (unbekannte Keys bleiben erhalten).
+2. **`computeLeg` Frontend + `legPnl` Worker:** wenn `isLong && tranche.longEntryFxRate` gesetzt und `entryCcy !== homeCurrency`, wird der historische Kurs für `entryNotionalInHome` verwendet. Aktueller FX kommt weiter aus `getCachedFx` für `currentNotionalInHome`. PnL = `currentNotionalInHome − entryNotionalInHome` (Long) — enthält damit den FX-Effekt implizit.
+3. **`entryToHomeFx`-Feld im Rückgabe-Objekt** bleibt aus Kompatibilität der AKTUELLE Kurs (downstream: Heute-Delta, current-notional). Historischer Wert steht separat in `entryToHomeFxHistorical`.
+4. **Worker-Endpoint `GET /fx-historical?from=USD&to=EUR&ts=<millis>`:** öffentlich, ruft Yahoo mit `period1/period2` um Trade-Datum ±14/+7 Tage, gibt Tages-Close-Kurs zurück. Fallback auf inverses Symbol wenn direktes fehlt.
+5. **Backfill `backfillMissingLongEntryFxRates()`:** läuft fire-and-forget 5 Sek nach Boot. Iteriert über alle Long-Legs ohne `longEntryFxRate`, holt historischen Kurs für `tranche.created`, schreibt zurück, `markLocalChange()` + Re-render. Idempotent — mehrfaches Aufrufen touched nur was noch fehlt. Für Native-Ccy-Trades wird PRICE_CACHE konsultiert (bzw. kurz gefetched) um `entryCcy` aufzulösen.
+6. **Neue Trades:** Save-Pfad schreibt `longEntryFxRate` NICHT direkt — Backfill trägt es beim nächsten Boot nach. Für ganz frisch angelegte Trades ist der Yahoo-Tages-Close-Kurs (Handelstag = heute) ≈ aktueller Kurs, die Vereinfachung ist damit unter Broker-FX-Spread.
+
+**Grenzen die dokumentiert bleiben:**
+- Yahoo liefert Tages-Close, nicht Intraday-Kurs. Fehler ist meistens < 0,3 %.
+- `tranche.created` ist Anleg-Zeitpunkt in der App, nicht zwingend Broker-Ausführungszeit. Wer nachträglich Trades einträgt, kriegt den FX vom Eintrag-Datum. Für Long-Historik-Trades kann das bei EUR/USD über Jahre mehrere Prozent Unterschied ausmachen — dann bleibt nur manuelles Editieren des Feldes (aktuell nicht in der UI, müsste als Admin-Pfad ergänzt werden).
+- Exotische Currency-Paare (z.B. TRY/EUR): Yahoo hat sie, aber Zuverlässigkeit ist niedriger. Bei fehlendem Kurs → Fallback auf aktuellen FX = altes Verhalten. Zeigt sich in Backfill-Log-Zeile („N Long-Legs nachgetragen, M failed").
+- Beim ersten Boot einer alten HTML-Version gegen einen neuen Worker: alte HTML kennt das Feld nicht, ignoriert es beim Push aber verliert es dank Merge-Sync v2 nicht.
 
 ### Körbe (Baskets) — Long-only und Short-only
 
@@ -845,6 +867,7 @@ Robert diktiert Trades in freiem Deutsch (via Wispr Flow) an den Telegram-Bot; d
 | Endpoint | Zweck |
 |---|---|
 | `GET /?symbol=AAPL` | Yahoo-Passthrough — used by App für Live-Preise und FX-Raten |
+| `GET /fx-historical?from=USD&to=EUR&ts=<millis>` | Historischer Tages-Close-FX-Kurs. Für Long-FX-Snapshot beim Trade-Anlegen und Backfill bestehender Long-Legs. Öffentlich (kein Auth) — nur Yahoo-Daten, keine Nutzerdaten |
 | `GET /check` | Manueller Loss/Profit-Alarm-Check (3-Min-Cron ruft intern dasselbe auf) |
 | `GET /check-squeeze` | Manueller Short-Squeeze-Check (Tages-Cron ruft intern dasselbe auf) |
 | `GET /test-alert` | Sendet Test-Telegram-Nachricht in aktueller Sprache |
@@ -931,6 +954,12 @@ In Cloudflare-Dashboard unter Worker → Settings → Variables (Secret type):
 26. **`data-i18n` darf NICHT direkt auf einem Element stehen das Kind-Elemente mit eigenem Inhalt hat.** `applyTranslations()` macht `el.textContent = t(key)` — das wischt ALLE Kinder weg. Beispiel-Bug der vor dem Polish-Pass im Code stand: `<button data-i18n="page_pairs"><span class="ds-nav-glyph">⇄</span><span data-i18n="page_pairs">Paare</span></button>` → nach erstem Sprachwechsel: nur noch "Paare", Glyph weg. Lösung: `data-i18n` nur auf den innersten Text-Span, nicht auf den Wrapper-Button.
 
 27. **`updateDesktopHeaderMeta()` muss alle Stellen aufrufen die den Markt-Offen-Status oder die Uhrzeit visuell ändern können.** Aktuell nur über `setAutoStatus()` (= `setInterval(..., 60000)` + Auto-Refresh-Loop). Wer einen früheren Trigger braucht (z.B. wenn der User die Settings-Modal-Trading-Hours editiert, falls das je hinzukommt), muss `updateDesktopHeaderMeta()` selbst aufrufen.
+
+28. **FX-Snapshot ist NUR für Long-Legs implementiert.** Shorts (auch die Short-Legs in Pair-Trades) rechnen weiter mit aktuellem FX für beide Seiten — bewusst so, weil Short-PnL eine andere Cashflow-Semantik hat (Cash-Zufluss beim Open statt Ausgabe, Margin-Kontext). Wenn irgendwer diese Symmetrie in `computeLeg`/`legPnl` „aufhebt" und Short-Legs auch historisiert, muss vorher explizit mit Robert die semantische Convention geklärt werden — sonst zeigt die App bei USD-Short-Positionen nach Dollar-Verlust einen FX-„Gewinn" der wirtschaftlich nicht sauber ist.
+
+29. **`longEntryFxRate`-Backfill braucht Worker-URL.** Der Backfill läuft nur wenn `priceSettings.workerUrl` gesetzt ist (spricht Endpoint `/fx-historical`). Auf Erst-Setup-Geräten ohne Sync-Config → keine Historisierung, PnL fällt auf aktuellen FX zurück (Legacy-Verhalten, kein Fehler). Sobald Worker-URL gesetzt und App neu geladen wird, holt der Backfill nach.
+
+30. **`entryToHomeFx` im `computeLeg`-Return ist AKTUELL, `entryToHomeFxHistorical` ist HISTORISCH.** Wer eine neue Anzeige-Berechnung baut, die den Einstands-FX braucht (z.B. „was war der EUR/USD-Kurs beim Kauf" als Info-Zeile), muss `entryToHomeFxHistorical` benutzen, nicht `entryToHomeFx`. Umgekehrt: für heute-Delta und aktuelles Marktwert-Notional bleibt `entryToHomeFx` richtig. Die Trennung ist wichtig, weil Downstream-Konsumenten (Zeilen um 3776, 4557, 4770) auf aktuellen FX angewiesen sind.
 
 ---
 

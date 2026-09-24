@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-08-26.15";
+const WORKER_VERSION = "2026-09-24.1";
 
 const WORKER_STRINGS = {
   de: {
@@ -636,6 +636,58 @@ async function getFxRate(from, to) {
   } catch (e) { if (c) return c.rate; throw e; }
 }
 
+// Historischer Tages-Close-FX-Kurs zu einem beliebigen Zeitpunkt. Wird für den
+// Long-Leg-FX-Snapshot beim Trade-Anlegen und für den Backfill bestehender Trades
+// verwendet. Yahoo liefert Tages-Closes (nicht Intraday); für Trade-Datum an einem
+// Handelstag ist der Close ausreichend genau (Broker-FX-Spread ist meist größer als
+// die Tages-Schwankung des EZB-Referenzkurses). Suche das Fenster ±7 Tage um ts,
+// nimm den letzten Close ≤ ts. Wenn der direkte Kurs (FROM+TO=X) fehlt, fällt es
+// auf den inversen (TO+FROM=X, dann 1/rate).
+async function fetchHistoricalFxRate(from, to, ts) {
+  const F = String(from || "").toUpperCase();
+  const T = String(to || "").toUpperCase();
+  if (!F || !T) return null;
+  if (F === T) return { rate: 1, effectiveDate: null, source: "identity" };
+  const targetSec = Math.floor(ts / 1000);
+  const p1 = targetSec - 14 * 24 * 3600;  // 14 Tage vorher fangt lange Wochenenden/Feiertage ab
+  const p2 = targetSec + 7 * 24 * 3600;
+  async function tryFetch(sym, invert) {
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?period1=${p1}&period2=${p2}&interval=1d`;
+      const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 PairTradeTracker" } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const result = j?.chart?.result?.[0];
+      const tsArr = result?.timestamp;
+      const closes = result?.indicators?.quote?.[0]?.close;
+      if (!Array.isArray(tsArr) || !Array.isArray(closes) || tsArr.length === 0) return null;
+      // Letzten gültigen Close ≤ targetSec finden (nächster Handelstag am oder vor Trade-Datum)
+      let idx = -1;
+      for (let i = tsArr.length - 1; i >= 0; i--) {
+        if (tsArr[i] <= targetSec && isFinite(closes[i])) { idx = i; break; }
+      }
+      // Falls kein Close ≤ ts (z.B. Trade-Datum liegt vor dem ersten Yahoo-Datenpunkt),
+      // nimm den ältesten verfügbaren als Näherung.
+      if (idx === -1) {
+        for (let i = 0; i < tsArr.length; i++) {
+          if (isFinite(closes[i])) { idx = i; break; }
+        }
+      }
+      if (idx === -1) return null;
+      const raw = closes[idx];
+      const rate = invert ? (1 / raw) : raw;
+      if (!isFinite(rate) || rate <= 0) return null;
+      const dateISO = new Date(tsArr[idx] * 1000).toISOString().slice(0, 10);
+      return { rate, effectiveDate: dateISO, source: invert ? "yahoo_inverse" : "yahoo" };
+    } catch { return null; }
+  }
+  const direct = await tryFetch(F + T + "=X", false);
+  if (direct) return direct;
+  const inv = await tryFetch(T + F + "=X", true);
+  if (inv) return inv;
+  return null;
+}
+
 async function fetchPriceInternal(symbol) {
   const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`, { headers: { "User-Agent": "Mozilla/5.0 PairTradeTracker" } });
   if (!r.ok) throw new Error(`yahoo http ${r.status} for ${symbol}`);
@@ -658,12 +710,21 @@ function getTranches(trade) {
   return arr;
 }
 
-async function legPnl(entry, qty, live, apiCcy, entryCcy, isLong) {
+// Long-Legs (auch in Pair-Trades) rechnen mit einem historischen FX-Kurs (Snapshot
+// vom Trade-Datum, siehe tranche.longEntryFxRate) für Einstands-Notional und PnL —
+// so wird der reale EUR-Verlust/-Gewinn durch Währungsbewegungen korrekt erfasst.
+// Shorts rechnen weiter mit aktuellem FX (fundamentale Cashflow-Semantik anders,
+// Robert hat das bewusst so entschieden). Ohne historicalE2h fällt Long auf aktuellen
+// FX zurück (Legacy-Trades ohne Snapshot).
+async function legPnl(entry, qty, live, apiCcy, entryCcy, isLong, historicalE2h) {
   const a2e = apiCcy === entryCcy ? 1 : await getFxRate(apiCcy, entryCcy);
-  const e2h = entryCcy === HOME_CCY ? 1 : await getFxRate(entryCcy, HOME_CCY);
+  const currentE2h = entryCcy === HOME_CCY ? 1 : await getFxRate(entryCcy, HOME_CCY);
+  const entryE2h = (isLong && isFinite(historicalE2h) && historicalE2h > 0) ? historicalE2h : currentE2h;
   const liveInEntry = live * a2e;
-  const pnlEntry = (isLong ? (liveInEntry - entry) : (entry - liveInEntry)) * qty;
-  return { pnlHome: pnlEntry * e2h, notionalHomeStart: entry * qty * e2h, notionalHomeNow: liveInEntry * qty * e2h };
+  const notionalHomeStart = entry * qty * entryE2h;      // real damals bezahlt (Long) / aktueller Wert (Short)
+  const notionalHomeNow   = liveInEntry * qty * currentE2h;
+  const pnlHome = isLong ? (notionalHomeNow - notionalHomeStart) : (notionalHomeStart - notionalHomeNow);
+  return { pnlHome, notionalHomeStart, notionalHomeNow };
 }
 
 async function computePerf(trade) {
@@ -678,12 +739,12 @@ async function computePerf(trade) {
   for (const tr of tranches) {
     if (type === "pair" || type === "long") {
       const longEntryCcy = tr.longEntryNative ? longLive.currency : (tr.longEntryCcy || HOME_CCY);
-      const L = await legPnl(tr.longEntry, tr.longQty, longLive.price, longLive.currency, longEntryCcy, true);
+      const L = await legPnl(tr.longEntry, tr.longQty, longLive.price, longLive.currency, longEntryCcy, true, tr.longEntryFxRate);
       totalPnl += L.pnlHome; totalNotStart += L.notionalHomeStart; totalNotNow += L.notionalHomeNow;
     }
     if (type === "pair" || type === "short") {
       const shortEntryCcy = tr.shortEntryNative ? shortLive.currency : (tr.shortEntryCcy || HOME_CCY);
-      const S = await legPnl(tr.shortEntry, tr.shortQty, shortLive.price, shortLive.currency, shortEntryCcy, false);
+      const S = await legPnl(tr.shortEntry, tr.shortQty, shortLive.price, shortLive.currency, shortEntryCcy, false, null);
       totalPnl += S.pnlHome; totalNotStart += S.notionalHomeStart; totalNotNow += S.notionalHomeNow;
     }
   }
@@ -1464,12 +1525,12 @@ async function botTradeLegAgg(trade, priceCache) {
   for (const tr of tranches) {
     if (type === "pair" || type === "long") {
       const ccy = tr.longEntryNative ? longLive.currency : (tr.longEntryCcy || HOME_CCY);
-      const L = await legPnl(tr.longEntry, tr.longQty, longLive.price, longLive.currency, ccy, true);
+      const L = await legPnl(tr.longEntry, tr.longQty, longLive.price, longLive.currency, ccy, true, tr.longEntryFxRate);
       pnl += L.pnlHome; longStart += L.notionalHomeStart; longNow += L.notionalHomeNow;
     }
     if (type === "pair" || type === "short") {
       const ccy = tr.shortEntryNative ? shortLive.currency : (tr.shortEntryCcy || HOME_CCY);
-      const S = await legPnl(tr.shortEntry, tr.shortQty, shortLive.price, shortLive.currency, ccy, false);
+      const S = await legPnl(tr.shortEntry, tr.shortQty, shortLive.price, shortLive.currency, ccy, false, null);
       pnl += S.pnlHome; shortStart += S.notionalHomeStart; shortNow += S.notionalHomeNow;
     }
   }
@@ -2371,12 +2432,26 @@ export default {
     if (url.pathname === "/" || url.pathname === "") {
       const s = url.searchParams.get("symbol");
       if (s) return yahooProxy(s);
-      return textResponse("Pair Trade Tracker Worker v" + WORKER_VERSION + " — endpoints: /?symbol=, /profile?symbol=, /sync-info, /check, /check-squeeze, /test-alert, /setup-webhook, /setup-entry-webhook, /telegram-webhook, /telegram-entry-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST), /bot-test (POST)");
+      return textResponse("Pair Trade Tracker Worker v" + WORKER_VERSION + " — endpoints: /?symbol=, /profile?symbol=, /fx-historical?from=&to=&ts=, /sync-info, /check, /check-squeeze, /test-alert, /setup-webhook, /setup-entry-webhook, /telegram-webhook, /telegram-entry-webhook, /tradebook (GET+POST), /migrate-from-jsonbin (POST), /bot-test (POST)");
     }
     if (url.pathname === "/profile") {
       const s = url.searchParams.get("symbol");
       if (!s) return jsonResponse({ error: "missing symbol" }, 400);
       return handleProfile(s, env);
+    }
+    // Historischer Tages-Close-FX-Kurs, verwendet von Frontend beim Anlegen neuer
+    // Long-Trades (Snapshot des Kauftags-FX) und beim einmaligen Backfill bestehender
+    // Long-Legs. Öffentlich (kein Auth), weil Yahoo-Daten öffentlich sind und der
+    // Endpoint keine Nutzerdaten preisgibt.
+    if (url.pathname === "/fx-historical") {
+      const from = url.searchParams.get("from");
+      const to = url.searchParams.get("to");
+      const tsRaw = url.searchParams.get("ts");
+      const ts = tsRaw ? parseInt(tsRaw, 10) : NaN;
+      if (!from || !to || !isFinite(ts) || ts <= 0) return jsonResponse({ error: "missing/invalid from, to or ts (millis)" }, 400);
+      const res = await fetchHistoricalFxRate(from, to, ts);
+      if (!res) return jsonResponse({ error: "no rate available", from, to, ts }, 502);
+      return jsonResponse(res);
     }
     if (url.pathname === "/sync-info") return handleSyncInfo(env);
     if (url.pathname === "/check") { try { return jsonResponse(await runAlarmCheck(env)); } catch (e) { return jsonResponse({ ok: false, error: e.message }, 500); } }
