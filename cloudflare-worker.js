@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-09-24.1";
+const WORKER_VERSION = "2026-09-25.1";
 
 const WORKER_STRINGS = {
   de: {
@@ -2074,7 +2074,18 @@ function anthToGemContents(messages) {
         if (b.type === "text") { if (b.text) parts.push({ text: b.text }); }
         else if (b.type === "image") parts.push({ inlineData: { mimeType: b.source.media_type, data: b.source.data } });
         else if (b.type === "document") parts.push({ inlineData: { mimeType: "application/pdf", data: b.source.data } });
-        else if (b.type === "tool_use") { idToName[b.id] = b.name; parts.push({ functionCall: { name: b.name, args: b.input || {} } }); }
+        else if (b.type === "tool_use") {
+          idToName[b.id] = b.name;
+          // Gemini 2.5+ verlangt bei Multi-Turn-Function-Calls, dass die vom Modell in
+          // Turn N zurückgegebene `thoughtSignature` beim entsprechenden functionCall-Part
+          // in Turn N+1 wieder mitgeliefert wird (sonst HTTP 400 "missing thought_signature").
+          // Wir haben sie in geminiCall als `_gemThoughtSignature` auf dem tool_use-Block
+          // gemerkt — hier fügen wir sie beim Rekonstruieren wieder in den Gemini-Part ein.
+          const fc = { name: b.name, args: b.input || {} };
+          const call = { functionCall: fc };
+          if (b._gemThoughtSignature) call.thoughtSignature = b._gemThoughtSignature;
+          parts.push(call);
+        }
         else if (b.type === "tool_result") {
           let resp;
           try { resp = JSON.parse(b.content); } catch { resp = { result: String(b.content) }; }
@@ -2110,7 +2121,14 @@ async function geminiCall(env, system, messages) {
   let hasCall = false;
   for (const p of (cand.content?.parts || [])) {
     if (p.text) content.push({ type: "text", text: p.text });
-    else if (p.functionCall) { hasCall = true; content.push({ type: "tool_use", id: "g_" + (++_gemCallSeq), name: p.functionCall.name, input: p.functionCall.args || {} }); }
+    else if (p.functionCall) {
+      hasCall = true;
+      // thoughtSignature (Gemini 2.5+ Pflicht) am tool_use mitspeichern, damit
+      // anthToGemContents sie beim nächsten Call wieder mitschicken kann.
+      const block = { type: "tool_use", id: "g_" + (++_gemCallSeq), name: p.functionCall.name, input: p.functionCall.args || {} };
+      if (p.thoughtSignature) block._gemThoughtSignature = p.thoughtSignature;
+      content.push(block);
+    }
   }
   const stop = hasCall ? "tool_use" : (cand.finishReason === "SAFETY" ? "refusal" : "end_turn");
   return { stop_reason: stop, content };
