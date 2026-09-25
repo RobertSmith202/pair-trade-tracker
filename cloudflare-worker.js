@@ -32,7 +32,7 @@ const TRADING_END_HOUR = 23;
 const HOME_CCY = "EUR";
 // Bei jeder Worker-Änderung hochzählen — wird auf / und /sync-info angezeigt,
 // damit von außen prüfbar ist, welche Version bei Cloudflare deployed ist.
-const WORKER_VERSION = "2026-09-25.1";
+const WORKER_VERSION = "2026-09-25.2";
 
 const WORKER_STRINGS = {
   de: {
@@ -2134,7 +2134,26 @@ async function geminiCall(env, system, messages) {
   return { stop_reason: stop, content };
 }
 
+// Entfernt Meta-Felder (Underscore-Präfix), die für einen anderen Provider gedacht sind
+// — z.B. `_gemThoughtSignature` am tool_use-Block: gehört zu Gemini, aber Anthropic
+// lehnt Extra-Felder strikt ab ("Extra inputs are not permitted"). Wir strippen sie
+// aus einer flachen Kopie, ohne das Original-Message-Array zu mutieren (History bleibt
+// mit Signaturen erhalten für den nächsten Gemini-Turn).
+function stripPrivateMetaForClaude(messages) {
+  return messages.map(msg => {
+    if (typeof msg.content === "string") return msg;
+    if (!Array.isArray(msg.content)) return msg;
+    const cleanContent = msg.content.map(block => {
+      const cleanBlock = {};
+      for (const k of Object.keys(block)) if (!k.startsWith("_")) cleanBlock[k] = block[k];
+      return cleanBlock;
+    });
+    return { ...msg, content: cleanContent };
+  });
+}
+
 async function claudeCall(env, system, messages, model = CLAUDE_MODEL) {
+  const cleanMessages = stripPrivateMetaForClaude(messages);
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -2146,7 +2165,7 @@ async function claudeCall(env, system, messages, model = CLAUDE_MODEL) {
       model,
       max_tokens: 8000,
       system,
-      messages,
+      messages: cleanMessages,
       tools: BOT_TOOLS
     })
   });
