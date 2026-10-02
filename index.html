@@ -422,18 +422,22 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
 .portfolio-split-title { font-size: 11px; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
 /* Netto-Positionierung-Chip: Ruder-Indikator ganz oben. Farbe swingt mit dem
    Verhältnis — grün Net Long, rot Net Short, muted Neutral. Transitionen auf
-   Background/Border, damit der Umschlag beim Trade-Anlegen weich wirkt. */
-.portfolio-net-exposure { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; margin-bottom: 16px; background: var(--card); border: 1px solid var(--border); transition: background 0.5s ease, border-color 0.5s ease; }
+   Background/Border, damit der Umschlag beim Trade-Anlegen weich wirkt.
+   Layout: Label und Wert sitzen direkt nebeneinander (flex-start + gap), nicht
+   gegenübergestellt — sonst klebt der Wert auf Desktop in der Whitespace-Wüste
+   rechts, auf Mobile bricht die Zeile am Prozentzeichen. nowrap am Wert sorgt
+   dafür, dass "Net Long · 23.5 %" nie zwischen Zahl und % umbricht. */
+.portfolio-net-exposure { display: flex; align-items: baseline; justify-content: flex-start; gap: 14px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; margin-bottom: 16px; background: var(--card); border: 1px solid var(--border); transition: background 0.5s ease, border-color 0.5s ease; }
 .portfolio-net-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; flex-shrink: 0; }
-.portfolio-net-value { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; color: var(--text); transition: color 0.5s ease; }
+.portfolio-net-value { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; color: var(--text); transition: color 0.5s ease; white-space: nowrap; }
 .portfolio-net-exposure.net-long  { background: var(--pos-soft); border-color: color-mix(in srgb, var(--pos) 40%, var(--border)); }
 .portfolio-net-exposure.net-long  .portfolio-net-value { color: var(--pos); }
 .portfolio-net-exposure.net-short { background: var(--neg-soft); border-color: color-mix(in srgb, var(--neg) 40%, var(--border)); }
 .portfolio-net-exposure.net-short .portfolio-net-value { color: var(--neg); }
 .portfolio-net-exposure.net-neutral .portfolio-net-value { color: var(--muted); }
-[data-layout="mobile"] .portfolio-net-exposure { padding: 10px 12px; }
-[data-layout="mobile"] .portfolio-net-value { font-size: 18px; }
-[data-layout="desktop"] .portfolio-net-value { font-size: 24px; }
+[data-layout="mobile"] .portfolio-net-exposure { padding: 10px 12px; gap: 10px; }
+[data-layout="mobile"] .portfolio-net-value { font-size: 17px; }
+[data-layout="desktop"] .portfolio-net-value { font-size: 22px; }
 .portfolio-split-block { margin-bottom: 16px; }
 .portfolio-split-block:last-of-type { margin-bottom: 0; }
 .portfolio-split-blocklabel { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 8px; }
@@ -2813,7 +2817,7 @@ let syncDebounce = null;
 // Sichtbare App-Version (Menü + Sidebar) — bei jeder HTML-Änderung hochzählen.
 // Zweck: zweifelsfrei erkennen, ob eine PWA noch eine alte Version aus dem
 // Cache lädt (der Sync-Clobber-Vorfall Aug 2026 war genau das, unentdeckbar).
-const APP_VERSION = "2026-10-02.1";
+const APP_VERSION = "2026-10-02.2";
 const PAGES = ["pair", "long", "short", "watch", "total"];
 let currentPage = "pair";
 let formType = "pair";
