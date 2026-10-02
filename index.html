@@ -420,6 +420,20 @@ button.icon { padding: 8px 12px; min-height: 0; font-size: 12px; }
    nacheinander stehen. */
 .portfolio-split { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
 .portfolio-split-title { font-size: 11px; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+/* Netto-Positionierung-Chip: Ruder-Indikator ganz oben. Farbe swingt mit dem
+   Verhältnis — grün Net Long, rot Net Short, muted Neutral. Transitionen auf
+   Background/Border, damit der Umschlag beim Trade-Anlegen weich wirkt. */
+.portfolio-net-exposure { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; margin-bottom: 16px; background: var(--card); border: 1px solid var(--border); transition: background 0.5s ease, border-color 0.5s ease; }
+.portfolio-net-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; flex-shrink: 0; }
+.portfolio-net-value { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; color: var(--text); transition: color 0.5s ease; }
+.portfolio-net-exposure.net-long  { background: var(--pos-soft); border-color: color-mix(in srgb, var(--pos) 40%, var(--border)); }
+.portfolio-net-exposure.net-long  .portfolio-net-value { color: var(--pos); }
+.portfolio-net-exposure.net-short { background: var(--neg-soft); border-color: color-mix(in srgb, var(--neg) 40%, var(--border)); }
+.portfolio-net-exposure.net-short .portfolio-net-value { color: var(--neg); }
+.portfolio-net-exposure.net-neutral .portfolio-net-value { color: var(--muted); }
+[data-layout="mobile"] .portfolio-net-exposure { padding: 10px 12px; }
+[data-layout="mobile"] .portfolio-net-value { font-size: 18px; }
+[data-layout="desktop"] .portfolio-net-value { font-size: 24px; }
 .portfolio-split-block { margin-bottom: 16px; }
 .portfolio-split-block:last-of-type { margin-bottom: 0; }
 .portfolio-split-blocklabel { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 8px; }
@@ -1827,6 +1841,13 @@ body.trade-drag-active { user-select: none; -webkit-user-select: none; cursor: g
     </div>
     <div class="portfolio-split" id="portfolio-donut" style="display:none">
       <h4 class="portfolio-split-title" data-i18n="donut_title">Portfolio-Verteilung</h4>
+      <!-- Netto-Positionierung: Richtungsindikator aus aktuellem Marktwert.
+           Net% = (curLong - curShort) / (curLong + curShort) × 100.
+           Positiv = Net Long (grün), negativ = Net Short (rot), ±0.5% = Neutral (muted). -->
+      <div class="portfolio-net-exposure" id="portfolio-net-exposure" style="display:none">
+        <div class="portfolio-net-label" data-i18n="net_exposure_label">Netto-Positionierung</div>
+        <div class="portfolio-net-value tabular" id="portfolio-net-value">—</div>
+      </div>
       <!-- Block 1: aktueller Marktwert (dynamisch) -->
       <div class="portfolio-split-block">
         <div class="portfolio-split-blocklabel" data-i18n="donut_current_label">Aktuell · Marktwert</div>
@@ -2246,6 +2267,10 @@ const STRINGS = {
     donut_current_label: "Aktuell · Marktwert",
     donut_entry_label: "Einstand · investiert",
     donut_help: "Oben: aktuelle Ausrichtung nach Marktwert jeder Position (Live-Preis × Stück) — zeigt wo du JETZT stehst. Unten: Ausrichtung nach investiertem Einstands-Betrag. Pair-Trades werden in ihre Legs zerlegt (Long-Leg zu Long, Short-Leg zu Short). FX-konvertiert in deiner Heimat-Währung.",
+    net_exposure_label: "Netto-Positionierung",
+    net_long: "Net Long",
+    net_short: "Net Short",
+    net_neutral: "Neutral",
     sector_title: "Exposure nach Branche",
     sector_sub: "Aktueller Marktwert je Sektor (Live-Preis × Stück) — in Home-Currency. Pair-Trades werden gesplittet: Long-Leg im Long-Donut, Short-Leg im Short-Donut, beide im Brutto-Donut.",
     sector_long: "Long-Exposure",
@@ -2485,6 +2510,10 @@ const STRINGS = {
     donut_current_label: "Current · market value",
     donut_entry_label: "Entry · invested",
     donut_help: "Top: current tilt by market value of each position (live price × shares) — shows where you stand NOW. Bottom: tilt by invested entry cost. Pair trades are broken into their legs (long leg to long, short leg to short). FX-converted into your home currency.",
+    net_exposure_label: "Net exposure",
+    net_long: "Net long",
+    net_short: "Net short",
+    net_neutral: "Neutral",
     sector_title: "Exposure by sector",
     sector_sub: "Current market value per sector (live price × shares) — in home currency. Pair trades are split: long leg in the long donut, short leg in the short donut, both in the gross donut.",
     sector_long: "Long exposure",
@@ -2784,7 +2813,7 @@ let syncDebounce = null;
 // Sichtbare App-Version (Menü + Sidebar) — bei jeder HTML-Änderung hochzählen.
 // Zweck: zweifelsfrei erkennen, ob eine PWA noch eine alte Version aus dem
 // Cache lädt (der Sync-Clobber-Vorfall Aug 2026 war genau das, unentdeckbar).
-const APP_VERSION = "2026-09-24.3";
+const APP_VERSION = "2026-10-02.1";
 const PAGES = ["pair", "long", "short", "watch", "total"];
 let currentPage = "pair";
 let formType = "pair";
@@ -4752,6 +4781,26 @@ function updatePortfolioDonut(totalRows) {
   const entTotal = entLong + entShort;
   if (curTotal <= 0 && entTotal <= 0) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
+  // Netto-Positionierung aus aktuellem Marktwert. Formel: (long - short) / (long + short) × 100.
+  // Spannweite -100% (voll short) bis +100% (voll long). ±0.5% = Neutral-Bereich (verhindert
+  // Flackern bei winzigen Imbalances). Vorzeichen entscheidet Richtung + Farbe.
+  const netEl = document.getElementById("portfolio-net-exposure");
+  const netValEl = document.getElementById("portfolio-net-value");
+  if (netEl && netValEl) {
+    if (curTotal > 0) {
+      const netPct = ((curLong - curShort) / curTotal) * 100;
+      let cls, label;
+      if (netPct > 0.5)       { cls = "net-long";    label = t("net_long"); }
+      else if (netPct < -0.5) { cls = "net-short";   label = t("net_short"); }
+      else                    { cls = "net-neutral"; label = t("net_neutral"); }
+      netValEl.textContent = label + " · " + Math.abs(netPct).toFixed(1) + " %";
+      netEl.classList.remove("net-long", "net-short", "net-neutral");
+      netEl.classList.add(cls);
+      netEl.style.display = "flex";
+    } else {
+      netEl.style.display = "none";
+    }
+  }
   const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct.toFixed(3) + "%"; };
   const rowHtml = (cls, label, pct, amt) =>
     `<div class="portfolio-split-row ${cls}">

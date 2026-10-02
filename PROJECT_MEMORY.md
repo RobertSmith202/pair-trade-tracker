@@ -505,6 +505,15 @@ Jede Tranche speichert ihre Entry-Currency explizit als `longEntryCcy` / `shortE
 
 `longEntryNative` / `shortEntryNative` erlaubt alternativ „verwende die API-Währung des Tickers".
 
+### Netto-Positionierung auf Gesamt-Page (seit Okt 2026)
+
+Oben in der „Portfolio-Verteilung"-Card (`#portfolio-donut`) sitzt ein großer Chip, der zeigt wo das Portfolio insgesamt steht: **Net Long X %**, **Net Short X %** oder **Neutral**. Formel: `(curLong − curShort) / (curLong + curShort) × 100` auf Basis aktueller Marktwerte (FX-konvertiert in Home-Ccy). Spannweite -100 % (voll short) bis +100 % (voll long).
+
+- Farbe swingt mit dem Vorzeichen: `.net-long` (grün, `--pos-soft`-Background), `.net-short` (rot, `--neg-soft`), `.net-neutral` (muted). Transitions 0.5s für weichen Umschlag beim Trade-Anlegen.
+- Dead-Zone ±0.5 %: zwischen -0.5 % und +0.5 % wird „Neutral" gezeigt, damit es bei winzigen Imbalances nicht flackert.
+- Berechnet in `updatePortfolioDonut()` nach `curTotal`-Fall, nutzt die bereits aggregierten `curLong`/`curShort`-Werte — kein zusätzlicher Compute-Pass. Pair-Trades sind implizit mit drin (Long-Leg geht in curLong, Short-Leg in curShort). i18n-Keys: `net_exposure_label`, `net_long`, `net_short`, `net_neutral`.
+- Nur Marktwert-basiert, nicht Einstands-basiert — bewusst, weil der User den Rudergriff seiner Positionierung heute sehen will, nicht wie er damals investiert hat. Falls jemand das umkehren will: analog aus `entLong`/`entShort` ableitbar.
+
 ### Echte EUR-Rendite bei Long-Legs (FX-Snapshot am Kauftag, seit Sep 2026)
 
 **Problem:** Vor Sep-2026 rechnete `computeLeg` sowohl Einstands-Notional als auch aktuellen Marktwert mit dem **heutigen** FX-Kurs in Home-Ccy um. Wenn eine US-Aktie zwischen Kauf und heute unverändert bei $100 steht, der Dollar aber 8 % zum Euro verloren hat, zeigte die App PnL = 0 € — obwohl beim realen Verkauf 8 % weniger EUR ankämen. Der Fehler ist symmetrisch für Long: FX-Verlust und FX-Gewinn werden beide unterschlagen.
